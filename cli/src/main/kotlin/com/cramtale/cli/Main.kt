@@ -22,6 +22,7 @@ private const val USAGE = """cramtale CLI (matcher calibration)
   build-jmdict <JMdict_e.gz> <out.sqlite>
   import-freq  --jmdict <db> --out <ranks.tsv> <Yomitan frequency dictionary .zip>
                (e.g. JPDB v2.2 Frequency Kana; rows become JMdict entry id, spelling, rank)
+  vocab-check  --jmdict <db> --deck <deck.jsonl>   (asks y/n per word, suggests a cut-off)
   deck-report  --jmdict <db> --deck <deck.jsonl>
   analyze      --jmdict <db> --deck <deck.jsonl> [--lists <dir>] [--threshold N]
                [--new-suspended-unknown] [--no-studied-suspended] <text file | ->
@@ -32,6 +33,7 @@ fun main(args: Array<String>) {
     when (args[0]) {
         "build-jmdict" -> buildJmdict(args.getOrNull(1), args.getOrNull(2))
         "import-freq" -> importFreq(Opts(args.drop(1)))
+        "vocab-check" -> vocabCheck(Opts(args.drop(1)))
         "deck-report" -> deckReport(Opts(args.drop(1)))
         "analyze" -> analyze(Opts(args.drop(1)))
         else -> { print(USAGE); exitProcess(1) }
@@ -122,6 +124,22 @@ private fun load(o: Opts): Triple<Jmdict, DeckIndex, List<com.cramtale.core.matc
 
 private val frequency by lazy {
     FrequencyList.bundled().also { if (it == null) System.err.println("(no bundled jpdb list: JMdict priority ranks only)") }
+}
+
+private fun vocabCheck(o: Opts) {
+    val (dict, index, _) = load(o)
+    val freq = frequency ?: run { System.err.println("needs the jpdb frequency list"); exitProcess(1) }
+    val items = com.cramtale.core.match.VocabCheck.items(dict, freq, index)
+    val answers = LinkedHashMap<com.cramtale.core.match.VocabCheck.Item, Boolean>()
+    for (it in items) {
+        print("[${it.band}+] ${it.spelling}   know it? (y/n) ")
+        val a = readLine() ?: break
+        answers[it] = a.trim().startsWith("y")
+        println("    = ${it.gloss}")
+    }
+    val results = com.cramtale.core.match.VocabCheck.results(answers)
+    for (r in results) println("%6d-%-6d  %d/%d known".format(r.from, r.to, r.known, r.asked))
+    println("Suggested cut-off: ${com.cramtale.core.match.VocabCheck.suggestedThreshold(results)}")
 }
 
 private fun deckReport(o: Opts) {

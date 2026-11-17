@@ -13,6 +13,13 @@ class FrequencyList(
 ) {
     val size get() = bySpelling.size
 
+    data class Ranked(val entry: Long, val spelling: String, val rank: Int)
+
+    /** Every (entry, spelling) ranked in [from, to). */
+    fun inRange(from: Int, to: Int): List<Ranked> = bySpelling.flatMap { (id, m) ->
+        m.filterValues { it in from until to }.map { (sp, r) -> Ranked(id, sp, r) }
+    }
+
     /** The rank of this spelling of one of [entries], else the entry's best rank. */
     fun rank(entries: Collection<Long>, spelling: String): Int? {
         val maps = entries.mapNotNull { bySpelling[it] }

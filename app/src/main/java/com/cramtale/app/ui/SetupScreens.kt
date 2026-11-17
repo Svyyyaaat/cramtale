@@ -112,7 +112,12 @@ fun HomeScreen(state: AppState, go: (Screen) -> Unit) {
             Text(if (t == null) "Not read yet" else "Snapshot from ${DateFormat.getDateTimeInstance().format(Date(t))}")
             Button(onClick = { go(Screen.DECK) }) { Text("Deck words") }
         }
-        Section("4. Calibrate") {
+        Section("4. Vocabulary check (2 minutes)") {
+            Text("About 80 words outside your decks, from common to rare. Know it or not? Sets the frequency cut-off " +
+                "where you stop knowing 90% of words. Currently: ${state.policy.frequencyThreshold}.")
+            Button(onClick = { go(Screen.VOCAB) }) { Text("Start") }
+        }
+        Section("5. Calibrate on real text") {
             Text("Paste Japanese text and see which words count as unknown. Mark what you actually know.")
             Button(onClick = { go(Screen.CALIBRATE) }) { Text("Calibrate") }
         }

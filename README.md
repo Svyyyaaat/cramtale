@@ -23,7 +23,9 @@ writes to it.
 2. *Run probe* → *Copy report*, and send it back. It settles which provider columns exist (PLAN.md §10).
 3. *Dictionary → Download* (10 MB, built on the phone in about a minute).
 4. *Your deck → Read from AnkiDroid*.
-5. *Calibrate*: paste text or tap a sample → *Analyze*. Tap a word to mark it Known, a Name, or Ignore.
+5. *Vocabulary check*: about 80 words outside your decks, common to rare; tap Know it / Don't know.
+   It sets the frequency cut-off where you stop knowing 90% of words.
+6. *Calibrate*: paste text or tap a sample → *Analyze*. Tap a word to mark it Known, a Name, or Ignore.
    Move the slider to see the unknown rate at each frequency threshold.
 
 **Desktop (JVM 17+):**
@@ -34,6 +36,7 @@ cli/build/install/cli/bin/cli build-jmdict local/JMdict_e.gz local/jmdict.sqlite
 python3 tools/export_deck.py your-export.apkg local/deck.jsonl      # pip install zstandard
 # optional, fiction frequency ranks: see core/src/main/resources/freq/SOURCES.md
 cli/build/install/cli/bin/cli deck-report --jmdict local/jmdict.sqlite --deck local/deck.jsonl
+cli/build/install/cli/bin/cli vocab-check --jmdict local/jmdict.sqlite --deck local/deck.jsonl
 cli/build/install/cli/bin/cli analyze --jmdict local/jmdict.sqlite --deck local/deck.jsonl --threshold 6000 text.txt
 ./gradlew :core:test        # the real-deck tests run when local/ has jmdict.sqlite and deck.jsonl
 ```

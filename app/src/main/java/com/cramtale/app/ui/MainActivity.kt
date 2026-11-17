@@ -30,7 +30,7 @@ import com.cramtale.app.AppState
 import com.cramtale.app.CramtaleApp
 import com.cramtale.app.anki.AnkiTarget
 
-enum class Screen(val title: String) { HOME("Cramtale"), TARGET("AnkiDroid"), PROBE("Anki probe"), DECK("Your deck"), CALIBRATE("Calibrate") }
+enum class Screen(val title: String) { HOME("Cramtale"), TARGET("AnkiDroid"), PROBE("Anki probe"), DECK("Your deck"), CALIBRATE("Calibrate"), VOCAB("Vocabulary check") }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -51,6 +51,7 @@ class MainActivity : ComponentActivity() {
                             Screen.PROBE -> ProbeScreen(state)
                             Screen.DECK -> DeckScreen(state)
                             Screen.CALIBRATE -> CalibrateScreen(state)
+                            Screen.VOCAB -> VocabCheckScreen(state) { screen = Screen.HOME }
                         }
                     }
                 }
