@@ -23,15 +23,21 @@ class DictionarySetup(private val context: Context) {
     fun open(): Jmdict = Jmdict(AndroidSql(dbFile.path))
 
     /** A prebuilt database shipped in the APK (tools/build_dict_asset.sh); absent in CI builds. */
-    fun hasBundled(): Boolean = runCatching { context.assets.list("")?.contains(BUNDLED) == true }.getOrDefault(false)
+    // the build tools ungzip a .gz asset and store it compressed in the APK under the plain name
+    private fun bundledName(): String? = runCatching { context.assets.list("").orEmpty() }.getOrDefault(emptyArray())
+        .firstOrNull { it == BUNDLED || it == BUNDLED.removeSuffix(".gz") }
+
+    fun hasBundled(): Boolean = bundledName() != null
 
     /** Unpacks the shipped database: a few seconds instead of downloading and building. */
     fun installBundled(progress: (String) -> Unit) {
         progress("Unpacking the dictionary…")
         val partial = File(dbFile.path + ".part")
         partial.parentFile?.mkdirs()
-        context.assets.open(BUNDLED).use { raw ->
-            java.util.zip.GZIPInputStream(raw, 1 shl 16).use { input -> partial.outputStream().use { input.copyTo(it, 1 shl 16) } }
+        val name = bundledName() ?: error("no dictionary in this build")
+        context.assets.open(name).use { raw ->
+            val input = if (name.endsWith(".gz")) java.util.zip.GZIPInputStream(raw, 1 shl 16) else raw
+            input.use { i -> partial.outputStream().use { i.copyTo(it, 1 shl 16) } }
         }
         dbFile.delete()
         if (!partial.renameTo(dbFile)) error("couldn't move the dictionary into place")
