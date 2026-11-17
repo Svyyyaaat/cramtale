@@ -5,20 +5,12 @@ import android.content.ClipboardManager
 import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -28,146 +20,49 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cramtale.app.AppState
 import com.cramtale.app.anki.AnkiReader
-import com.cramtale.app.anki.AnkiTarget
 import com.cramtale.app.anki.Probe
-import com.cramtale.core.match.CardState
 import com.cramtale.core.match.DeckIndex
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.text.DateFormat
-import java.util.Date
 
+/** Which AnkiDroid to read, access, and the probe report. */
 @Composable
-private fun Page(content: @Composable () -> Unit) {
-    Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        content()
-    }
-}
-
-@Composable
-private fun Section(title: String, content: @Composable () -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            content()
-        }
-    }
-}
-
-@Composable
-fun HomeScreen(state: AppState, go: (Screen) -> Unit) {
-    val scope = rememberCoroutineScope()
-    var dictStatus by remember { mutableStateOf("Checking…") }
-    var busy by remember { mutableStateOf(false) }
-    var refresh by remember { mutableIntStateOf(0) }
-    val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) scope.launch {
-            busy = true
-            dictStatus = withContext(Dispatchers.IO) {
-                runCatching { state.dictionary.import(uri) { s -> dictStatus = s }; state.dictionaryRebuilt(); "Dictionary ready" }
-                    .getOrElse { "Import failed: ${it.message}" }
-            }
-            busy = false
-            refresh++
-        }
-    }
-    LaunchedEffect(refresh) {
-        dictStatus = withContext(Dispatchers.IO) {
-            state.jmdict()?.let { "JMdict ready (${it.entryCount()} entries)" } ?: "Not set up yet"
-        }
-    }
-    Page {
-        Section("Story") {
-            Text("Read-only: due words from Anki are woven in and graded in a log; nothing is sent to AnkiDroid yet.")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { go(Screen.STORY) }) { Text("Play") }
-                OutlinedButton(onClick = { go(Screen.LOGS) }) { Text("Logs") }
-                OutlinedButton(onClick = { go(Screen.FILES) }) { Text("Files") }
-            }
-        }
-        Section("1. AnkiDroid") {
-            Text(state.target?.let { "Connected to ${it.packageName}" } ?: "Pick which AnkiDroid to read: your copy (parallel build) or the real one.")
-            Button(onClick = { go(Screen.TARGET) }) { Text("Choose AnkiDroid") }
-            OutlinedButton(onClick = { go(Screen.PROBE) }, enabled = state.target != null) { Text("Run probe") }
-        }
-        Section("2. Dictionary (JMdict)") {
-            Text(dictStatus)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(enabled = !busy, onClick = {
-                    scope.launch {
-                        busy = true
-                        dictStatus = withContext(Dispatchers.IO) {
-                            runCatching { state.dictionary.download { s -> dictStatus = s }; state.dictionaryRebuilt(); "Dictionary ready" }
-                                .getOrElse { "Download failed: ${it.message}" }
-                        }
-                        busy = false
-                        refresh++
-                    }
-                }) { Text("Download (10 MB)") }
-                OutlinedButton(enabled = !busy, onClick = { importer.launch(arrayOf("*/*")) }) { Text("From file") }
-            }
-        }
-        Section("3. Your deck") {
-            val t = state.deckSnapshotTime
-            Text(if (t == null) "Not read yet" else "Snapshot from ${DateFormat.getDateTimeInstance().format(Date(t))}")
-            Button(onClick = { go(Screen.DECK) }) { Text("Deck words") }
-        }
-        Section("4. Vocabulary check (2 minutes)") {
-            Text("About 80 words outside your decks, from common to rare. Know it or not? Sets the frequency cut-off " +
-                "where you stop knowing 90% of words. Currently: ${state.policy.frequencyThreshold}.")
-            Button(onClick = { go(Screen.VOCAB) }) { Text("Start") }
-        }
-        Section("5. Calibrate on real text") {
-            Text("Paste Japanese text and see which words count as unknown. Mark what you actually know.")
-            Button(onClick = { go(Screen.CALIBRATE) }) { Text("Calibrate") }
-        }
-    }
-}
-
-@Composable
-fun TargetScreen(state: AppState, changed: () -> Unit) {
+fun TargetScreen(state: AppState, onProbe: () -> Unit) {
     val context = LocalContext.current
-    var installed by remember { mutableStateOf(AnkiReader.installed(context)) }
+    var refresh by remember { mutableIntStateOf(0) }
     var selected by remember { mutableStateOf(state.targetPackage) }
-    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        installed = AnkiReader.installed(context)
-    }
-    Page {
-        Text(
-            "Cramtale only reads in this step. For development use a parallel AnkiDroid build " +
-                "(com.ichi2.anki.a–e) with a backup of your collection imported. Never log the copy into sync, " +
-                "and in the copy create an empty deck named ${AnkiTarget.SANDBOX_MARKER_DECK}. " +
-                "Later steps refuse to write anywhere that deck is missing.",
-        )
-        if (installed.isEmpty()) Text("No AnkiDroid installed.", color = MaterialTheme.colorScheme.error)
-        for (i in installed) {
-            Section(i.target.packageName + if (i.target.isReal) "  (your real AnkiDroid)" else "  (parallel build)") {
-                Text("Version ${i.versionName} · provider ${if (i.providerFound) "found" else "MISSING"} · access ${if (i.granted) "granted" else "not granted"}")
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (!i.granted) OutlinedButton(onClick = { ask.launch(i.target.permission) }) { Text("Grant access") }
-                    Button(enabled = selected != i.target.packageName, onClick = {
-                        state.targetPackage = i.target.packageName
-                        selected = i.target.packageName
-                        changed()
-                    }) { Text(if (selected == i.target.packageName) "Selected" else "Use this one") }
-                }
-            }
+    val installs = remember(refresh) {
+        AnkiReader.installed(context).map { i ->
+            InstallUi(i.target.packageName,
+                if (i.target.isReal) "AnkiDroid (your real collection)" else "AnkiDroid parallel build (${i.target.packageName.substringAfterLast('.')})",
+                "Version ${i.versionName}" + if (!i.providerFound) " · its provider wasn't found" else "", i.granted, i.target.isReal)
         }
+    }
+    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh++ }
+    Page {
+        Text("Cramtale reads your decks and Anki's due queue from the AnkiDroid you pick here. In this version it never writes.",
+            style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        for (i in installs) PaperCard(onClick = { selected = i.packageName; state.targetPackage = i.packageName }) {
+            Row { Text(i.title, style = MaterialTheme.typography.titleSmall) }
+            Text(i.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (i.packageName == selected) Pill("Selected", MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer)
+            if (!i.granted) SecondaryButton("Allow access", { ask.launch(com.cramtale.app.anki.AnkiTarget(i.packageName).permission) })
+        }
+        if (installs.isEmpty()) ErrorNote("AnkiDroid isn't installed on this phone.")
+        SecondaryButton("Run the probe", onProbe)
     }
 }
 
 @Composable
 fun ProbeScreen(state: AppState) {
     val context = LocalContext.current
-    var report by remember { mutableStateOf("Running…") }
+    var report by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
         report = withContext(Dispatchers.IO) {
             val t = state.target ?: return@withContext "Pick an AnkiDroid first."
@@ -175,52 +70,55 @@ fun ProbeScreen(state: AppState) {
         }
     }
     Page {
-        Button(onClick = { copy(context, "Cramtale probe", report) }) { Text("Copy report") }
-        SelectionContainer { Text(report, fontFamily = FontFamily.Monospace, fontSize = 12.sp) }
+        Text("What this AnkiDroid's interface offers. Copy it and send it back if something doesn't work.",
+            style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        val r = report
+        if (r == null) Busy("Asking AnkiDroid…") else {
+            PrimaryButton("Copy report", { copy(context, "Cramtale probe", r) }, icon = Icons.Filled.ContentCopy)
+            PaperCard { SelectionContainer { Text(r, fontFamily = FontFamily.Monospace, fontSize = 11.sp) } }
+        }
     }
 }
 
 @Composable
 fun DeckScreen(state: AppState) {
     val scope = rememberCoroutineScope()
-    var status by remember { mutableStateOf("") }
-    var summary by remember { mutableStateOf("") }
-    var busy by remember { mutableStateOf(false) }
-
-    suspend fun summarize() {
-        summary = withContext(Dispatchers.IO) {
-            val words = state.deck()
-            if (words.isEmpty()) return@withContext "No snapshot yet: read it from AnkiDroid."
-            val sb = StringBuilder("Deck words: ${words.size}\n")
-            words.groupBy { it.deck }.toSortedMap().forEach { (deck, ws) ->
-                val s = ws.groupingBy { it.state }.eachCount()
-                sb.append("\n$deck: ${ws.size}\n  studied ${s[CardState.STUDIED] ?: 0} · studied+suspended ${s[CardState.STUDIED_SUSPENDED] ?: 0} · " +
-                    "new ${s[CardState.NEW] ?: 0} · new+suspended ${s[CardState.NEW_SUSPENDED] ?: 0}\n")
-            }
-            state.jmdict()?.let { d ->
-                val unresolved = DeckIndex(words, d).unresolved
-                sb.append("\nNot in JMdict (${unresolved.size}, still matched by spelling):\n")
-                sb.append(unresolved.joinToString("  ") { it.word })
-            }
-            sb.toString()
-        }
+    var rows by remember { mutableStateOf(deckRows(state)) }
+    var busy by remember { mutableStateOf<String?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var unresolved by remember { mutableStateOf<List<String>>(emptyList()) }
+    LaunchedEffect(rows) {
+        unresolved = withContext(Dispatchers.IO) { state.jmdict()?.let { d -> DeckIndex(state.deck(), d).unresolved.map { it.word } }.orEmpty() }
     }
-    LaunchedEffect(Unit) { summarize() }
     Page {
-        Text("Reads every note of your four note types and the state of their recognition cards. Nothing is written.")
-        Button(enabled = !busy, onClick = {
-            scope.launch {
-                busy = true
-                status = withContext(Dispatchers.IO) {
-                    runCatching { state.reloadDeck { s -> status = s }; "Done" }.getOrElse { "Failed: ${it.message}" }
-                }
-                summarize()
-                busy = false
+        if (busy != null) Busy(busy!!)
+        if (error != null) ErrorNote(error!!)
+        if (rows.isNotEmpty()) {
+            PaperCard {
+                Text("%,d words".format(rows.sumOf { it.total }), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
+                Text("%,d known · %,d not studied yet".format(rows.sumOf { it.known }, rows.sumOf { it.new }),
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-        }) { Text("Read from AnkiDroid") }
-        if (status.isNotEmpty()) Text(status)
-        Spacer(Modifier.height(4.dp))
-        SelectionContainer { Text(summary) }
+            PaperCard {
+                for (r in rows) Row {
+                    Text(r.name.substringAfterLast("::"), androidx.compose.ui.Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                    Text("%,d · %,d new".format(r.total, r.new), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        SecondaryButton("Read again from AnkiDroid", {
+            scope.launch {
+                busy = "Reading…"
+                error = withContext(Dispatchers.IO) { runCatching { state.reloadDeck { s -> busy = s }; null }.getOrElse { it.message } }
+                rows = deckRows(state)
+                busy = null
+            }
+        }, icon = Icons.Filled.Refresh)
+        if (unresolved.isNotEmpty()) PaperCard {
+            Text("Not in the dictionary (${unresolved.size})", style = MaterialTheme.typography.titleSmall)
+            Text("Still matched by spelling: " + unresolved.joinToString("、"), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 

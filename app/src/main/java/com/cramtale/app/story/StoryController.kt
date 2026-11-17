@@ -249,4 +249,17 @@ class StoryController(private val context: Context, private val app: AppState) {
     }
 
     fun sessionCost() = costs.total(session)
+
+    private fun scene() = runCatching { com.cramtale.core.story.StoryState(dir).scene() }.getOrNull()
+    fun place(): String? = scene()?.place?.ifBlank { null }
+    fun turn(): Int = scene()?.turn ?: 0
+    fun chapter(): Int = scene()?.chapter ?: 1
+
+    /** The end of the last passage, for the home screen. */
+    fun lastLines(): String? = File(dir, "log/turns.jsonl").takeIf { it.exists() }?.readLines()?.lastOrNull { it.isNotBlank() }
+        ?.let { runCatching { JSONObject(it).getString("passage") }.getOrNull() }?.lines()?.filter { it.isNotBlank() }?.takeLast(3)?.joinToString("\n")
+
+    /** Every session's costs, from the log file. */
+    fun totalCost(): Double = File(dir, "log/costs.jsonl").takeIf { it.exists() }?.readLines()
+        ?.mapNotNull { runCatching { JSONObject(it).optDouble("dollars") }.getOrNull() }?.sum() ?: 0.0
 }

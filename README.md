@@ -21,20 +21,15 @@ writes to it: grades are decided and logged, nothing is sent.
 
 ## Run it
 
-**Phone:** install the debug APK (built by CI on every push, or `./gradlew :app:assembleDebug` →
-`app/build/outputs/apk/debug/app-debug.apk`).
-1. *Choose AnkiDroid*: pick your parallel build (copy) or the real one, then grant access. Read-only either way.
-2. *Run probe* → *Copy report*, and send it back. It settles which provider columns exist (PLAN.md §10).
-3. *Dictionary → Download* (10 MB, built on the phone in about a minute).
-4. *Your deck → Read from AnkiDroid*.
-5. *Vocabulary check*: about 80 words outside your decks, common to rare; tap Know it / Don't know.
-   It sets the frequency cut-off where you stop knowing 90% of words.
-6. *Calibrate*: paste text or tap a sample → *Analyze*.
-7. *Story → Play*: paste your Claude API key (kept on the phone, encrypted by the Android Keystore), create
-   the story, pick the style you like reading, then play. Tap words you don't know; reply in Japanese, or
-   *Continue*. *Logs* shows the dry-run report (what the app would have answered vs what you pressed in
-   AnkiDroid), costs per call and your mistakes; *Files* edits prompts, taste and story state. Tap a word to mark it Known, a Name, or Ignore.
-   Move the slider to see the unknown rate at each frequency threshold.
+**Phone:** install the debug APK. The first start walks you through setup (progress is saved):
+welcome → connect AnkiDroid (read-only) → download the dictionary → read your decks → vocabulary check
+(about 80 words; Back undoes a wrong answer) → Claude API key → create the story → pick a style.
+After that, the home screen opens on your story; the vocabulary check, calibration on real text, your
+decks, the review log and costs, the prompt and story files and the AnkiDroid connection (with its probe)
+are all one tap away, and *Run setup again* repeats the walk-through.
+
+**Screens:** `./gradlew :app:recordPaparazziDebug` renders every screen from sample data to
+`app/src/test/snapshots/images/` (light and dark).
 
 **Desktop (JVM 17+):**
 ```

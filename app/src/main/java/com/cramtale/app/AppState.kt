@@ -43,6 +43,15 @@ class AppState(private val context: Context) {
             .putBoolean("newSuspendedKnown", p.newSuspendedKnown)
             .apply()
 
+    /** Setup steps (0 = welcome); saved so leaving the app resumes the flow. */
+    var onboardingStep: Int
+        get() = prefs.getInt("onboardingStep", 0)
+        set(v) = prefs.edit().putInt("onboardingStep", v).apply()
+
+    var onboardingDone: Boolean
+        get() = prefs.getBoolean("onboardingDone", false)
+        set(v) = prefs.edit().putBoolean("onboardingDone", v).apply()
+
     /** Optional rule: review cards with an interval under 21 days need two untapped reads. Off by default. */
     var twoReads: Boolean
         get() = prefs.getBoolean("twoReads", false)

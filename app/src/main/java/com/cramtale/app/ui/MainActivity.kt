@@ -4,78 +4,84 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import com.cramtale.app.AppState
 import com.cramtale.app.CramtaleApp
-import com.cramtale.app.anki.AnkiTarget
 
-enum class Screen(val title: String) { HOME("Cramtale"), TARGET("AnkiDroid"), PROBE("Anki probe"), DECK("Your deck"), CALIBRATE("Calibrate"), VOCAB("Vocabulary check"), STORY("Story"), LOGS("Logs"), FILES("Files") }
+enum class Screen(val title: String) {
+    HOME("Cramtale"), STORY("Story"), VOCAB("Vocabulary check"), CALIBRATE("Calibrate on text"), DECK("Your decks"),
+    LOGS("Review log and costs"), FILES("Prompts and story files"), TARGET("AnkiDroid connection"), PROBE("AnkiDroid probe"),
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         val state = (application as CramtaleApp).state
-        setContent {
-            MaterialTheme(colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
-                Surface(Modifier.fillMaxSize()) {
-                    var screen by remember { mutableStateOf(Screen.HOME) }
-                    // bumped when the target changes, so the banner re-reads it
-                    var version by remember { mutableIntStateOf(0) }
-                    BackHandler(enabled = screen != Screen.HOME) { screen = Screen.HOME }
-                    Column(Modifier.safeDrawingPadding()) {
-                        TargetBanner(state, version)
-                        when (screen) {
-                            Screen.HOME -> HomeScreen(state) { screen = it }
-                            Screen.TARGET -> TargetScreen(state) { version++ }
-                            Screen.PROBE -> ProbeScreen(state)
-                            Screen.DECK -> DeckScreen(state)
-                            Screen.CALIBRATE -> CalibrateScreen(state)
-                            Screen.VOCAB -> VocabCheckScreen(state) { screen = Screen.HOME }
-                            Screen.STORY -> StoryScreen(state)
-                            Screen.LOGS -> LogsScreen(state)
-                            Screen.FILES -> FilesScreen(state)
-                        }
-                    }
+        setContent { CramtaleTheme { App(state) } }
+    }
+}
+
+@Composable
+fun App(state: AppState) {
+    var onboarding by remember { mutableStateOf(!state.onboardingDone) }
+    val stack = remember { mutableStateListOf(Screen.HOME) }
+    val screen = stack.last()
+    val back: () -> Unit = { if (stack.size > 1) stack.removeAt(stack.size - 1) }
+    BackHandler(enabled = !onboarding && stack.size > 1) { back() }
+
+    // a Surface, so every text gets the theme's content colour (dark mode included)
+    androidx.compose.material3.Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    Column(Modifier.fillMaxSize()
+        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))) {
+        if (onboarding) {
+            OnboardingFlow(state) { onboarding = false; stack.clear(); stack.add(Screen.HOME) }
+            return@Column
+        }
+        when (screen) {
+            Screen.HOME -> HomeContent(homeInfo(state), go = { stack.add(it) }, onRestartSetup = { state.onboardingStep = 0; state.onboardingDone = false; onboarding = true })
+            Screen.STORY -> StoryScreen(state, onBack = back)
+            Screen.VOCAB -> { AppBar(screen.title, back); VocabCheckFlow(state) { back() } }
+            else -> {
+                AppBar(screen.title, back)
+                when (screen) {
+                    Screen.CALIBRATE -> CalibrateScreen(state)
+                    Screen.DECK -> DeckScreen(state)
+                    Screen.LOGS -> LogsScreen(state)
+                    Screen.FILES -> FilesScreen(state)
+                    Screen.TARGET -> TargetScreen(state) { stack.add(Screen.PROBE) }
+                    Screen.PROBE -> ProbeScreen(state)
+                    else -> {}
                 }
             }
         }
     }
+    }
 }
 
-/** Always visible: which collection the app is connected to (PLAN.md §4.6). */
-@Composable
-fun TargetBanner(state: AppState, version: Int) {
-    val t = remember(version) { state.target }
-    val (text, color) = when {
-        t == null -> "Not connected to AnkiDroid" to Color(0xFF757575)
-        t.isReal -> "REAL COLLECTION · read-only · ${t.packageName}" to Color(0xFFC62828)
-        else -> "COPY · read-only · ${t.packageName}" to Color(0xFF2E7D32)
-    }
-    Text(
-        text, color = Color.White, fontWeight = FontWeight.Bold,
-        modifier = Modifier.fillMaxWidth().background(color).padding(horizontal = 16.dp, vertical = 6.dp),
+fun homeInfo(state: AppState): HomeInfo {
+    val s = state.story
+    val t = state.target
+    return HomeInfo(
+        place = s.place(), turn = s.turn(), chapter = s.chapter(), lastLines = s.lastLines(), totalCost = s.totalCost(),
+        collection = t?.let { (if (it.isReal) "Real collection" else "Copy") + " · " + it.packageName } ?: "Not connected",
+        collectionIsReal = t?.isReal == true, connected = t != null && state.deck().isNotEmpty(),
+        deckWords = state.deck().size, cutoff = state.policy.frequencyThreshold,
     )
 }
-
-internal fun isRealTarget(t: AnkiTarget?) = t?.isReal == true

@@ -2,25 +2,46 @@ package com.cramtale.app.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Casino
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -31,13 +52,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
@@ -49,229 +71,261 @@ import com.cramtale.app.story.ShownTurn
 import com.cramtale.core.match.GrammarPatterns
 import com.cramtale.core.match.Span
 import com.cramtale.core.match.Status
-import com.cramtale.core.story.StoryEngine
+import com.cramtale.core.review.MistakeLog
+import com.cramtale.core.story.Correction
 import kotlinx.coroutines.launch
 
+// ---------------------------------------------------------------- stateless pieces
+
 @Composable
-fun StoryScreen(state: AppState) {
-    val story = state.story
-    var stage by remember { mutableIntStateOf(0) } // bumped to re-check key / setup / style
-    val scope = rememberCoroutineScope()
-    Column(Modifier.fillMaxSize()) {
-        story.busy?.let { Text(it, Modifier.padding(horizontal = 16.dp, vertical = 4.dp)); LinearProgressIndicator(Modifier.fillMaxWidth()) }
-        story.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) }
-        key(stage) {
-            when {
-                !story.hasKey() -> KeyEntry { story.saveKey(it); stage++ }
-                !story.isSetUp() -> SetupStory { seed -> scope.launch { story.setup(seed); stage++ } }
-                !story.hasStyle() -> StylePicker(state) { stage++ }
-                else -> StoryView(state)
-            }
+fun PlayerBubble(text: String, corrections: List<Correction>) {
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(20.dp, 20.dp, 6.dp, 20.dp),
+            modifier = Modifier.widthIn(max = 320.dp)) {
+            Text(text, Modifier.padding(horizontal = 16.dp, vertical = 12.dp), style = MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp),
+                color = MaterialTheme.colorScheme.onPrimaryContainer)
+        }
+        // corrections beside your message
+        for (c in corrections) Column(Modifier.widthIn(max = 320.dp), horizontalAlignment = Alignment.End) {
+            Text(buildAnnotatedString {
+                withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough, color = MaterialTheme.colorScheme.error)) { append(c.wrong) }
+                append("  →  ")
+                withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.tertiary)) { append(c.right) }
+            }, style = MaterialTheme.typography.bodyLarge)
+            Text(c.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.End)
         }
     }
 }
 
 @Composable
-private fun key(k: Int, content: @Composable () -> Unit) = androidx.compose.runtime.key(k) { content() }
-
-@Composable
-private fun KeyEntry(save: (String) -> Unit) {
-    var key by remember { mutableStateOf("") }
-    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Claude API key", style = MaterialTheme.typography.titleMedium)
-        Text("Stored only on this phone, encrypted with a key from the Android Keystore. The story uses " +
-            "claude-opus-5-5 to write and claude-haiku-5-5 for checks; every call's cost is logged.")
-        OutlinedTextField(key, { key = it }, Modifier.fillMaxWidth(), label = { Text("sk-ant-…") },
-            visualTransformation = PasswordVisualTransformation(), singleLine = true)
-        Button(enabled = key.startsWith("sk-"), onClick = { save(key) }) { Text("Save") }
-    }
+fun Ornament() {
+    Text("◇", Modifier.fillMaxWidth().padding(vertical = 4.dp), textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.outline,
+        style = MaterialTheme.typography.labelMedium)
 }
 
+/** The passage as reading text: every word tappable; tapped words marked; new cards with their meaning inline. */
 @Composable
-private fun SetupStory(create: (String) -> Unit) {
-    var seed by remember { mutableStateOf("") }
-    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("New story", style = MaterialTheme.typography.titleMedium)
-        Text("The game master builds a small world from your taste in stories (config/plot.md): a place, three or four " +
-            "people with their own goals and secrets, off-screen threats, and an opening. Optionally say what it should be about.")
-        OutlinedTextField(seed, { seed = it }, Modifier.fillMaxWidth().heightIn(min = 100.dp), label = { Text("Seed (optional)") })
-        Button(onClick = { create(seed) }) { Text("Create") }
-    }
-}
-
-@Composable
-private fun StylePicker(state: AppState, done: () -> Unit) {
-    val story = state.story
-    val scope = rememberCoroutineScope()
-    var options by remember { mutableStateOf<List<Pair<StoryEngine.StyleOption, Double>>?>(null) }
-    LaunchedEffect(Unit) { options = story.styleOptions() }
-    Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Pick the one you like reading", style = MaterialTheme.typography.titleMedium)
-        Text("The same scene in four styles. Your pick becomes the writer's style sample.")
-        for ((o, rate) in options.orEmpty()) {
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("${o.name} · ${"%.1f".format(rate * 100)}% unknown", fontWeight = FontWeight.Bold)
-                    Text(o.passage, fontSize = 18.sp, lineHeight = 28.sp)
-                    Button(onClick = { scope.launch { story.pickStyle(o); done() } }) { Text("This one") }
-                }
-            }
-        }
-        if (options != null) OutlinedButton(onClick = { scope.launch { options = story.styleOptions() } }) { Text("Four more") }
-    }
-}
-
-@Composable
-private fun StoryView(state: AppState) {
-    val story = state.story
-    val scope = rememberCoroutineScope()
-    var input by remember { mutableStateOf("") }
-    var picked by remember { mutableStateOf<Pair<Span, ShownPassage>?>(null) }
-    var pickedGrammar by remember { mutableStateOf<GrammarPatterns.Found?>(null) }
-    var editing by remember { mutableStateOf<String?>(null) }
-    var tapVersion by remember { mutableIntStateOf(0) }
-    val listState = rememberLazyListState()
-    LaunchedEffect(Unit) { if (story.current == null) story.start() }
-    LaunchedEffect(story.history.size, story.current) {
-        val n = story.history.size + (if (story.current != null) 1 else 0)
-        if (n > 0) listState.animateScrollToItem(n - 1)
-    }
-
-    Column(Modifier.fillMaxSize().imePadding()) {
-        Text("Session cost: $${"%.3f".format(story.sessionCost())} · read-only: grades are logged, nothing is sent to Anki",
-            fontSize = 11.sp, modifier = Modifier.padding(horizontal = 16.dp))
-        LazyColumn(Modifier.weight(1f).padding(horizontal = 16.dp), state = listState, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            items(story.history) { t -> TurnView(state, t, interactive = false, tapVersion) { _, _ -> } }
-            story.current?.let { t ->
-                item {
-                    TurnView(state, t, interactive = true, tapVersion) { span, p ->
-                        story.tap(span); tapVersion++; picked = span to p
-                    }
-                    GrammarRow(t.passage) { pickedGrammar = it }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(enabled = story.busy == null, onClick = { scope.launch { story.reroll() } }) { Text("Reroll") }
-                        OutlinedButton(enabled = story.busy == null, onClick = { editing = t.passage.text }) { Text("Edit") }
-                    }
-                    GmNotes(t.passage)
-                }
-            }
-        }
-        for (p in story.proposals.toList()) {
-            Card(Modifier.fillMaxWidth().padding(8.dp)) {
-                Column(Modifier.padding(12.dp)) {
-                    Text("Second time: ${p.key}", fontWeight = FontWeight.Bold)
-                    Text("Make a card from your corrected sentence? (Cards are added from step 3 on; for now this records your choice.)", fontSize = 12.sp)
-                    Row { TextButton(onClick = { story.decideProposal(p.key, true) }) { Text("Approve") }
-                        TextButton(onClick = { story.decideProposal(p.key, false) }) { Text("Reject") } }
-                }
-            }
-        }
-        Row(Modifier.padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(input, { input = it }, Modifier.weight(1f), placeholder = { Text("日本語で返事…") })
-            Button(enabled = story.busy == null && story.current != null, onClick = {
-                val msg = input
-                input = ""
-                scope.launch { story.send(msg) }
-            }) { Text(if (input.isBlank()) "Continue" else "Send") }
-        }
-    }
-
-    picked?.let { (span, p) -> WordPopup(state, span, p) { picked = null; tapVersion++ } }
-    pickedGrammar?.let { g -> AlertDialog(onDismissRequest = { pickedGrammar = null },
-        title = { Text(g.pattern.id) }, text = { Text(g.pattern.meaning) },
-        confirmButton = { TextButton(onClick = { pickedGrammar = null }) { Text("Close") } }) }
-    editing?.let { text ->
-        var t by remember { mutableStateOf(text) }
-        AlertDialog(onDismissRequest = { editing = null }, title = { Text("Edit passage") },
-            text = { OutlinedTextField(t, { t = it }, Modifier.fillMaxWidth().heightIn(min = 200.dp)) },
-            confirmButton = { TextButton(onClick = { editing = null; scope.launch { story.edit(t) } }) { Text("Save") } },
-            dismissButton = { TextButton(onClick = { editing = null }) { Text("Cancel") } })
-    }
-}
-
-@Composable
-private fun TurnView(state: AppState, t: ShownTurn, interactive: Boolean, tapVersion: Int, onTap: (Span, ShownPassage) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        t.player?.let { msg ->
-            Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.secondaryContainer).padding(10.dp)) {
-                Text(msg, fontSize = 16.sp)
-                // corrections beside your message
-                for (c in t.corrections) Text("✎ ${c.wrong} → ${c.right}  ${c.reason}", fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
-            }
-        }
-        PassageText(state, t.passage, interactive, tapVersion, onTap)
-    }
-}
-
-@Composable
-private fun PassageText(state: AppState, p: ShownPassage, interactive: Boolean, tapVersion: Int, onTap: (Span, ShownPassage) -> Unit) {
-    val story = state.story
-    val text = remember(p, tapVersion) {
+fun PassageText(p: ShownPassage, interactive: Boolean, isTapped: (Span) -> Boolean, statusOf: (Span) -> Status, tapVersion: Int, onTap: (Span) -> Unit) {
+    val tappedBg = MaterialTheme.colorScheme.secondaryContainer
+    val glossColor = MaterialTheme.colorScheme.tertiary
+    val unknownLine = MaterialTheme.colorScheme.secondary
+    val text = remember(p, tapVersion, interactive) {
         buildAnnotatedString {
             var pos = 0
             for (s in p.spans) {
                 if (s.start > pos) append(p.text.substring(pos, s.start))
-                val tapped = interactive && story.isTapped(s)
                 val style = when {
-                    tapped -> SpanStyle(background = Color(0x55FFB300))
-                    s.status(state.policy, state.lists) == Status.UNKNOWN -> SpanStyle(textDecoration = TextDecoration.Underline)
+                    interactive && isTapped(s) -> SpanStyle(background = tappedBg)
+                    statusOf(s) == Status.UNKNOWN -> SpanStyle(textDecoration = TextDecoration.Underline, color = unknownLine)
                     else -> SpanStyle()
                 }
-                if (interactive && s.isWord) withLink(LinkAnnotation.Clickable("w${s.start}") { onTap(s, p) }) { withStyle(style) { append(s.surface) } }
+                if (interactive && s.isWord) withLink(LinkAnnotation.Clickable("w${s.start}") { onTap(s) }) { withStyle(style) { append(s.surface) } }
                 else withStyle(style) { append(s.surface) }
-                // a new card's first appearance shows its meaning inline
                 s.deck.firstOrNull { it.noteId in p.newNotes }?.let { w ->
-                    withStyle(SpanStyle(fontSize = 12.sp, color = Color(0xFF2E7D32))) { append("〔${p.glosses[w.noteId].orEmpty()}〕") }
+                    withStyle(SpanStyle(fontSize = 12.sp, color = glossColor)) { append("〔${p.glosses[w.noteId].orEmpty()}〕") }
                 }
                 pos = s.end
             }
             if (pos < p.text.length) append(p.text.substring(pos))
         }
     }
-    Text(text, fontSize = 20.sp, lineHeight = 34.sp)
+    Text(text, style = ReadingText, color = MaterialTheme.colorScheme.onBackground)
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun GrammarRow(p: ShownPassage, onTap: (GrammarPatterns.Found) -> Unit) {
-    if (p.grammar.isEmpty()) return
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("Grammar:", fontSize = 12.sp)
-        for (g in p.grammar.distinctBy { it.pattern.id }) TextButton(onClick = { onTap(g) }) { Text(g.pattern.id, fontSize = 12.sp) }
+fun PassageTools(p: ShownPassage, enabled: Boolean, onReroll: () -> Unit, onEdit: () -> Unit, onGrammar: (GrammarPatterns.Found) -> Unit) {
+    var notes by remember { mutableStateOf(false) }
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        AssistChip(onReroll, { Text("Reroll") }, enabled = enabled, leadingIcon = { Icon(Icons.Filled.Refresh, null, Modifier.size(18.dp)) })
+        AssistChip(onEdit, { Text("Edit") }, enabled = enabled, leadingIcon = { Icon(Icons.Filled.Edit, null, Modifier.size(18.dp)) })
+        AssistChip({ notes = !notes }, { Text("Notes") }, leadingIcon = { Icon(Icons.Filled.Casino, null, Modifier.size(18.dp)) })
+        for (g in p.grammar.distinctBy { it.pattern.id }) {
+            AssistChip({ onGrammar(g) }, { Text(g.pattern.id) },
+                colors = AssistChipDefaults.assistChipColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer, labelColor = MaterialTheme.colorScheme.onTertiaryContainer))
+        }
+    }
+    if (notes) PaperCard {
+        Text("Game master notes", style = MaterialTheme.typography.titleSmall)
+        (p.gmNotes + p.checks).forEach { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
 
 @Composable
-private fun GmNotes(p: ShownPassage) {
-    var open by remember { mutableStateOf(false) }
-    TextButton(onClick = { open = !open }) { Text(if (open) "Hide game master notes" else "Game master notes", fontSize = 12.sp) }
-    if (open) (p.gmNotes + p.checks).forEach { Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+fun ProposalCard(p: MistakeLog.Key, onDecide: (Boolean) -> Unit) {
+    PaperCard {
+        Text("You've made this mistake twice", style = MaterialTheme.typography.titleSmall)
+        Text(p.key, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+        p.examples.lastOrNull()?.let { (_, c) -> Text("${c.wrong} → ${c.right}", style = MaterialTheme.typography.bodyMedium) }
+        Text("Make a card from your corrected sentence? (Cards are created from the next version on; this records your choice.)",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilledTonalButton({ onDecide(true) }) { Text("Make a card") }
+            TextButton({ onDecide(false) }) { Text("No") }
+        }
+    }
 }
 
 @Composable
-private fun WordPopup(state: AppState, span: Span, p: ShownPassage, close: () -> Unit) {
-    val story = state.story
-    val sentence = remember(span, p) {
-        val start = p.text.lastIndexOfAny(charArrayOf('。', '！', '？', '\n', '」'), span.start - 1).let { if (it < 0) 0 else it + 1 }
-        val end = p.text.indexOfAny(charArrayOf('。', '！', '？', '\n'), span.end).let { if (it < 0) p.text.length else it + 1 }
-        p.text.substring(start, end).trim()
-    }
-    var inSentence by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(span) { inSentence = story.meaning(span, sentence) }
-    val dict = state.jmdict()
-    val forms = remember(span) { span.entries.firstOrNull()?.let { dict?.forms(it) } }
-    val senses = remember(span) { span.entries.take(2).flatMap { e -> dict?.senses(e).orEmpty().take(3).map { it.gloss } } }
-    AlertDialog(
-        onDismissRequest = close,
-        title = { Text(span.lemma + (forms?.kana?.firstOrNull()?.let { "  【$it】" } ?: "")) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(inSentence?.let { "Here: $it" } ?: "…", fontWeight = FontWeight.Bold)
-                senses.forEach { Text("• $it", fontSize = 13.sp) }
-                if (span.deck.isNotEmpty()) Text("In your deck (counts as a tap)", fontSize = 12.sp)
-                else Text("Not in your deck: from step 3 it goes to the RP deck", fontSize = 12.sp)
+fun ReplyBar(busy: String?, canSend: Boolean, onSend: (String) -> Unit) {
+    var input by remember { mutableStateOf("") }
+    Surface(color = MaterialTheme.colorScheme.surfaceContainer, tonalElevation = 2.dp) {
+        Column(Modifier.navigationBarsPadding()) {
+            if (busy != null) LinearProgressIndicator(Modifier.fillMaxWidth())
+            Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(input, { input = it }, Modifier.weight(1f).heightIn(min = 52.dp),
+                    placeholder = { Text(busy ?: "日本語で返事…") }, shape = RoundedCornerShape(26.dp), maxLines = 5,
+                    colors = OutlinedTextFieldDefaults.colors(unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest))
+                Spacer(Modifier.width(8.dp))
+                if (input.isBlank()) {
+                    FilledTonalButton({ onSend("") }, enabled = canSend && busy == null, contentPadding = PaddingValues(horizontal = 18.dp)) { Text("Continue") }
+                } else {
+                    FilledIconButton({ val m = input; input = ""; onSend(m) }, Modifier.size(52.dp), enabled = canSend && busy == null) {
+                        Icon(Icons.AutoMirrored.Filled.Send, "Send")
+                    }
+                }
             }
-        },
-        confirmButton = { TextButton(onClick = { story.iKnowIt(span); close() }) { Text("I know it") } },
-        dismissButton = { TextButton(onClick = close) { Text("Close") } },
+        }
+    }
+}
+
+/** The whole reading screen, from data: used by the app and by the screenshot tests. */
+@Composable
+fun StoryContent(
+    title: String, cost: Double, history: List<ShownTurn>, current: ShownTurn?, busy: String?, error: String?,
+    proposals: List<MistakeLog.Key>, tapVersion: Int,
+    isTapped: (Span) -> Boolean, statusOf: (Span) -> Status,
+    onBack: () -> Unit, onTap: (Span, ShownPassage) -> Unit, onGrammar: (GrammarPatterns.Found) -> Unit,
+    onReroll: () -> Unit, onEdit: () -> Unit, onSend: (String) -> Unit, onDecide: (String, Boolean) -> Unit,
+) {
+    val listState = rememberLazyListState()
+    LaunchedEffect(history.size, current) {
+        val n = history.size + (if (current != null) 1 else 0) + proposals.size
+        if (n > 0) listState.animateScrollToItem(n - 1)
+    }
+    Column(Modifier.fillMaxSize().imePadding()) {
+        AppBar(title, onBack = onBack) {
+            Text("$%.2f".format(cost), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(end = 16.dp))
+        }
+        LazyColumn(Modifier.weight(1f), state = listState, contentPadding = PaddingValues(horizontal = 22.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            items(history) { t ->
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    t.player?.let { PlayerBubble(it, t.corrections) }
+                    PassageText(t.passage, false, isTapped, statusOf, tapVersion) {}
+                    Ornament()
+                }
+            }
+            if (current != null) item {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    current.player?.let { PlayerBubble(it, current.corrections) }
+                    PassageText(current.passage, true, isTapped, statusOf, tapVersion) { onTap(it, current.passage) }
+                    PassageTools(current.passage, busy == null, onReroll, onEdit, onGrammar)
+                }
+            } else if (busy != null) item { Busy(busy) }
+            if (error != null) item { ErrorNote(error) }
+            items(proposals) { p -> ProposalCard(p) { onDecide(p.key, it) } }
+        }
+        ReplyBar(busy, current != null, onSend)
+    }
+}
+
+data class WordInfo(val word: String, val reading: String?, val inSentence: String?, val senses: List<String>, val inDeck: Boolean)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun WordSheet(info: WordInfo, onKnow: () -> Unit, onClose: () -> Unit) {
+    ModalBottomSheet(onDismissRequest = onClose, containerColor = MaterialTheme.colorScheme.surfaceContainerLowest) {
+        WordSheetBody(info, onKnow, onClose)
+    }
+}
+
+@Composable
+fun WordSheetBody(info: WordInfo, onKnow: () -> Unit, onClose: () -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(info.word, style = WordText.copy(fontSize = 40.sp))
+            info.reading?.let { Text("  $it", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp)) }
+        }
+        Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = MaterialTheme.shapes.medium) {
+            Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                Text("In this sentence", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                Text(info.inSentence ?: "…", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+            }
+        }
+        if (info.senses.isNotEmpty()) {
+            Text("Dictionary", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            info.senses.forEachIndexed { i, s -> Text("${i + 1}. $s", style = MaterialTheme.typography.bodyMedium) }
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.Info, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.width(8.dp))
+            Text(if (info.inDeck) "In your deck: this tap counts as Again. If it was a mis-tap, say you know it."
+                else "Not in your deck. From the next version, unknown words go to your RP deck.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            SecondaryButton("Close", onClose, Modifier.weight(1f))
+            PrimaryButton("I know it", onKnow, Modifier.weight(1f))
+        }
+    }
+}
+
+// ---------------------------------------------------------------- the screen
+
+@Composable
+fun StoryScreen(state: AppState, onBack: () -> Unit) {
+    val story = state.story
+    val scope = rememberCoroutineScope()
+    var picked by remember { mutableStateOf<Pair<Span, ShownPassage>?>(null) }
+    var grammar by remember { mutableStateOf<GrammarPatterns.Found?>(null) }
+    var editing by remember { mutableStateOf<String?>(null) }
+    var tapVersion by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) { if (story.current == null && story.busy == null) story.start() }
+
+    StoryContent(
+        title = story.place() ?: "Story", cost = story.sessionCost(), history = story.history, current = story.current,
+        busy = story.busy, error = story.error, proposals = story.proposals, tapVersion = tapVersion,
+        isTapped = story::isTapped, statusOf = { it.status(state.policy, state.lists) },
+        onBack = onBack,
+        onTap = { s, p -> story.tap(s); tapVersion++; picked = s to p },
+        onGrammar = { grammar = it },
+        onReroll = { scope.launch { story.reroll() } },
+        onEdit = { editing = story.current?.passage?.text },
+        onSend = { m -> scope.launch { story.send(m) } },
+        onDecide = story::decideProposal,
     )
+
+    picked?.let { (span, p) ->
+        val sentence = remember(span, p) { sentenceAround(p.text, span.start, span.end) }
+        var meaning by remember(span) { mutableStateOf<String?>(null) }
+        LaunchedEffect(span) { meaning = story.meaning(span, sentence) }
+        val dict = state.jmdict()
+        val info = remember(span, meaning) {
+            WordInfo(span.lemma, span.entries.firstOrNull()?.let { dict?.forms(it)?.kana?.firstOrNull() }, meaning,
+                span.entries.take(2).flatMap { e -> dict?.senses(e).orEmpty().take(3).map { it.gloss } }, span.deck.isNotEmpty())
+        }
+        WordSheet(info, onKnow = { story.iKnowIt(span); tapVersion++; picked = null }, onClose = { picked = null })
+    }
+    grammar?.let { g ->
+        AlertDialog(onDismissRequest = { grammar = null }, title = { Text(g.pattern.id, style = WordText.copy(fontSize = 28.sp)) },
+            text = { Text(g.pattern.meaning, style = MaterialTheme.typography.bodyLarge) },
+            confirmButton = { TextButton({ grammar = null }) { Text("Close") } })
+    }
+    editing?.let { text ->
+        var t by remember { mutableStateOf(text) }
+        AlertDialog(onDismissRequest = { editing = null }, title = { Text("Edit the passage") },
+            text = { OutlinedTextField(t, { t = it }, Modifier.fillMaxWidth().heightIn(min = 220.dp), textStyle = ReadingText.copy(fontSize = 16.sp, lineHeight = 26.sp)) },
+            confirmButton = { TextButton({ editing = null; scope.launch { story.edit(t) } }) { Text("Save") } },
+            dismissButton = { TextButton({ editing = null }) { Text("Cancel") } })
+    }
+}
+
+fun sentenceAround(text: String, start: Int, end: Int): String {
+    val s = text.lastIndexOfAny(charArrayOf('。', '！', '？', '\n', '」'), start - 1).let { if (it < 0) 0 else it + 1 }
+    val e = text.indexOfAny(charArrayOf('。', '！', '？', '\n'), end).let { if (it < 0) text.length else it + 1 }
+    return text.substring(s, e).trim()
 }
