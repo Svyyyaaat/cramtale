@@ -13,6 +13,7 @@ object ErrorText {
             chain.any { it is UnknownHostException } ->
                 "Can't reach Claude: the phone couldn't look up api.anthropic.com. Check the internet connection (and that " +
                     "this app may use mobile data), then try again."
+            "cut off" in all -> "The connection dropped while Claude was writing. Try again."
             chain.any { it is SocketTimeoutException } || "timed out" in all || "timeout" in all.lowercase() ->
                 "The connection timed out. On a weak signal this happens; try again."
             chain.any { it is SSLException } ->

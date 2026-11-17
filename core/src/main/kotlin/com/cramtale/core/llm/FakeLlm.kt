@@ -9,10 +9,13 @@ class FakeLlm(private val defaults: Map<String, String> = emptyMap()) : Llm {
     private val queued = HashMap<String, ArrayDeque<String>>()
     val requests = ArrayList<LlmRequest>()
 
+    @Synchronized
     fun queue(purpose: String, vararg replies: String) {
         queued.getOrPut(purpose) { ArrayDeque() }.addAll(replies)
     }
 
+    // the engine runs independent calls in parallel
+    @Synchronized
     override fun call(req: LlmRequest): LlmResponse {
         requests += req
         val text = queued[req.purpose]?.removeFirstOrNull() ?: defaults[req.purpose]
@@ -20,5 +23,6 @@ class FakeLlm(private val defaults: Map<String, String> = emptyMap()) : Llm {
         return LlmResponse(text, Usage(1000, text.length.toLong(), 0, 0), "end_turn", req.model)
     }
 
+    @Synchronized
     fun sent(purpose: String) = requests.filter { it.purpose == purpose }
 }

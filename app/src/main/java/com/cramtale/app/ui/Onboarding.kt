@@ -180,28 +180,30 @@ fun KeyStepContent(key: String, onKey: (String) -> Unit, onNext: () -> Unit, onB
 }
 
 @Composable
-fun StoryStepContent(seed: String, onSeed: (String) -> Unit, busy: String?, error: String?, onCreate: () -> Unit, onBack: () -> Unit) {
+fun StoryStepContent(seed: String, onSeed: (String) -> Unit, busy: String?, error: String?, onCreate: () -> Unit, onBack: () -> Unit,
+                     taste: String = "", wait: (@Composable (String) -> Unit)? = null) {
     StepFrame(onBack, footer = { StepFooter("Create the story", onCreate, enabled = busy == null) }) {
         StepHeader(6, SETUP_STEPS, "Your story",
             "The game master builds a small world from your taste: a place, three or four people with their own goals, limits and secrets, and threats that move while you're away.")
         PaperCard {
             Text("Your taste (config/plot.md)", style = MaterialTheme.typography.titleSmall)
-            Text("Hard stories with real stakes where you can lose; adults with conflicting interests; no moral lessons and no guaranteed good endings.",
+            Text(taste.ifBlank { "(empty: edit config/plot.md in Prompts and story files)" },
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         OutlinedTextField(seed, onSeed, Modifier.fillMaxWidth().heightIn(min = 120.dp), shape = MaterialTheme.shapes.medium,
             label = { Text("What should it be about? (optional)") }, placeholder = { Text("e.g. a fishing town, a debt, a family business") })
-        if (busy != null) Busy(busy)
+        if (busy != null) wait?.invoke(busy) ?: Busy(busy)
         if (error != null) ErrorNote(error)
     }
 }
 
 @Composable
-fun StyleStepContent(options: List<Pair<StoryEngine.StyleOption, Double>>?, busy: String?, error: String?, onPick: (StoryEngine.StyleOption) -> Unit, onMore: () -> Unit, onBack: () -> Unit) {
+fun StyleStepContent(options: List<Pair<StoryEngine.StyleOption, Double>>?, busy: String?, error: String?, onPick: (StoryEngine.StyleOption) -> Unit, onMore: () -> Unit, onBack: () -> Unit,
+                     wait: (@Composable (String) -> Unit)? = null) {
     StepFrame(onBack, footer = {}) {
         StepHeader(7, SETUP_STEPS, "Pick the one you like reading",
             "The same short scene in four styles. Your choice becomes the writer's style sample for the whole story.")
-        if (busy != null) Busy(busy)
+        if (busy != null) wait?.invoke(busy) ?: Busy(busy)
         if (error != null) ErrorNote(error, onMore)
         for ((o, rate) in options.orEmpty()) {
             PaperCard {
@@ -311,8 +313,10 @@ fun OnboardingFlow(state: AppState, onFinished: () -> Unit) {
         6 -> {
             if (state.story.isSetUp()) { LaunchedEffect(Unit) { go(7) }; return }
             var seed by remember { mutableStateOf("") }
+            val taste = remember { state.story.taste() }
             StoryStepContent(seed, { seed = it }, state.story.busy, state.story.error,
-                onCreate = { scope.launch { state.story.setup(seed); if (state.story.isSetUp()) go(7) } }, onBack = back)
+                onCreate = { scope.launch { state.story.setup(seed); if (state.story.isSetUp()) go(7) } }, onBack = back,
+                taste = taste, wait = { label -> StudyWhileWaiting(state, label) })
         }
         else -> {
             // a new story keeps the style you picked before
@@ -322,7 +326,8 @@ fun OnboardingFlow(state: AppState, onFinished: () -> Unit) {
             StyleStepContent(options, state.story.busy, state.story.error,
                 onPick = { o -> scope.launch { state.story.pickStyle(o); state.onboardingDone = true; onFinished() } },
                 onMore = { scope.launch { options = state.story.styleOptions(fresh = options != null) } },
-                onBack = { if (state.story.restoreStyle()) { state.onboardingDone = true; onFinished() } else back() })
+                onBack = { if (state.story.restoreStyle()) { state.onboardingDone = true; onFinished() } else back() },
+                wait = { label -> StudyWhileWaiting(state, label) })
         }
     }
 }
@@ -330,4 +335,11 @@ fun OnboardingFlow(state: AppState, onFinished: () -> Unit) {
 fun deckRows(state: AppState): List<DeckRowUi> = state.deck().groupBy { it.deck }.toSortedMap().map { (deck, ws) ->
     DeckRowUi(deck, ws.size, ws.count { it.state == CardState.STUDIED || it.state == CardState.STUDIED_SUSPENDED || it.state == CardState.NEW_SUSPENDED },
         ws.count { it.state == CardState.NEW })
+}
+
+/** The wait panel with the story's flashcards (setup and the style samples take a while). */
+@Composable
+fun StudyWhileWaiting(state: com.cramtale.app.AppState, label: String) {
+    val story = state.story
+    WaitPanel(label, story.study, { c, good -> story.answerFlashcard(c, good) }, { c, known -> story.triageNew(c, known) })
 }

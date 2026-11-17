@@ -6,6 +6,7 @@ import com.cramtale.core.llm.CostLog
 import com.cramtale.core.llm.Llm
 import com.cramtale.core.llm.LlmRequest
 import com.cramtale.core.llm.Models
+import com.cramtale.core.llm.PartialJson
 import com.cramtale.core.llm.Msg
 import com.cramtale.core.llm.Role
 import org.json.JSONArray
@@ -204,8 +205,27 @@ class StoryEngine(
 
     // ------------------------------------------------------------------ calls
 
+    /** The passage as it streams in: (phase, text so far). Phases: "writing", "rewriting". */
+    var onDraft: (String, String) -> Unit = { _, _ -> }
+
+    // calls that don't depend on each other run side by side
+    private val workers = java.util.concurrent.Executors.newCachedThreadPool { r -> Thread(r, "story-call").apply { isDaemon = true } }
+
+    private fun <A, B> both(a: () -> A, b: () -> B): Pair<A, B> {
+        val fb = workers.submit(java.util.concurrent.Callable { b() })
+        val ra = try { a() } catch (e: Throwable) { fb.cancel(true); throw e }
+        val rb = try { fb.get() } catch (e: java.util.concurrent.ExecutionException) { throw e.cause ?: e }
+        return ra to rb
+    }
+
+    private val logLock = Any()
+
     private fun call(purpose: String, model: String, system: String, messages: List<Msg>, schema: String? = null,
-                     maxTokens: Int = 4096, cacheSystem: Boolean = false, extraSystem: List<Msg> = emptyList()): String {
+                     maxTokens: Int = 4096, cacheSystem: Boolean = false, extraSystem: List<Msg> = emptyList(),
+                     /** streams the reply, handing over its "passage" field as it grows */
+                     onPassage: ((String) -> Unit)? = null,
+                     /** a background call: no progress line */
+                     quiet: Boolean = false): String {
         // one-shot jobs (everything but the writer): the instructions and material go in the user
         // message, ending with the request, which is where Claude reads a request best
         val oneShot = purpose != "writer" && purpose != "rewrite"
@@ -216,19 +236,25 @@ class StoryEngine(
             messages = if (oneShot) listOf(Msg(Role.USER, system.trimEnd() + "\n\n" + messages.joinToString("\n") { it.text })) else messages, maxTokens = maxTokens, effort = "low", jsonSchema = schema,
             thinking = model != Models.CHECKS,
         )
-        onCall(purpose)
-        var resp = llm.call(req)
+        if (!quiet) onCall(purpose)
+        fun send(r: LlmRequest) = if (onPassage == null) llm.call(r) else {
+            val sb = StringBuilder()
+            llm.stream(r) { piece -> sb.append(piece); PartialJson.stringField(sb.toString(), "passage")?.let(onPassage) }
+        }
+        var resp = send(req)
         costs.record(session, req, resp)
         if (resp.stopReason == "max_tokens") {
             // thinking counts against max_tokens and can't be turned off on Opus 5.5: one retry with room to spare
             val bigger = req.copy(maxTokens = req.maxTokens * 2)
-            resp = llm.call(bigger)
+            resp = send(bigger)
             costs.record(session, bigger, resp)
         }
-        // every reply, for tuning prompts (log/calls.jsonl)
-        File(dir, "log").mkdirs()
-        File(dir, "log/calls.jsonl").appendText(JSONObject().put("purpose", purpose).put("model", resp.model)
-            .put("out", resp.usage.output).put("text", resp.text).toString() + "\n")
+        // every reply, for tuning prompts (log/calls.jsonl); calls can run in parallel
+        synchronized(logLock) {
+            File(dir, "log").mkdirs()
+            File(dir, "log/calls.jsonl").appendText(JSONObject().put("purpose", purpose).put("model", resp.model)
+                .put("out", resp.usage.output).put("text", resp.text).toString() + "\n")
+        }
         return resp.text
     }
 
@@ -371,14 +397,18 @@ class StoryEngine(
         }
         maybeNewChapter()
         val scene = state.scene()
-        val corrections = if (message.isNullOrBlank()) emptyList() else checkMistakes(message, knownMistakeKeys)
+        // the mistakes check and the referee don't depend on each other: side by side
+        val (corrections, adjudication) = if (message.isNullOrBlank()) emptyList<Correction>() to null else both(
+            { checkMistakes(message, knownMistakeKeys) },
+            { json(call("adjudicator", Models.CHECKS, Prompts.fill(prompts.prompt("adjudicator"), mapOf(
+                "scene" to sceneSummary(scene), "message" to message,
+            )), listOf(Msg(Role.USER, "Decide.")), schema = ADJUDICATOR_SCHEMA, maxTokens = 400)) },
+        )
         val correctKeys = lastCorrectKeys
         var roll: Dice.Roll? = null
         var rollNote: String? = null
-        if (!message.isNullOrBlank()) {
-            val a = json(call("adjudicator", Models.CHECKS, Prompts.fill(prompts.prompt("adjudicator"), mapOf(
-                "scene" to sceneSummary(scene), "message" to message,
-            )), listOf(Msg(Role.USER, "Decide.")), schema = ADJUDICATOR_SCHEMA, maxTokens = 400))
+        if (adjudication != null) {
+            val a = adjudication
             if (a.optBoolean("roll")) {
                 roll = dice.roll(a.optInt("difficulty").coerceIn(-2, 2))
                 // a failure is written down before the writer sees it: it can't be narrated away
@@ -461,12 +491,11 @@ class StoryEngine(
             return listOf("already recorded")
         }
         val s = state.scene()
-        val ops = StateOp.parse(call("scribe", Models.CHECKS, Prompts.fill(prompts.prompt("scribe"), records() + mapOf(
-            "present" to s.present.joinToString(), "place" to s.place,
-            "beat" to (s.beats.firstOrNull { !it.done }?.goal ?: "none"),
-            "clocks" to state.clocks().joinToString("; ") { "${it.name} ${it.filled}/${it.size}" },
-            "message" to (t.player ?: "(the player let the scene continue)"), "passage" to t.draft.passage,
-        )), listOf(Msg(Role.USER, "List the changes.")), schema = StateOp.SCHEMA, maxTokens = 1500))
+        // the scribe usually ran already, in the background while the passage was read
+        val passage = t.draft.passage
+        val ahead = scribeAhead?.takeIf { it.first == passage }?.second
+        scribeAhead = null
+        val ops = StateOp.parse(ahead?.let { f -> runCatching { f.get() }.getOrNull() } ?: scribe(t, passage, quiet = false))
         val applied = state.apply(ops)
         unknownWords?.check(t.draft.passage)?.second?.let { words ->
             seenFile.parentFile.mkdirs()
@@ -489,6 +518,30 @@ class StoryEngine(
         savePending()
         // a failed summary call is tried again before the next turn (maybeNewChapter in playerTurn)
         return applied + listOfNotNull(runCatching { maybeNewChapter() }.getOrNull())
+    }
+
+    private fun scribe(t: PendingTurn, passage: String, quiet: Boolean): String {
+        val s = state.scene()
+        return call("scribe", Models.CHECKS, Prompts.fill(prompts.prompt("scribe"), records() + mapOf(
+            "present" to s.present.joinToString(), "place" to s.place,
+            "beat" to (s.beats.firstOrNull { !it.done }?.goal ?: "none"),
+            "clocks" to state.clocks().joinToString("; ") { "${it.name} ${it.filled}/${it.size}" },
+            "message" to (t.player ?: "(the player let the scene continue)"), "passage" to passage,
+        )), listOf(Msg(Role.USER, "List the changes.")), schema = StateOp.SCHEMA, maxTokens = 1500, quiet = quiet)
+    }
+
+    @Volatile private var scribeAhead: Pair<String, java.util.concurrent.Future<String>>? = null
+
+    /**
+     * Starts the scribe on the shown version in the background (it only reads the state), so sending a
+     * reply doesn't wait for it. A reroll or edit makes it start again on the new text.
+     */
+    fun prepareCommit() {
+        val t = pending ?: return
+        if (!t.ready) return
+        val passage = t.draft.passage
+        if (scribeAhead?.first == passage) return
+        scribeAhead = passage to workers.submit(java.util.concurrent.Callable { scribe(t, passage, quiet = true) })
     }
 
     /** Closes the chapter once it has enough turns. */
@@ -581,7 +634,7 @@ class StoryEngine(
         val system = writerSystem()
         val messages = writerMessages(t, packet)
         val first = retry(3) { parseDraft(call("writer", Models.WRITER, system.first().text, messages, schema = WRITER_SCHEMA,
-            maxTokens = 10000, cacheSystem = true, extraSystem = system.drop(1)), t) }
+            maxTokens = 10000, cacheSystem = true, extraSystem = system.drop(1), onPassage = { onDraft("writing", it) }), t) }
         val problems = problems(first, t)
         if (problems.isEmpty()) return first.copy(checks = first.checks + CheckResult("all checks", true, ""))
         val raw = JSONObject().put("passage", first.passage).put("used", JSONArray(first.used.map { JSONObject().put("word", it.first).put("form", it.second) }))
@@ -589,7 +642,8 @@ class StoryEngine(
         val fixed = runCatching { parseDraft(call("rewrite", Models.WRITER, system.first().text,
             messages + Msg(Role.ASSISTANT, raw) + Msg(Role.USER, Prompts.fill(prompts.prompt("rewrite"), mapOf(
                 "problems" to problems.joinToString("\n") { "- ${it.detail}" }))),
-            schema = WRITER_SCHEMA, maxTokens = 10000, cacheSystem = true, extraSystem = system.drop(1)), t) }
+            schema = WRITER_SCHEMA, maxTokens = 10000, cacheSystem = true, extraSystem = system.drop(1),
+            onPassage = { onDraft("rewriting", it) }), t) }
             .getOrElse { return first.copy(checks = problems + CheckResult("rewrite", false, "rewrite failed: ${it.message}")) }
         // one retry, then accept: what's still wrong is logged, not retried again
         return fixed.copy(checks = problems.map { it.copy(detail = "fixed by rewrite: " + it.detail) } + cheapChecks(fixed.passage), rewritten = true)
@@ -648,11 +702,15 @@ class StoryEngine(
                 "A reader with about 5,000 words may not know: ${words.joinToString("、")}. Where an everyday word fits naturally, use it.")
         }
         bannedHits(d.passage).forEach { out += CheckResult("banned phrase", false, "Rewrite this sentence without its stock phrase: $it") }
-        leaks(d, t).forEach { out += CheckResult("leak", false, "This sentence makes the word 「${it.second}」 too easy to guess from context; keep the word, make the context less leading: ${it.first}") }
-        val judged = json(call("judge", Models.CHECKS, Prompts.fill(prompts.prompt("judge"), mapOf(
-            "player" to playerText(),
-            "message" to (t.player ?: "(none: the scene continues)"), "passage" to d.passage,
-        )), listOf(Msg(Role.USER, "Check.")), schema = JUDGE_SCHEMA, maxTokens = 800))
+        // the leak check and the judge read the same draft independently: side by side
+        val (leaked, judged) = both(
+            { leaks(d, t) },
+            { json(call("judge", Models.CHECKS, Prompts.fill(prompts.prompt("judge"), mapOf(
+                "player" to playerText(),
+                "message" to (t.player ?: "(none: the scene continues)"), "passage" to d.passage,
+            )), listOf(Msg(Role.USER, "Check.")), schema = JUDGE_SCHEMA, maxTokens = 800)) },
+        )
+        leaked.forEach { out += CheckResult("leak", false, "This sentence makes the word 「${it.second}」 too easy to guess from context; keep the word, make the context less leading: ${it.first}") }
         judged.optJSONArray("violations")?.let { a ->
             for (i in 0 until a.length()) a.getJSONObject(i).let { v ->
                 val q = v.optString("quote").trim().trim('「', '」')

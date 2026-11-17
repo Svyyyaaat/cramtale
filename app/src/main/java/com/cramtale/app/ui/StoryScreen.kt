@@ -1,5 +1,7 @@
 package com.cramtale.app.ui
 
+import androidx.compose.material.icons.filled.Style
+import com.cramtale.core.review.DueCard
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
@@ -230,6 +232,12 @@ fun StoryContent(
     notice: String? = null,
     listening: Boolean = false,
     onListen: ((String) -> Unit)? = null,
+    /** The passage streaming in while it's written: (phase, text). */
+    draft: Pair<String, String>? = null,
+    /** Anki cards to answer while waiting, and what to do with an answer. */
+    study: List<DueCard> = emptyList(),
+    onAnswer: (DueCard, Boolean) -> Unit = { _, _ -> },
+    onTriage: (DueCard, Boolean) -> Unit = { _, _ -> },
     onInfo: (() -> Unit)? = null,
 ) {
     val listState = rememberLazyListState()
@@ -263,11 +271,16 @@ fun StoryContent(
             if (current != null) item {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     current.player?.let { PlayerBubble(it, current.corrections) }
-                    PassageText(current.passage, true, isTapped, statusOf, tapVersion) { onTap(it, current.passage) }
+                    // a reroll streams its new version in place of the old one
+                    if (busy != null && draft != null) DraftPassage(busy, draft.second)
+                    else PassageText(current.passage, true, isTapped, statusOf, tapVersion) { onTap(it, current.passage) }
                     PassageTools(current.passage, busy == null, onReroll, onEdit, onGrammar, onVersion, listening,
                         onListen?.let { l -> { l(current.passage.text) } })
                 }
-            } else if (busy != null) item { Busy(busy) }
+            } else if (busy != null) item {
+                if (draft != null) DraftPassage(busy, draft.second)
+                else WaitPanel(busy, study, onAnswer, onTriage)
+            }
             if (error != null) item { ErrorNote(error, onRetry) }
             items(proposals) { p -> ProposalCard(p) { onDecide(p.key, it) } }
         }
@@ -392,6 +405,8 @@ fun StoryScreen(state: AppState, onBack: () -> Unit) {
         intro = role, onInfo = { infoWanted = true },
         notice = state.speaker.problem() ?: story.ankiNote,
         listening = state.speaker.speaking,
+        draft = story.draft, study = story.study,
+        onAnswer = { c, good -> story.answerFlashcard(c, good) }, onTriage = { c, known -> story.triageNew(c, known) },
         onListen = { text -> if (state.speaker.speaking) state.speaker.stop() else state.speaker.say(text) },
     )
     info?.let { i -> StoryInfoSheet(i) { info = null } }
@@ -476,6 +491,59 @@ fun StoryInfoBody(info: StoryController.StoryInfo) {
         info.chapters.forEach { (n, text) ->
             Text("Chapter $n", style = MaterialTheme.typography.titleSmall)
             Text(text, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+/** The passage while it's being written: readable at once, muted until it's checked and tappable. */
+@Composable
+fun DraftPassage(label: String, text: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            androidx.compose.material3.CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
+            Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text(text, style = readingStyle(), color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f))
+    }
+}
+
+/** A wait with nothing to stream: the step that's running, and Anki cards to answer meanwhile. */
+@Composable
+fun WaitPanel(label: String, study: List<DueCard>, onAnswer: (DueCard, Boolean) -> Unit, onTriage: (DueCard, Boolean) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Busy(label)
+        study.firstOrNull()?.let { card -> Flashcard(card, study.size, onAnswer, onTriage) }
+    }
+}
+
+@Composable
+fun Flashcard(card: DueCard, left: Int, onAnswer: (DueCard, Boolean) -> Unit, onTriage: (DueCard, Boolean) -> Unit) {
+    var shown by remember(card.ref) { mutableStateOf(false) }
+    PaperCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.Style, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.secondary)
+            Spacer(Modifier.width(8.dp))
+            Text(if (card.isNew) "New card · meanwhile" else "Anki · meanwhile", style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.secondary, modifier = Modifier.weight(1f))
+            Text("$left left", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text(card.word.word, style = WordText.copy(fontSize = 40.sp, lineHeight = 48.sp), modifier = Modifier.padding(vertical = 4.dp))
+        if (shown) {
+            (card.word.reading ?: nameReading(card.word.word))?.let { Text(it, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            Text(card.word.meaning ?: "(no meaning on the card)", style = MaterialTheme.typography.bodyLarge)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            when {
+                !shown -> SecondaryButton("Show", { shown = true }, Modifier.weight(1f))
+                card.isNew -> {
+                    SecondaryButton("For the story", { onTriage(card, false) }, Modifier.weight(1f))
+                    PrimaryButton("Already know it", { onTriage(card, true) }, Modifier.weight(1f))
+                }
+                else -> {
+                    SecondaryButton("Again", { onAnswer(card, false) }, Modifier.weight(1f))
+                    PrimaryButton("Good", { onAnswer(card, true) }, Modifier.weight(1f))
+                }
+            }
         }
     }
 }

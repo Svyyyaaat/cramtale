@@ -170,6 +170,26 @@ class Shots {
             listOf("供える" to true, "組合" to false, "許可" to true, "書類" to true, "保証人" to true, "手間" to false)))
     }
 
+    private fun due(id: Long, word: String, meaning: String, isNew: Boolean = false) = com.cramtale.core.review.DueCard(
+        com.cramtale.core.review.CardRef(id, 0),
+        com.cramtale.core.match.DeckWord(id, "Core", "Japanese Core 5k", word, null, com.cramtale.core.match.CardState.STUDIED,
+            listOf(com.cramtale.core.match.RawCard(0, "Recognition", 2, 2)), meaning = meaning),
+        if (isNew) com.cramtale.core.review.CardInfo(0, 0, 1) else com.cramtale.core.review.CardInfo(2, 2, 10, 4, 12))
+
+    @Test fun d7_story_streaming() = shot {
+        StoryContent("狐火堂", 0.21, history = emptyList(), current = null, busy = "Writing…", error = null, proposals = emptyList(),
+            tapVersion = 0, isTapped = { false }, statusOf = { Status.DECK }, onBack = {}, onTap = { _, _ -> }, onGrammar = {},
+            onReroll = {}, onEdit = {}, onSend = {}, onDecide = { _, _ -> },
+            draft = "writing" to "榊さんは書類を受け取らなかった。「サインは、お祭りのあとでもいいですよ」\nコガネが尻尾を")
+    }
+
+    @Test fun d8_story_waiting_flashcard() = shot {
+        StoryContent("狐火堂", 0.21, history = emptyList(), current = null, busy = "Checking your Japanese…", error = null, proposals = emptyList(),
+            tapVersion = 0, isTapped = { false }, statusOf = { Status.DECK }, onBack = {}, onTap = { _, _ -> }, onGrammar = {},
+            onReroll = {}, onEdit = {}, onSend = {}, onDecide = { _, _ -> },
+            study = listOf(due(1, "見逃す", "to miss; to overlook"), due(2, "手間", "time; labour")))
+    }
+
     @Test fun e1_settings() = shot {
         SettingsContent(SettingsValues(1.15f, com.cramtale.core.story.PassageLength.LONG, false, false, "sk-ant-…x9Qa", "Spare and close: short sentences, objects and what people do."), {}, {}, {}, {}, {}, {})
     }

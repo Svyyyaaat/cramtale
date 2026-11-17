@@ -81,6 +81,27 @@ class StoryController(
     val gradeLog = GradeLog(File(dir, "log/grades.jsonl"))
     /** New cards you already know: skipped here, would be suspended in Anki once writing is on. */
     val knownNew = com.cramtale.core.review.KnownNewCards(File(dir, "log/known-new.json"))
+    /** Cards answered as flashcards while waiting: out of the story's reviews for the rest of the day. */
+    val flashcards = com.cramtale.core.review.Flashcards(File(dir, "log/flashcards.json"))
+
+    /** The passage as it streams in while being written: (phase, text), null otherwise. */
+    var draft by mutableStateOf<Pair<String, String>?>(null)
+        private set
+
+    /** Anki cards to answer while a passage is prepared (not ones this passage uses). */
+    val study = mutableStateListOf<com.cramtale.core.review.DueCard>()
+
+    /** A flashcard answered: Good/Again for a review (logged, read-only); new cards are only triaged. */
+    fun answerFlashcard(card: com.cramtale.core.review.DueCard, good: Boolean) {
+        study.remove(card)
+        runCatching { flashcards.answer(card, good, gradeLog) }
+    }
+
+    /** A new card triaged while waiting: known (skip it) or left for the story. */
+    fun triageNew(card: com.cramtale.core.review.DueCard, known: Boolean) {
+        study.remove(card)
+        if (known) alreadyKnow(listOf(card.word))
+    }
     private val grading = GradingEngine(twoReads = app.twoReads, pendingReads = PendingReads(File(dir, "log/two-reads.json")))
 
     var busy by mutableStateOf<String?>(null)
@@ -128,7 +149,7 @@ class StoryController(
      */
     fun archiveAndReset(): File? {
         if (isWorking) return null
-        val keep = listOf("log/mistakes.json", "log/grades.jsonl", "log/skips.json", "log/two-reads.json", "log/costs.jsonl", "log/not-vocab.txt", "log/known-new.json")
+        val keep = listOf("log/mistakes.json", "log/grades.jsonl", "log/skips.json", "log/two-reads.json", "log/costs.jsonl", "log/not-vocab.txt", "log/known-new.json", "log/flashcards.json")
         val archive = File(context.filesDir, "story-archive/" + java.text.SimpleDateFormat("yyyy-MM-dd_HHmm", java.util.Locale.US).format(java.util.Date()))
         archive.parentFile?.mkdirs()
         if (!dir.renameTo(archive)) return null
@@ -164,7 +185,13 @@ class StoryController(
         return StoryEngine(dir, llmFor(key), costs, session, unknown,
             settings = StoryEngine.Settings(firmStyleRules = app.firmStyleRules, length = app.passageLength.text, aimWords = app.passageLength.aim)).also { e ->
             engine = e
-            e.onCall = { purpose -> STEP_LABELS[purpose]?.let { busy = it } }
+            e.onCall = { purpose -> if (isWorking) STEP_LABELS[purpose]?.let { busy = it } }
+            var last = 0L
+            e.onDraft = { phase, text ->
+                // a few updates a second are plenty for the eye
+                val now = System.currentTimeMillis()
+                if (now - last > 60 || draft == null) { last = now; draft = phase to text }
+            }
         }
     }
 
@@ -178,7 +205,7 @@ class StoryController(
             busy = label
             error = null
             retry = null
-            engine?.onCall = { purpose -> busy = STEP_LABELS[purpose] ?: label }
+            engine?.onCall = { purpose -> if (isWorking) busy = STEP_LABELS[purpose] ?: label }
             try {
                 block()
             } catch (e: Throwable) {
@@ -187,6 +214,7 @@ class StoryController(
                 null
             } finally {
                 busy = null
+                draft = null
                 running.set(false)
             }
         }
@@ -216,12 +244,20 @@ class StoryController(
         return true
     }
 
-    suspend fun setup(seed: String): Unit? = work("Creating the story…", again = { setup(seed) }) { engine().setup(seed) }
+    suspend fun setup(seed: String): Unit? = work("Creating the story…", again = { setup(seed) }) {
+        runCatching { takeSnapshot() }   // flashcards for the wait
+        engine().setup(seed)
+    }
+
+    /** config/plot.md as it is now (the story's copy, else the bundled default). */
+    fun taste(): String = File(dir, "config/plot.md").takeIf { it.exists() }?.readText()?.trim()
+        ?: com.cramtale.core.story.Prompts(null).config("plot.md")?.trim().orEmpty()
 
     private val styleCache = File(dir, "state/style_options.json")
 
     /** The four samples, kept on disk: a rebuilt screen shows the same ones instead of paying for new ones. */
     suspend fun styleOptions(fresh: Boolean = false): List<Pair<StoryEngine.StyleOption, Double>>? = work("Writing four styles…") {
+        if (study.isEmpty()) runCatching { takeSnapshot() }
         val cached = if (fresh) null else runCatching {
             val a = org.json.JSONArray(styleCache.readText())
             (0 until a.length()).map { a.getJSONObject(it) }.map { StoryEngine.StyleOption(it.getString("name"), it.getString("line"), it.getString("passage")) }
@@ -275,9 +311,13 @@ class StoryController(
         }
         val snap = result.getOrElse { return noReviews("Couldn't read Anki's queue (${it.message}). This passage has no review words.") }
             // new cards you already know are neither offered nor graded
-            .let { s -> DueSnapshot(s.cards.filter { it.ref.noteId !in knownNew }, s.takenAt, s.unknownNotes) }
+            .let { s -> DueSnapshot(s.cards.filter { it.ref.noteId !in knownNew && !flashcards.answeredToday(it.ref) }, s.takenAt, s.unknownNotes) }
         snapshot = snap
         pool = planner.pool(snap, mistakes.weakPoints(), maxWords = app.passageLength.maxWords)
+        // flashcards for the wait: what this passage won't use (reviews first, then new cards to triage)
+        val inPassage = (engine?.pending?.pool ?: pool).words.map { it.noteId }.toSet()
+        val cards = flashcards.pick(snap, inPassage).sortedBy { if (it.isNew) 1 else 0 }
+        study.clear(); study.addAll(cards)
         ankiNote = if (snap.cards.isEmpty()) "Nothing is due in Anki right now: this is reading practice." else null
     }
 
@@ -436,6 +476,8 @@ class StoryController(
             listOfNotNull(roll?.let { "Roll: $it" }, complication?.let { "Complication: $it" }, if (d.rewritten) "Rewritten once by the checks" else null),
             version = t.current, versions = t.drafts.size)
         current = ShownTurn(player, corrections, passage)
+        // the scribe for this version starts now, in the background, while it's read
+        runCatching { engine?.prepareCommit() }
         if (shownAt == 0L || current?.passage?.turn != turn) shownAt = System.currentTimeMillis()
     }
 

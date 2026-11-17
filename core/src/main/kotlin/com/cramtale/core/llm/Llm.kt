@@ -38,6 +38,9 @@ class LlmException(message: String, val retryable: Boolean = false, cause: Throw
 
 interface Llm {
     fun call(req: LlmRequest): LlmResponse
+
+    /** Like [call], handing over the reply's text as it arrives ([onText] gets each new piece). */
+    fun stream(req: LlmRequest, onText: (String) -> Unit): LlmResponse = call(req).also { onText(it.text) }
 }
 
 data class Price(val input: Double, val output: Double, val cacheRead: Double, val cacheWrite: Double) {

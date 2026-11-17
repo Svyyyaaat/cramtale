@@ -74,6 +74,24 @@ class OnAndroidTest {
                     .put("stop_reason", "end_turn").put("stop_sequence", JSONObject.NULL)
                     .put("usage", JSONObject().put("input_tokens", 10).put("output_tokens", 5)
                         .put("cache_read_input_tokens", 0).put("cache_creation_input_tokens", 0))
+                if (body.optBoolean("stream")) {
+                    // the real API streams server-sent events: send the text in two pieces
+                    fun ev(type: String, data: JSONObject) = "event: $type\ndata: $data\n\n"
+                    val half = text.length / 2
+                    fun delta(s: String) = JSONObject().put("type", "content_block_delta").put("index", 0)
+                        .put("delta", JSONObject().put("type", "text_delta").put("text", s))
+                    val start = JSONObject(reply.toString()).put("content", org.json.JSONArray()).put("stop_reason", JSONObject.NULL)
+                    val sse = ev("message_start", JSONObject().put("type", "message_start").put("message", start)) +
+                        ev("content_block_start", JSONObject().put("type", "content_block_start").put("index", 0)
+                            .put("content_block", JSONObject().put("type", "text").put("text", ""))) +
+                        ev("content_block_delta", delta(text.substring(0, half))) + ev("content_block_delta", delta(text.substring(half))) +
+                        ev("content_block_stop", JSONObject().put("type", "content_block_stop").put("index", 0)) +
+                        ev("message_delta", JSONObject().put("type", "message_delta")
+                            .put("delta", JSONObject().put("stop_reason", "end_turn").put("stop_sequence", JSONObject.NULL))
+                            .put("usage", JSONObject().put("output_tokens", 5))) +
+                        ev("message_stop", JSONObject().put("type", "message_stop"))
+                    return MockResponse().setHeader("content-type", "text/event-stream").setBody(sse)
+                }
                 return MockResponse().setHeader("content-type", "application/json").setBody(reply.toString())
             }
         }
@@ -86,7 +104,10 @@ class OnAndroidTest {
     fun `setup, styles, a session, turns, reroll, edit, chapter and meaning run on Android`() {
         val real = AnthropicLlm("test-key", baseUrl = server.url("/").toString().trimEnd('/'))
         val llm = object : Llm {
-            override fun call(req: LlmRequest): LlmResponse { purpose = req.purpose; return real.call(req) }
+            // one at a time: the stand-in server tells calls apart by the purpose set here
+            private val lock = Any()
+            override fun call(req: LlmRequest): LlmResponse = synchronized(lock) { purpose = req.purpose; real.call(req) }
+            override fun stream(req: LlmRequest, onText: (String) -> Unit): LlmResponse = synchronized(lock) { purpose = req.purpose; real.stream(req, onText) }
         }
         val dir = Files.createTempDirectory("story").toFile()
         Prompts(dir).installDefaults(Prompts.PROMPTS + Prompts.CONFIG)

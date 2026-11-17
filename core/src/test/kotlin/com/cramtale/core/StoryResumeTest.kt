@@ -176,4 +176,30 @@ class StoryResumeTest {
         assertEquals(turn + 1, again.state.scene().turn)
         assertNull(again.pending)
     }
+
+    @Test
+    fun `the draft is handed over while writing, and an early scribe isn't repeated at commit`() {
+        val e = ready()
+        val drafts = ArrayList<Pair<String, String>>()
+        e.onDraft = { phase, text -> synchronized(drafts) { drafts += phase to text } }
+        e.playerTurn("嘘をつく。", pool)
+        assertTrue(drafts.any { it.first == "writing" && it.second == "佐伯は帳簿を閉じた。" }, drafts.toString())
+        val scribes = fake.sent("scribe").size
+        e.prepareCommit()
+        e.prepareCommit()   // same text: not started twice
+        e.commit()
+        assertEquals(scribes + 1, fake.sent("scribe").size)
+    }
+
+    @Test
+    fun `a reroll after the early scribe makes commit scribe the new text`() {
+        val e = ready()
+        e.playerTurn(null, pool)
+        e.prepareCommit()
+        fake.queue("writer", """{"passage":"北村は笑った。","used":[],"grammar":[]}""")
+        e.reroll()
+        e.commit()
+        val last = fake.sent("scribe").last().messages.joinToString { it.text }
+        assertTrue("北村は笑った。" in last)
+    }
 }

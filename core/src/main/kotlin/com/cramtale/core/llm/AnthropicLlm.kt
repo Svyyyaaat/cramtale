@@ -31,7 +31,7 @@ class AnthropicLlm(apiKey: String, private val fallbacks: Boolean = true, baseUr
         .maxRetries(2)
         .build()
 
-    override fun call(req: LlmRequest): LlmResponse {
+    private fun params(req: LlmRequest): MessageCreateParams {
         val b = MessageCreateParams.builder()
             .model(req.model)
             .maxTokens(req.maxTokens.toLong())
@@ -55,9 +55,31 @@ class AnthropicLlm(apiKey: String, private val fallbacks: Boolean = true, baseUr
             b.putAdditionalHeader("anthropic-beta", "server-side-fallback-2026-07-01")
             b.putAdditionalBodyProperty("fallbacks", JsonValue.from("default"))
         }
+        return b.build()
+    }
 
-        val msg = try {
-            client.messages().create(b.build())
+    override fun call(req: LlmRequest): LlmResponse {
+        val msg = errors { client.messages().create(params(req)) }
+        return response(msg)
+    }
+
+    override fun stream(req: LlmRequest, onText: (String) -> Unit): LlmResponse {
+        val msg = errors {
+            client.messages().createStreaming(params(req)).use { stream ->
+                val acc = com.anthropic.helpers.MessageAccumulator.create()
+                stream.stream().forEach { event ->
+                    acc.accumulate(event)
+                    event.contentBlockDelta().flatMap { it.delta().text() }.ifPresent { onText(it.text()) }
+                }
+                // a stream that ends early (connection dropped) has no message_stop: a network failure, retryable
+                runCatching { acc.message() }.getOrElse { throw LlmException("network: the reply was cut off", retryable = true, cause = it) }
+            }
+        }
+        return response(msg)
+    }
+
+    private fun <T> errors(block: () -> T): T = try {
+            block()
         } catch (e: RateLimitException) {
             throw LlmException("rate limited", retryable = true, cause = e)
         } catch (e: InternalServerException) {
@@ -67,6 +89,8 @@ class AnthropicLlm(apiKey: String, private val fallbacks: Boolean = true, baseUr
         } catch (e: AnthropicServiceException) {
             throw LlmException("API error ${e.statusCode()}: ${e.message}", cause = e)
         }
+
+    private fun response(msg: com.anthropic.models.messages.Message): LlmResponse {
         val stop = msg.stopReason().map { it.asString() }.orElse("")
         if (stop == "refusal") throw LlmException("the model declined (${msg.stopDetails().map { it.toString() }.orElse("")})")
         val text = msg.content().mapNotNull { c -> c.text().map { it.text() }.orElse(null) }.joinToString("")
