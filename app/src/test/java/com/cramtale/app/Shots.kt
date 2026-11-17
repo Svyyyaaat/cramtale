@@ -17,6 +17,8 @@ import com.android.resources.NightMode
 import com.cramtale.app.story.ShownPassage
 import com.cramtale.app.story.ShownTurn
 import com.cramtale.app.ui.DueCounts
+import com.cramtale.app.ui.LogsContent
+import com.cramtale.app.ui.LogsData
 import com.cramtale.app.ui.StoryInfoBody
 import com.cramtale.app.ui.SettingsContent
 import com.cramtale.app.ui.SettingsValues
@@ -215,6 +217,20 @@ class Shots {
                     colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(androidx.compose.ui.graphics.Color(0xFFD6E3FF)))
             }
         }
+    }
+
+    @Test fun e2_logs() = shot {
+
+        val rows = listOf(
+            com.cramtale.core.review.DryRunReport.Row("書類", 3, com.cramtale.core.review.DryRunReport.Real.PASSED, "read without a tap"),
+            com.cramtale.core.review.DryRunReport.Row("組合", 1, com.cramtale.core.review.DryRunReport.Real.AGAIN, "tapped"),
+            com.cramtale.core.review.DryRunReport.Row("保証人", 3, com.cramtale.core.review.DryRunReport.Real.AGAIN, "read without a tap"),
+            com.cramtale.core.review.DryRunReport.Row("手間", 1, com.cramtale.core.review.DryRunReport.Real.PASSED, "tapped (not due: Again right away)"),
+            com.cramtale.core.review.DryRunReport.Row("許可", 3, com.cramtale.core.review.DryRunReport.Real.NOT_YET, "read without a tap"),
+        )
+        LogsContent(LogsData(com.cramtale.core.review.DryRunReport.Summary(rows), null, 3.41, 0.62,
+            mapOf("writer" to 0.31, "rewrite" to 0.18, "judge" to 0.04, "mistakes" to 0.03, "scribe" to 0.02),
+            listOf(com.cramtale.core.review.KnownNewCards.Entry(1, "見逃す", 0)), emptyList()), {})
     }
 
     @Test fun e1_settings() = shot {

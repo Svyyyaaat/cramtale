@@ -1,5 +1,17 @@
 package com.cramtale.app.ui
 
+import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material3.Icon
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -37,12 +49,24 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /** Dry-run report, would-be answers, costs, your mistakes, and story settings. */
+/** What the review log shows (plain data, so screenshots can render it). */
+data class LogsData(
+    val report: DryRunReport.Summary?,
+    val reportNote: String?,
+    val total: Double,
+    val session: Double,
+    val byPurpose: Map<String, Double>,
+    val known: List<com.cramtale.core.review.KnownNewCards.Entry>,
+    val mistakes: List<com.cramtale.core.review.MistakeLog.Key>,
+)
+
 @Composable
 fun LogsScreen(state: AppState) {
     val story = state.story
     val context = LocalContext.current
     var report by remember { mutableStateOf<DryRunReport.Summary?>(null) }
     var reportNote by remember { mutableStateOf<String?>(null) }
+    var known by remember { mutableStateOf(story.knownNew.all.reversed()) }
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             val t = state.target ?: run { reportNote = "No AnkiDroid connected."; return@withContext }
@@ -51,27 +75,61 @@ fun LogsScreen(state: AppState) {
             report = DryRunReport.build(story.gradeLog.snapshot(), reader::card)
         }
     }
+    LogsContent(LogsData(report, reportNote, story.totalCost(), story.sessionCost(), story.costs.byPurpose(story.session),
+        known, story.mistakes.all.sortedByDescending { it.count }),
+        onUndoKnown = { id -> story.undoAlreadyKnow(id); known = story.knownNew.all.reversed() })
+}
+
+@Composable
+fun LogsContent(d: LogsData, onUndoKnown: (Long) -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    val amber = LocalAccents.current.amber
     Page {
         SectionTitle("Would-be answers vs what you pressed")
-        val r = report
-        if (r == null) { if (reportNote != null) ErrorNote(reportNote!!) else Busy("Comparing with AnkiDroid…") } else {
+        val r = d.report
+        if (r == null) { if (d.reportNote != null) ErrorNote(d.reportNote) else Busy("Comparing with AnkiDroid…") } else {
             PaperCard {
-                Text("${r.rows.size} answers logged", style = MaterialTheme.typography.titleMedium)
-                Stat("Agree, Good", r.agreeGood)
-                Stat("Agree, Again", r.agreeAgain)
-                Stat("App Good, you Again (leaks, over-easy context)", r.appGoodRealAgain, warn = true)
-                Stat("App Again, you passed", r.appAgainRealPassed, warn = true)
-                Stat("Not reviewed in AnkiDroid yet", r.undecided)
+                val decided = r.agreeGood + r.agreeAgain + r.appGoodRealAgain + r.appAgainRealPassed
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(if (decided == 0) "–" else "${(100 * (r.agreeGood + r.agreeAgain) / decided)}%",
+                        style = MaterialTheme.typography.displaySmall, color = cs.primary)
+                    Spacer(Modifier.width(10.dp))
+                    Text("agree with you", style = MaterialTheme.typography.titleSmall, color = cs.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 6.dp))
+                }
+                Text("${r.rows.size} answers logged · ${r.undecided} not reviewed in AnkiDroid yet", style = MaterialTheme.typography.bodySmall,
+                    color = cs.onSurfaceVariant)
+                Spacer(Modifier.height(4.dp))
+                Outcome(cs.tertiary, "Both Good", r.agreeGood)
+                Outcome(cs.primary, "Both Again", r.agreeAgain)
+                Outcome(cs.accent, "App Good, you Again", r.appGoodRealAgain, "a leak or an over-easy context")
+                Outcome(amber, "App Again, you passed", r.appAgainRealPassed, "a needless tap, or a word you half knew")
             }
             if (r.rows.isNotEmpty()) PaperCard {
+                Text("Latest", style = MaterialTheme.typography.titleSmall)
                 r.rows.takeLast(30).reversed().forEachIndexed { i, row ->
-                    if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(row.word, style = ReadingText.copy(fontSize = 17.sp, lineHeight = 26.sp), modifier = Modifier.width(96.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text("app ${if (row.appEase == 3) "Good" else "Again"} · you ${row.real.name.lowercase().replace('_', ' ')}",
-                                style = MaterialTheme.typography.labelMedium)
-                            Text(row.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (i > 0) HorizontalDivider(color = cs.outlineVariant)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(row.word, style = ReadingText.copy(fontSize = 18.sp, lineHeight = 26.sp), modifier = Modifier.width(88.dp),
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                val good = row.appEase == 3
+                                Pill("app ${if (good) "Good" else "Again"}", if (good) cs.tertiaryContainer else cs.primaryContainer,
+                                    if (good) cs.onTertiaryContainer else cs.onPrimaryContainer)
+                                val decided = row.real == DryRunReport.Real.PASSED || row.real == DryRunReport.Real.AGAIN
+                                val agree = (good && row.real == DryRunReport.Real.PASSED) || (!good && row.real == DryRunReport.Real.AGAIN)
+                                val label = when (row.real) {
+                                    DryRunReport.Real.PASSED -> "you passed"; DryRunReport.Real.AGAIN -> "you Again"
+                                    DryRunReport.Real.NOT_YET -> "not reviewed yet"; DryRunReport.Real.STILL_LEARNING -> "still learning"
+                                    DryRunReport.Real.STUDIED_NEW -> "studied as new"; DryRunReport.Real.UNKNOWN -> "unknown"
+                                }
+                                // only a real disagreement is in the accent
+                                Pill(label, if (decided && !agree) cs.accentContainer else cs.surfaceContainerHigh,
+                                    if (decided && !agree) cs.onAccentContainer else cs.onSurfaceVariant)
+                            }
+                            Text(row.reason, style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant, maxLines = 2,
+                                overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
@@ -80,54 +138,66 @@ fun LogsScreen(state: AppState) {
 
         SectionTitle("Costs")
         PaperCard {
-            Text("$%.3f".format(story.totalCost()), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
-            Text("all sessions · this session $%.3f".format(story.sessionCost()), style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-            for ((k, v) in story.costs.byPurpose(story.session).entries.sortedByDescending { it.value }) Row {
-                Text(k, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                Text("$%.4f".format(v), fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodyMedium)
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text("$%.2f".format(d.total), style = MaterialTheme.typography.displaySmall, color = cs.primary)
+                Spacer(Modifier.width(10.dp))
+                Text("in all · $%.2f this session".format(d.session), style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 6.dp))
+            }
+            val max = d.byPurpose.values.maxOrNull() ?: 0.0
+            for ((k, v) in d.byPurpose.entries.sortedByDescending { it.value }) Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Row {
+                    Text(k, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                    Text("$%.3f".format(v), fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
+                }
+                Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(cs.surfaceContainerHigh)) {
+                    Box(Modifier.fillMaxWidth((if (max > 0) v / max else 0.0).toFloat()).height(6.dp).clip(RoundedCornerShape(3.dp)).background(cs.primary))
+                }
             }
         }
 
         SectionTitle("New cards you already know")
         PaperCard {
-            var known by remember { mutableStateOf(story.knownNew.all.reversed()) }
-            if (known.isEmpty()) Text("None. Tap a new card's word in the story and choose Already know it.",
-                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            else Text("Skipped in the story. They'd be suspended in AnkiDroid once the app may write to it.",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            known.forEachIndexed { i, k ->
-                if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            if (d.known.isEmpty()) Text("None yet. In the story, tap a new card's word: Already know it.",
+                style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
+            else Text("Skipped in the story; suspended in AnkiDroid once the app may write.",
+                style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
+            d.known.forEachIndexed { i, k ->
+                if (i > 0) HorizontalDivider(color = cs.outlineVariant)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(k.word, Modifier.weight(1f), style = ReadingText.copy(fontSize = 18.sp, lineHeight = 26.sp))
-                    androidx.compose.material3.TextButton({ story.undoAlreadyKnow(k.noteId); known = story.knownNew.all.reversed() }) { Text("Undo") }
+                    androidx.compose.material3.TextButton({ onUndoKnown(k.noteId) }) {
+                        Icon(Icons.AutoMirrored.Filled.Undo, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Undo")
+                    }
                 }
             }
         }
 
         SectionTitle("Your mistakes")
         PaperCard {
-            val keys = story.mistakes.all.sortedByDescending { it.count }
-            if (keys.isEmpty()) Text("None yet.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            keys.forEachIndexed { i, k ->
-                if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                Row(verticalAlignment = Alignment.CenterVertically) {
+            if (d.mistakes.isEmpty()) Text("None yet.", style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
+            d.mistakes.forEachIndexed { i, k ->
+                if (i > 0) HorizontalDivider(color = cs.outlineVariant)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(k.key, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                    Text("×${k.count}", style = MaterialTheme.typography.labelLarge)
-                    if (k.correctSince >= 3) { Spacer(Modifier.width(8.dp)); Pill("fixed", MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer) }
+                    if (k.correctSince >= 3) Pill("fixed", cs.tertiaryContainer, cs.onTertiaryContainer)
+                    else Pill("×${k.count}", cs.accentContainer, cs.onAccentContainer)
                 }
             }
         }
-
     }
 }
 
 @Composable
-private fun Stat(label: String, n: Int, warn: Boolean = false) {
-    Row {
-        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-        Text("$n", style = MaterialTheme.typography.labelLarge,
-            color = if (warn && n > 0) MaterialTheme.colorScheme.accent else MaterialTheme.colorScheme.onSurface)
+private fun Outcome(color: Color, label: String, n: Int, hint: String? = null) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(10.dp).clip(CircleShape).background(color))
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyMedium)
+            if (hint != null && n > 0) Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text("$n", style = MaterialTheme.typography.titleMedium)
     }
 }
 
