@@ -28,6 +28,10 @@ After that, the home screen opens on your story; the vocabulary check, calibrati
 decks, the review log and costs, the prompt and story files and the AnkiDroid connection (with its probe)
 are all one tap away, and *Run setup again* repeats the walk-through.
 
+**Dictionary:** builds from here ship JMdict prebuilt (`tools/build_dict_asset.sh` makes
+`app/src/main/assets/jmdict.sqlite.gz`, gitignored); the phone only unpacks it. Builds without it (CI)
+download JMdict and build the database on the phone.
+
 **Screens:** `./gradlew :app:recordPaparazziDebug` renders every screen from sample data to
 `app/src/test/snapshots/images/` (light and dark).
 

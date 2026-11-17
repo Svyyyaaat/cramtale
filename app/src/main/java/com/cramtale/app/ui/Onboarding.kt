@@ -114,7 +114,7 @@ fun AnkiStepContent(installs: List<InstallUi>, selected: String?, onSelect: (Str
 fun DictionaryStepContent(status: String, busy: Boolean, ready: Boolean, onDownload: () -> Unit, onImport: () -> Unit, onNext: () -> Unit, onBack: () -> Unit) {
     StepFrame(onBack, footer = { StepFooter("Continue", onNext, enabled = ready) }) {
         StepHeader(2, SETUP_STEPS, "Get the dictionary",
-            "JMdict gives every word's readings and meanings, and lets Cramtale recognise spelling variants of your cards (付属 / 附属, なぜ / 何故).")
+            "JMdict gives every word's readings and meanings, and lets Cramtale recognise spelling variants of your cards (付属 / 附属, なぜ / 何故). It comes with the app and only needs unpacking.")
         PaperCard {
             if (busy) Busy(status) else Text(status, style = MaterialTheme.typography.bodyLarge)
             if (!ready && !busy) {
@@ -122,7 +122,7 @@ fun DictionaryStepContent(status: String, busy: Boolean, ready: Boolean, onDownl
                 SecondaryButton("I have JMdict_e.gz", onImport, icon = Icons.Filled.FolderOpen)
             }
         }
-        Text("JMdict © EDRDG, CC BY-SA 4.0. Built on the phone in about a minute.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("JMdict © EDRDG, CC BY-SA 4.0.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -274,8 +274,9 @@ fun OnboardingFlow(state: AppState, onFinished: () -> Unit) {
             }
             LaunchedEffect(Unit) {
                 ready = withContext(Dispatchers.IO) { state.dictionary.isReady() }
-                status = if (ready) "The dictionary is ready." else "Not downloaded yet."
-                if (!ready) run { p -> state.dictionary.download(p) }
+                status = if (ready) "The dictionary is ready." else "Not set up yet."
+                // the APK usually carries it prebuilt: unpacking takes seconds; otherwise download and build
+                if (!ready) run { p -> if (state.dictionary.hasBundled()) state.dictionary.installBundled(p) else state.dictionary.download(p) }
             }
             DictionaryStepContent(status, busy, ready, onDownload = { run { p -> state.dictionary.download(p) } },
                 onImport = { importer.launch(arrayOf("*/*")) }, onNext = { go(3) }, onBack = back)
