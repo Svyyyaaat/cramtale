@@ -86,7 +86,7 @@ class StoryController(private val context: Context, private val app: AppState) {
         engine?.let { return it }
         val key = keys.load() ?: error("Add your Claude API key first")
         val unknown = UnknownWords { text ->
-            val m = app.matcher() ?: return@UnknownWords 0.0 to emptyList()
+            val m = app.matcher() ?: return@UnknownWords 0 to emptyList()
             val a = m.analyze(text)
             val reviewing = pool.words.map { it.word }.toSet()
             val counted = a.words().filter { s -> s.status(app.policy, app.lists).let { it != Status.IGNORED && it != Status.NAME } }
@@ -94,7 +94,7 @@ class StoryController(private val context: Context, private val app: AppState) {
             val unknown = counted.filter { s ->
                 s.status(app.policy, app.lists) in setOf(Status.UNKNOWN, Status.DECK_NEW) && s.deck.none { it.word in reviewing }
             }
-            (if (counted.isEmpty()) 0.0 else unknown.size.toDouble() / counted.size) to unknown.map { it.lemma }.distinct()
+            counted.size to unknown.map { it.lemma }
         }
         return StoryEngine(dir, AnthropicLlm(key), costs, session, unknown,
             settings = StoryEngine.Settings(firmStyleRules = app.firmStyleRules)).also { engine = it }

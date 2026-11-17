@@ -29,7 +29,7 @@ class StoryEngineTest {
     private fun engine(llm: FakeLlm, dice: Dice = Dice(Random(3)), chapterTurns: Int = 30): StoryEngine {
         val dir = Files.createTempDirectory("story").toFile()
         val e = StoryEngine(dir, llm, CostLog(File(dir, "costs.jsonl")), "s1",
-            unknownWords = { text -> if ("輪ゴム" in text) 0.05 to listOf("輪ゴム") else 0.0 to emptyList() },
+            unknownWords = { text -> if ("輪ゴム" in text) 20 to listOf("輪ゴム") else 20 to emptyList() },
             dice = dice, settings = StoryEngine.Settings(chapterTurns = chapterTurns))
         llm.queue("setup", setupJson)
         e.setup()
@@ -43,7 +43,7 @@ class StoryEngineTest {
         "adjudicator" to """{"roll":true,"action":"stall Saeki","difficulty":2,"stakes":"Saeki stops trusting the player"}""",
         "judge" to """{"violations":[]}""",
         "leak" to """{"guesses":["?"]}""",
-        "scribe" to """{"ops":[{"op":"chronicle","text":"鍵の話が出た","tags":["倉庫","佐伯"]},{"op":"reveal","secret":"S1","to":"北村"}]}""",
+        "scribe" to """{"ops":[{"op":"chronicle","a":"鍵の話が出た","b":"","list":["倉庫","佐伯"],"n":0},{"op":"reveal","a":"S1","b":"北村","list":[],"n":0}]}""",
         "summary" to "Saeki wants the key.\n最後の場面。",
         "writer" to """{"passage":"佐伯は帳簿を閉じた。「鍵は明日だな」","used":[{"word":"帳簿","form":"帳簿"}],"grammar":[]}""",
     ))
@@ -120,7 +120,7 @@ class StoryEngineTest {
         val e = engine(llm)
         e.startSession(pool)
         e.playerTurn(null, pool)
-        assertTrue("□□" in llm.sent("leak").single().messages.isEmpty().let { llm.sent("leak").single().system.first().text })
+        assertTrue("□□" in llm.sent("leak").single().messages.single().text)
         assertTrue(llm.sent("rewrite").single().messages.last().text.contains("too easy to guess"))
     }
 

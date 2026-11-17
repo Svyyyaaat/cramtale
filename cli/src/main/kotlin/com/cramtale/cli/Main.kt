@@ -262,7 +262,7 @@ private fun storySmoke(o: Opts) {
         val unk = counted.filter { s ->
             s.status(policy, lists) in setOf(Status.UNKNOWN, Status.DECK_NEW) && s.deck.none { it.word in reviewing } && s.lemma !in reviewing
         }
-        (if (counted.isEmpty()) 0.0 else unk.size.toDouble() / counted.size) to unk.map { it.lemma }.distinct()
+        counted.size to unk.map { it.lemma }
     }
     val engine = com.cramtale.core.story.StoryEngine(out, llm, costs, "smoke", unknown)
     fun step(name: String) = println("\n======== $name  (spent so far $${"%.3f".format(costs.total("smoke"))})")
@@ -274,7 +274,7 @@ private fun storySmoke(o: Opts) {
     engine.state.characterNames().forEach { println("--- $it\n" + engine.state.character(it)) }
 
     step("style picker")
-    val rated = engine.styleOptions().map { it to unknown.check(it.passage).first }
+    val rated = engine.styleOptions().map { o -> o to unknown.check(o.passage).let { (n, u) -> if (n == 0) 0.0 else u.size.toDouble() / n } }
     rated.forEach { (s, r) -> println("--- ${s.name} (${"%.1f".format(r * 100)}% unknown): ${s.line}\n${s.passage}") }
     engine.pickStyle(rated.minByOrNull { it.second }!!.first)
 

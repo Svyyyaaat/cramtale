@@ -42,13 +42,15 @@ class PendingTurn(
     val drafts: MutableList<Draft> = ArrayList(),
 ) {
     var current = 0
+    /** The facts sent with this turn; rerolls reuse them, and history keeps them. */
+    var packet: String? = null
     val draft get() = drafts[current]
 }
 
 /** Measures a passage against what the reader knows (backed by the matcher in the app). */
 fun interface UnknownWords {
-    /** Unknown share of counted words, and the unknown lemmas. */
-    fun check(text: String): Pair<Double, List<String>>
+    /** Counted words, and the lemma of every unknown occurrence. */
+    fun check(text: String): Pair<Int, List<String>>
 }
 
 /**
@@ -86,18 +88,47 @@ class StoryEngine(
 
     private fun call(purpose: String, model: String, system: String, messages: List<Msg>, schema: String? = null,
                      maxTokens: Int = 4096, cacheSystem: Boolean = false, extraSystem: List<Msg> = emptyList()): String {
+        // one-shot jobs (everything but the writer): the instructions and material go in the user
+        // message, ending with the request, which is where Claude reads a request best
+        val oneShot = purpose != "writer" && purpose != "rewrite"
         val req = LlmRequest(
             purpose = purpose, model = model,
-            system = listOf(Msg(Role.SYSTEM, system, cache = cacheSystem)) + extraSystem,
-            messages = messages, maxTokens = maxTokens, effort = "low", jsonSchema = schema,
+            system = if (oneShot) listOf(Msg(Role.SYSTEM, ONE_SHOT_SYSTEM))
+                else listOf(Msg(Role.SYSTEM, system, cache = cacheSystem)) + extraSystem,
+            messages = if (oneShot) listOf(Msg(Role.USER, system.trimEnd() + "\n\n" + messages.joinToString("\n") { it.text })) else messages, maxTokens = maxTokens, effort = "low", jsonSchema = schema,
             thinking = model != Models.CHECKS,
         )
-        val resp = llm.call(req)
+        var resp = llm.call(req)
         costs.record(session, req, resp)
+        if (resp.stopReason == "max_tokens") {
+            // thinking counts against max_tokens and can't be turned off on Opus 5.5: one retry with room to spare
+            val bigger = req.copy(maxTokens = req.maxTokens * 2)
+            resp = llm.call(bigger)
+            costs.record(session, bigger, resp)
+        }
+        // every reply, for tuning prompts (log/calls.jsonl)
+        File(dir, "log").mkdirs()
+        File(dir, "log/calls.jsonl").appendText(JSONObject().put("purpose", purpose).put("model", resp.model)
+            .put("out", resp.usage.output).put("text", resp.text).toString() + "\n")
         return resp.text
     }
 
     private fun json(text: String) = JSONObject(text.trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim())
+
+    /**
+     * Structured output guarantees the JSON's shape, not its content: at low effort a model can
+     * return every field empty. Such replies are retried (twice), then the call fails loudly.
+     */
+    private fun validJson(purpose: String, valid: (JSONObject) -> Boolean, attempt: () -> String): JSONObject {
+        var last: String? = null
+        repeat(3) {
+            val text = attempt()
+            last = text
+            val o = runCatching { json(text) }.getOrNull()
+            if (o != null && valid(o)) return o
+        }
+        throw IllegalStateException("$purpose: no usable reply after 3 tries (last: ${last?.take(200)})")
+    }
 
     // ------------------------------------------------------------------ setup and style
 
@@ -105,10 +136,14 @@ class StoryEngine(
 
     /** Creates the world, cast, secrets, clocks and opening situation from the plot taste. */
     fun setup(seed: String = "") {
-        val text = call("setup", Models.WRITER, Prompts.fill(prompts.prompt("setup"), mapOf(
-            "plot" to prompts.config("plot.md"), "seed" to if (seed.isBlank()) "" else "Seed from the player: $seed",
-        )), listOf(Msg(Role.USER, "Create the game.")), schema = SETUP_SCHEMA, maxTokens = 8000)
-        val o = json(text)
+        val o = validJson("setup", { o ->
+            o.optString("world").isNotBlank() && (o.optJSONArray("characters")?.length() ?: 0) >= 2 &&
+                o.optJSONObject("opening")?.optString("place")?.isNotBlank() == true
+        }) {
+            call("setup", Models.WRITER, Prompts.fill(prompts.prompt("setup"), mapOf(
+                "plot" to prompts.config("plot.md"), "seed" to if (seed.isBlank()) "" else "Seed from the player: $seed",
+            )), listOf(Msg(Role.USER, "Create the game now, with every field filled in.")), schema = SETUP_SCHEMA, maxTokens = 16000)
+        }
         val stateDir = File(dir, "state").apply { mkdirs() }
         val clocks = o.optJSONArray("clocks")
         File(stateDir, "world.md").writeText(o.getString("world").trimEnd() + "\n\n## Clocks\n" +
@@ -140,9 +175,13 @@ class StoryEngine(
 
     /** Four versions of one scene in clearly different styles (first run). */
     fun styleOptions(scene: String = "A tenant comes to ask the landlord for more time to pay the rent. The landlord has his own debts."): List<StyleOption> {
-        val text = call("style_picker", Models.WRITER, Prompts.fill(prompts.prompt("style_picker"), mapOf("scene" to scene)),
-            listOf(Msg(Role.USER, "Write the four versions.")), schema = STYLES_SCHEMA, maxTokens = 6000)
-        val a = json(text).getJSONArray("styles")
+        val a = validJson("style_picker", { o ->
+            val s = o.optJSONArray("styles")
+            s != null && s.length() >= 4 && (0 until s.length()).all { s.getJSONObject(it).optString("passage").length > 50 }
+        }) {
+            call("style_picker", Models.WRITER, Prompts.fill(prompts.prompt("style_picker"), mapOf("scene" to scene)),
+                listOf(Msg(Role.USER, "Write the four versions now.")), schema = STYLES_SCHEMA, maxTokens = 12000)
+        }.getJSONArray("styles")
         return (0 until a.length()).map { i -> a.getJSONObject(i).let { StyleOption(it.getString("name"), it.getString("line"), it.getString("passage")) } }
     }
 
@@ -162,7 +201,7 @@ class StoryEngine(
         val log = ArrayList<String>()
         if (scene.session > 0 && scene.turn > 0) {
             val text = call("offscreen", Models.WRITER, Prompts.fill(prompts.prompt("offscreen"), records()),
-                listOf(Msg(Role.USER, "What happened off-screen?")), schema = StateOp.SCHEMA)
+                listOf(Msg(Role.USER, "What happened off-screen?")), schema = StateOp.SCHEMA, maxTokens = 12000)
             log += state.apply(StateOp.parse(text), offscreen = true)
         }
         val s = state.scene()
@@ -171,12 +210,16 @@ class StoryEngine(
             "The player is practising these points: ${weak.joinToString("; ")}. You may plan ONE beat where one of them " +
                 "would come up naturally in what the player's character has to say or do, only if it fits a beat you would " +
                 "plan anyway. Never make it a quiz or a prompt to use it. Usually plan none."
-        val text = call("director", Models.WRITER, Prompts.fill(prompts.prompt("director"), records() + mapOf(
+        val o = validJson("director", { o ->
+            val b = o.optJSONArray("beats")
+            b != null && b.length() >= 1 && (0 until b.length()).all { b.getJSONObject(it).optString("goal").isNotBlank() }
+        }) {
+            call("director", Models.WRITER, Prompts.fill(prompts.prompt("director"), records() + mapOf(
             "opening_rule" to openingRule,
             "situation" to "Place: ${s.place}. Present: ${s.present.joinToString()}. Turn ${s.turn}. " +
                 "Unfinished beats: ${s.beats.filter { !it.done }.joinToString("; ") { it.goal }.ifEmpty { "none" }}",
-        )), listOf(Msg(Role.USER, "Plan the session.")), schema = DIRECTOR_SCHEMA)
-        val o = json(text)
+        )), listOf(Msg(Role.USER, "Plan the three beats now.")), schema = DIRECTOR_SCHEMA, maxTokens = 16000)
+        }
         val beats = o.getJSONArray("beats")
         s.beats = (0 until beats.length()).map { i ->
             val b = beats.getJSONObject(i)
@@ -262,10 +305,15 @@ class StoryEngine(
             "message" to (t.player ?: "(the player let the scene continue)"), "passage" to t.draft.passage,
         )), listOf(Msg(Role.USER, "List the changes.")), schema = StateOp.SCHEMA, maxTokens = 1500))
         val applied = state.apply(ops)
+        unknownWords?.check(t.draft.passage)?.second?.let { words ->
+            seenFile.parentFile.mkdirs()
+            seenFile.writeText((seenWords() + words).sorted().joinToString("\n") + "\n")
+        }
         logFile.parentFile.mkdirs()
         logFile.appendText(JSONObject()
             .put("turn", t.turn).put("chapter", s.chapter).put("player", t.player ?: "")
             .put("passage", t.draft.passage).put("roll", t.roll?.toString() ?: "")
+            .put("packet", t.packet ?: "").put("sentAs", sentAs(t, turnsInChapter(s.chapter).isEmpty()))
             .put("corrections", JSONArray(t.corrections.map { JSONObject().put("wrong", it.wrong).put("right", it.right).put("key", it.key) }))
             .put("checks", JSONArray(t.draft.checks.map { "${it.name}: ${if (it.passed) "ok" else it.detail}" }))
             .put("versions", t.drafts.size).put("ops", JSONArray(applied))
@@ -285,7 +333,7 @@ class StoryEngine(
             (o.optString("player").takeIf { it.isNotBlank() }?.let { "Player: $it\n" } ?: "") + o.getString("passage")
         }
         val summary = call("summary", Models.WRITER, Prompts.fill(prompts.prompt("summary"), mapOf("chapter" to text)),
-            listOf(Msg(Role.USER, "Summarize.")), maxTokens = 1200)
+            listOf(Msg(Role.USER, "Summarize.")), maxTokens = 6000)
         chaptersDir.mkdirs()
         File(chaptersDir, "${s.chapter}.md").writeText(summary.trim() + "\n")
         s.chapter += 1
@@ -300,7 +348,8 @@ class StoryEngine(
 
     private fun writerSystem(): List<Msg> {
         val fixed = Prompts.fill(prompts.prompt("writer"), mapOf(
-            "plot" to prompts.config("plot.md"), "world" to state.world() + "\n\n## The player's character\n" + File(dir, "state/player.md").let { if (it.exists()) it.readText() else "" },
+            // the fixed (cached) prompt must not change from turn to turn: no clocks here, they're in the packet
+            "plot" to prompts.config("plot.md"), "world" to state.world().substringBefore("## Clocks").trim() + "\n\n## The player's character\n" + playerText(),
             "style_sample" to prompts.config("style_sample.md"),
         ))
         val prev = File(chaptersDir, "${state.scene().chapter - 1}.md")
@@ -309,12 +358,18 @@ class StoryEngine(
     }
 
     private fun writerMessages(t: PendingTurn, packet: String): List<Msg> {
+        // append-only: each earlier turn is exactly what was sent then (message, facts, passage), so
+        // the next call reads all of it from the cache
         val history = turnsInChapter(state.scene().chapter).flatMap { o ->
-            listOf(Msg(Role.USER, o.optString("player").ifBlank { "（続けて）" }), Msg(Role.ASSISTANT, o.getString("passage")))
+            listOfNotNull(Msg(Role.USER, o.optString("player").ifBlank { o.optString("sentAs").ifBlank { "（続けて）" } }),
+                o.optString("packet").takeIf { it.isNotBlank() }?.let { Msg(Role.SYSTEM, it) },
+                Msg(Role.ASSISTANT, o.getString("passage")))
         }
-        val now = t.player?.takeIf { it.isNotBlank() } ?: if (history.isEmpty()) "（物語の始まり）" else "（続けて）"
+        val now = sentAs(t, history.isEmpty())
         return history + Msg(Role.USER, now) + Msg(Role.SYSTEM, packet)
     }
+
+    private fun sentAs(t: PendingTurn, first: Boolean) = t.player?.takeIf { it.isNotBlank() } ?: if (first) "（物語の始まり）" else "（続けて）"
 
     private fun turnPacket(t: PendingTurn): String {
         val s = state.scene()
@@ -324,6 +379,7 @@ class StoryEngine(
             (state.characterNames() - names).map { n -> "- $n (not here)" }
         val tags = names + s.place
         return Prompts.fill(prompts.prompt("turn"), mapOf(
+            "player" to playerText(),
             "place" to s.place, "present" to s.present.joinToString().ifEmpty { "nobody but the player" },
             "turn" to s.turn.toString(), "chapter" to s.chapter.toString(),
             "beat" to (beat?.let { "${it.goal} Pressure: ${it.pressure}" } ?: "Let the scene breathe; follow what the player does."),
@@ -335,6 +391,7 @@ class StoryEngine(
             "consequences" to state.consequences().filter { it.open }.joinToString("\n") { c ->
                 "- ${c.id}: ${c.text}" + (c.dueTurn?.let { d -> if (d <= s.turn) " (DUE NOW)" else " (due turn $d)" } ?: "")
             }.ifEmpty { "nothing" },
+            "clocks" to state.clocks().joinToString("\n") { "- ${it.name}: ${it.filled}/${it.size} (when full: ${it.whenFull})" }.ifEmpty { "none" },
             "chronicle" to state.chronicle().filter { e -> e.tags.any { it in tags } }.takeLast(8).joinToString("\n") { "- ${it.text}" }.ifEmpty { "nothing yet" },
             "due_words" to t.pool.words.joinToString("、") { it.word }.ifEmpty { "none this turn" },
             "due_grammar" to (t.pool.grammar.map { "${it.id} (${it.meaning})" } +
@@ -348,25 +405,27 @@ class StoryEngine(
     }
 
     private fun write(t: PendingTurn): Draft {
-        val packet = turnPacket(t)
+        val packet = t.packet ?: turnPacket(t).also { t.packet = it }
         val system = writerSystem()
         val messages = writerMessages(t, packet)
-        val first = parseDraft(call("writer", Models.WRITER, system.first().text, messages, schema = WRITER_SCHEMA,
-            maxTokens = 4000, cacheSystem = true, extraSystem = system.drop(1)), t)
+        val first = retry(3) { parseDraft(call("writer", Models.WRITER, system.first().text, messages, schema = WRITER_SCHEMA,
+            maxTokens = 10000, cacheSystem = true, extraSystem = system.drop(1)), t) }
         val problems = problems(first, t)
         if (problems.isEmpty()) return first.copy(checks = first.checks + CheckResult("all checks", true, ""))
         val raw = JSONObject().put("passage", first.passage).put("used", JSONArray(first.used.map { JSONObject().put("word", it.first).put("form", it.second) }))
             .put("grammar", JSONArray(first.grammar)).toString()
-        val fixed = parseDraft(call("rewrite", Models.WRITER, system.first().text,
+        val fixed = runCatching { parseDraft(call("rewrite", Models.WRITER, system.first().text,
             messages + Msg(Role.ASSISTANT, raw) + Msg(Role.USER, Prompts.fill(prompts.prompt("rewrite"), mapOf(
                 "problems" to problems.joinToString("\n") { "- ${it.detail}" }))),
-            schema = WRITER_SCHEMA, maxTokens = 4000, cacheSystem = true, extraSystem = system.drop(1)), t)
+            schema = WRITER_SCHEMA, maxTokens = 10000, cacheSystem = true, extraSystem = system.drop(1)), t) }
+            .getOrElse { return first.copy(checks = problems + CheckResult("rewrite", false, "rewrite failed: ${it.message}")) }
         // one retry, then accept: what's still wrong is logged, not retried again
         return fixed.copy(checks = problems.map { it.copy(detail = "fixed by rewrite: " + it.detail) } + cheapChecks(fixed.passage), rewritten = true)
     }
 
     private fun parseDraft(text: String, t: PendingTurn): Draft {
         val o = json(text)
+        check(o.optString("passage").isNotBlank()) { "the writer returned an empty passage" }
         val passage = o.getString("passage").trim()
         val used = o.optJSONArray("used")?.let { a ->
             (0 until a.length()).map { a.getJSONObject(it) }.map { it.optString("word") to it.optString("form") }
@@ -378,12 +437,27 @@ class StoryEngine(
 
     private fun cheapChecks(passage: String): List<CheckResult> {
         val out = ArrayList<CheckResult>()
-        unknownWords?.check(passage)?.let { (rate, words) ->
+        unknownCheck(passage)?.let { (rate, words) ->
             out += CheckResult("unknown words", rate <= settings.unknownLimit, "%.1f%% unknown: %s".format(rate * 100, words.joinToString("、")))
         }
         val hits = bannedHits(passage)
         out += CheckResult("banned phrases", hits.isEmpty(), hits.joinToString(" / "))
         return out
+    }
+
+    private val seenFile get() = File(dir, "state/seen_words.txt")
+
+    /** Words the story already used: you've had the chance to tap them, so they don't send passages back again. */
+    private fun seenWords(): Set<String> = if (seenFile.exists()) seenFile.readLines().filter { it.isNotBlank() }.toSet() else emptySet()
+
+    /** Unknown share not counting words the story already introduced, and those unknown lemmas. */
+    private fun unknownCheck(passage: String): Pair<Double, List<String>>? {
+        val (total, occurrences) = unknownWords?.check(passage) ?: return null
+        val seen = seenWords()
+        // the cast's names aren't vocabulary (タム in グエン・ヴァン・タム, 村井 in 村井 早苗)
+        val names = state.characterNames().flatMap { n -> n.split(' ', '　', '・', '(', ')', '（', '）') }.filter { it.length >= 2 }
+        val fresh = occurrences.filter { w -> w !in seen && names.none { it.contains(w) || w.contains(it) } }
+        return (if (total == 0) 0.0 else fresh.size.toDouble() / total) to fresh.distinct()
     }
 
     private fun bannedHits(passage: String): List<String> {
@@ -397,18 +471,22 @@ class StoryEngine(
     /** Everything that sends a passage back for its one rewrite. */
     private fun problems(d: Draft, t: PendingTurn): List<CheckResult> {
         val out = ArrayList<CheckResult>()
-        unknownWords?.check(d.passage)?.let { (rate, words) ->
+        unknownCheck(d.passage)?.let { (rate, words) ->
             if (rate > settings.unknownLimit) out += CheckResult("unknown words", false,
-                "These words are beyond a reader with about 5,000 words: ${words.joinToString("、")}. Use plainer words.")
+                "A reader with about 5,000 words may not know: ${words.joinToString("、")}. Where an everyday word fits naturally, use it.")
         }
         bannedHits(d.passage).forEach { out += CheckResult("banned phrase", false, "Rewrite this sentence without its stock phrase: $it") }
         leaks(d, t).forEach { out += CheckResult("leak", false, "This sentence makes the word 「${it.second}」 too easy to guess from context; keep the word, make the context less leading: ${it.first}") }
         val judged = json(call("judge", Models.CHECKS, Prompts.fill(prompts.prompt("judge"), mapOf(
+            "player" to playerText(),
             "message" to (t.player ?: "(none: the scene continues)"), "passage" to d.passage,
         )), listOf(Msg(Role.USER, "Check.")), schema = JUDGE_SCHEMA, maxTokens = 800))
         judged.optJSONArray("violations")?.let { a ->
             for (i in 0 until a.length()) a.getJSONObject(i).let { v ->
-                out += CheckResult(v.optString("rule"), false, "${v.optString("rule")}: 「${v.optString("quote")}」. ${v.optString("fix")}")
+                val q = v.optString("quote").trim().trim('「', '」')
+                // a quote that isn't in the passage is the checker's mistake, not the writer's
+                if (q.isEmpty() || q !in d.passage) return@let
+                out += CheckResult(v.optString("rule"), false, "${v.optString("rule")}: 「$q」. ${v.optString("fix")}")
             }
         }
         return out
@@ -451,7 +529,8 @@ class StoryEngine(
         val a = o.optJSONArray("errors") ?: return emptyList()
         return (0 until a.length()).map { a.getJSONObject(it) }
             .map { Correction(it.getString("wrong"), it.getString("right"), it.optString("type"), it.optString("reason"), it.getString("key")) }
-            .filter { it.wrong in message } // the span must be real text from the message
+            // the span must be real text from the message, and actually change something
+            .filter { it.wrong.isNotBlank() && it.wrong in message && it.wrong != it.right && it.key.isNotBlank() }
     }
 
     /** The popup's one-line meaning of a word in its sentence. */
@@ -460,6 +539,8 @@ class StoryEngine(
             listOf(Msg(Role.USER, "Meaning?")), maxTokens = 120).trim()
 
     // ------------------------------------------------------------------ helpers
+
+    private fun playerText() = File(dir, "state/player.md").takeIf { it.exists() }?.readText()?.trim().orEmpty().ifEmpty { "the protagonist" }
 
     private fun sceneSummary(s: StoryState.Scene) =
         "Place: ${s.place}. Present: ${s.present.joinToString()}. Beat: ${s.beats.firstOrNull { !it.done }?.goal ?: "none"}.\n" +
@@ -474,7 +555,15 @@ class StoryEngine(
         "chronicle" to state.chronicle().takeLast(20).joinToString("\n") { "- ${it.id}: ${it.text}" }.ifEmpty { "none" },
     )
 
+    private fun <T> retry(times: Int, block: () -> T): T {
+        var last: Throwable? = null
+        repeat(times) { runCatching(block).onSuccess { return it }.onFailure { last = it } }
+        throw last!!
+    }
+
     companion object {
+        const val ONE_SHOT_SYSTEM = "You assist the game master of a Japanese roleplaying game. Do the job in the user's message and answer in the requested format, with every field filled in properly."
+
         val WRITER_SCHEMA = """{"type":"object","additionalProperties":false,"required":["passage","used","grammar"],"properties":{
             "passage":{"type":"string"},
             "used":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["word","form"],"properties":{"word":{"type":"string"},"form":{"type":"string"}}}},

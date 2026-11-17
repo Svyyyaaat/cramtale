@@ -26,7 +26,7 @@ enum class Status {
 /** What the reader is assumed to know. */
 data class KnownPolicy(
     /** Words with a JMdict frequency rank at or below this count as known (0 = off). */
-    val frequencyThreshold: Int = 6000,
+    val frequencyThreshold: Int = 8000,
     /** Studied cards you suspended (leeches) still count as known. */
     val studiedSuspendedKnown: Boolean = true,
     /** Never-studied cards you suspended (tagged suspend_me): you suspended them because you know them. */
@@ -221,6 +221,15 @@ class Matcher(
             val e = Normalize.entriesFor(dict, t.surface, null)
             if (e.isNotEmpty()) { lemma = t.surface; entries = e }
         }
+        // potential forms: IPADIC gives 待てる, 払える, 出せる as verbs of their own; they're 待つ, 払う, 出す
+        // (also when JMdict lists the potential itself, e.g. もらえる: the base verb is what the reader knows)
+        if (t.pos1 == "動詞") potentialBase(t.base)?.let { b ->
+            val e = Normalize.entriesFor(dict, b, null)
+            val baseRank = rank(e, b)
+            if (e.isNotEmpty() && (entries.isEmpty() || (baseRank != null && baseRank < (rank(entries, lemma) ?: Int.MAX_VALUE)))) {
+                lemma = b; entries = e
+            }
+        }
         val texts = mutableListOf(lemma, t.surface)
         // IPADIC reads 属し as 属す; dictionaries and decks list 属する (and 要する, 愛する…)
         if (t.pos1 == "動詞" && t.base.length >= 2 && t.base.endsWith("す")) {
@@ -235,6 +244,14 @@ class Matcher(
         // both: 一気に is your V2K card 一気に and your Core 5k card 一気
         val deck = (index.find(texts.distinct(), entries) + affixFallback(lemma)).distinct()
         Span(t.start, t.end, t.surface, lemma, entries, rank(entries, lemma), deck, null, 1)
+    }
+
+    /** 待てる → 待つ: an e-row kana before the final る back to its u-row godan ending. */
+    private fun potentialBase(base: String): String? {
+        if (base.length < 3 || !base.endsWith("る")) return null
+        val e = base[base.length - 2]
+        val u = POTENTIAL[e] ?: return null
+        return base.dropLast(2) + u
     }
 
     /**
@@ -263,5 +280,6 @@ class Matcher(
 
     companion object {
         const val MAX_JOIN = 5
+        private val POTENTIAL = mapOf('え' to 'う', 'け' to 'く', 'げ' to 'ぐ', 'せ' to 'す', 'て' to 'つ', 'ね' to 'ぬ', 'べ' to 'ぶ', 'め' to 'む', 'れ' to 'る')
     }
 }

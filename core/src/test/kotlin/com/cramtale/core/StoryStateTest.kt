@@ -54,7 +54,7 @@ class StoryStateTest {
 
     @Test
     fun `scribe JSON parses and unknown ops are skipped`() {
-        val ops = StateOp.parse("""{"ops":[{"op":"chronicle","text":"鍵を渡した","tags":["倉庫"]},{"op":"teleport"},{"op":"beat_done"}]}""")
+        val ops = StateOp.parse("""{"ops":[{"op":"chronicle","a":"鍵を渡した","b":"","list":["倉庫"],"n":0},{"op":"teleport","a":"","b":"","list":[],"n":0},{"op":"beat_done","a":"","b":"","list":[],"n":0}]}""")
         assertEquals(2, ops.size)
         val s = state()
         s.apply(ops)

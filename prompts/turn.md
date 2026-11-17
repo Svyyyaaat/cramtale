@@ -1,4 +1,5 @@
 ## This turn (facts the game has decided)
+The player's character: {{player}} (they say and decide nothing in your passage)
 Place: {{place}}
 Present: {{present}}
 Turn {{turn}}, chapter {{chapter}}.
@@ -17,6 +18,9 @@ Turn {{turn}}, chapter {{chapter}}.
 
 ### What they know that the player doesn't (game master only; reveal only through what people do or what can be found)
 {{secrets}}
+
+### Off-screen clocks (game master only; when one fills, its event happens)
+{{clocks}}
 
 ### Owed and due
 {{consequences}}

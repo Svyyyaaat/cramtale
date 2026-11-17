@@ -259,23 +259,36 @@ sealed interface StateOp {
     data object BeatDone : StateOp
 
     companion object {
-        /** The JSON shape the scribe and off-screen prompts return: {"ops": [{"op": "...", ...}]}. */
+        /**
+         * The JSON the scribe and off-screen prompts return: {"ops": [{"op", "a", "b", "list", "n"}]},
+         * every field present (structured output rejects a schema with many optional fields):
+         *   chronicle: a = text, list = tags        drop: a = id
+         *   reveal: a = secret id, b = who           new_secret: a = text, list = who knows
+         *   consequence: a = text, n = due in turns (0 = no date)   resolve: a = id
+         *   clock: a = clock name, n = steps         new_clock: a = name, b = when full, n = size
+         *   move: a = place, list = people present   character: a = name, b = note
+         *   beat_done
+         */
         fun parse(json: String): List<StateOp> {
             val a = JSONObject(json).optJSONArray("ops") ?: return emptyList()
             return (0 until a.length()).mapNotNull { i ->
                 val o = a.getJSONObject(i)
+                val x = o.optString("a")
+                val y = o.optString("b")
+                val list = o.optJSONArray("list").strings()
+                val n = o.optInt("n")
                 runCatching {
                     when (o.getString("op")) {
-                        "chronicle" -> Chronicle(o.getString("text"), o.optJSONArray("tags").strings())
-                        "drop" -> Drop(o.getString("id"))
-                        "reveal" -> Reveal(o.getString("secret"), o.getString("to"))
-                        "new_secret" -> NewSecret(o.getString("text"), o.optJSONArray("knows").strings())
-                        "consequence" -> AddConsequence(o.getString("text"), if (o.has("due_in_turns") && !o.isNull("due_in_turns")) o.getInt("due_in_turns") else null)
-                        "resolve" -> ResolveConsequence(o.getString("id"))
-                        "clock" -> AdvanceClock(o.getString("clock"), o.optInt("by", 1).coerceIn(-1, 2))
-                        "new_clock" -> NewClock(o.getString("name"), o.optInt("size", 6), o.optString("when_full"))
-                        "move" -> Move(o.optString("place"), o.optJSONArray("present").strings())
-                        "character" -> Character(o.getString("name"), o.getString("note"))
+                        "chronicle" -> Chronicle(x, list)
+                        "drop" -> Drop(x)
+                        "reveal" -> Reveal(x, y)
+                        "new_secret" -> NewSecret(x, list)
+                        "consequence" -> AddConsequence(x, n.takeIf { it > 0 })
+                        "resolve" -> ResolveConsequence(x)
+                        "clock" -> AdvanceClock(x, n.coerceIn(-1, 2).takeIf { it != 0 } ?: 1)
+                        "new_clock" -> NewClock(x, if (n > 0) n else 6, y)
+                        "move" -> Move(x, list)
+                        "character" -> Character(x, y)
                         "beat_done" -> BeatDone
                         else -> null
                     }
@@ -288,13 +301,9 @@ sealed interface StateOp {
         /** JSON schema for structured output of the ops list. */
         val SCHEMA = """
         {"type":"object","additionalProperties":false,"required":["ops"],"properties":{"ops":{"type":"array","items":{
-          "type":"object","additionalProperties":false,"required":["op"],"properties":{
+          "type":"object","additionalProperties":false,"required":["op","a","b","list","n"],"properties":{
             "op":{"type":"string","enum":["chronicle","drop","reveal","new_secret","consequence","resolve","clock","new_clock","move","character","beat_done"]},
-            "text":{"type":"string"},"tags":{"type":"array","items":{"type":"string"}},"id":{"type":"string"},
-            "secret":{"type":"string"},"to":{"type":"string"},"knows":{"type":"array","items":{"type":"string"}},
-            "due_in_turns":{"type":"integer"},"clock":{"type":"string"},"by":{"type":"integer"},
-            "name":{"type":"string"},"size":{"type":"integer"},"when_full":{"type":"string"},
-            "place":{"type":"string"},"present":{"type":"array","items":{"type":"string"}},"note":{"type":"string"}}}}}}
+            "a":{"type":"string"},"b":{"type":"string"},"list":{"type":"array","items":{"type":"string"}},"n":{"type":"integer"}}}}}}
         """.trimIndent()
     }
 }

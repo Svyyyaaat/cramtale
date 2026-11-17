@@ -169,3 +169,24 @@ class DeckSelftestRegressionTest {
         assertEquals(setOf("一気", "一気に"), deckHits("彼女は水を一気に飲み干した。", "一気", "一気に").toSet())
     }
 }
+
+class PotentialFormTest {
+    @Test
+    fun `potential verbs count as their base verb`() {
+        val dict = TestDict.full
+        org.junit.jupiter.api.Assumptions.assumeTrue(dict != null, "needs local/jmdict.sqlite")
+        val m = Matcher(dict!!, DeckIndex(listOf(TestDict.word("待つ"), TestDict.word("払う"), TestDict.word("出す")), dict))
+        val lemmas = m.analyze("もう待てない。払えるし、出せる。").words().map { it.lemma }
+        assertEquals(listOf("もう", "待つ", "払う", "出す"), lemmas)
+    }
+}
+
+class PotentialOfCommonVerbTest {
+    @Test
+    fun `potential listed in JMdict still counts as its common base verb`() {
+        val dict = TestDict.full
+        org.junit.jupiter.api.Assumptions.assumeTrue(dict != null, "needs local/jmdict.sqlite")
+        val m = Matcher(dict!!, DeckIndex(emptyList(), dict), com.cramtale.core.match.FrequencyList.bundled())
+        assertEquals(listOf("もらう"), m.analyze("もらえる").words().map { it.lemma })
+    }
+}
