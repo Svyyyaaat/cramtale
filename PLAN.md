@@ -43,6 +43,22 @@ content provider (`content://com.ichi2.anki.flashcards`, `AnkiDroidBridge.java`)
 - Tokenizer: **Kuromoji IPADIC** in the app (`Text.kt`), Janome in Termux, plus JMdict as SQLite.
 - It has labelled test sets of about 510 words (`tools/cases*.json`) for readings and lemmas.
 
+**Your collection** (from the export you sent; it stays out of git):
+
+| Deck | Note type | Word field | Card(s) the app grades |
+|---|---|---|---|
+| 日本語::Nayr's Core 5k (5000) | Japanese Core 5k | `Lemma` | `Recognition` (its only template) |
+| 日本語::claude-generated (145) | Japanese Core 5k | `Lemma` | `Recognition` |
+| 日本語::Japanese V2K (1983 notes) | Japanese (Furigana1, Kanji2 V2K) | `Expression` | `Furigana1` and `Kanji2`; both show the word and ask the meaning |
+| 日本語::僕の日本語 (26 + 45) | 基本 | first line of `裏` (`表` is a sentence with the word in bold) | `カード:1` |
+
+The 45 `GRE vocabulary with Mnemonics` notes in 僕の日本語 are English and are ignored.
+Your Core 5k has more fields than the Miner fills (`Rank` comes first, then `Sentence Gloss`,
+`Hint` and two MorphMan fields). I map fields by name, as the Miner does, and leave the extra
+ones empty. Every deck uses the Default options: 20 new cards a day, 200 reviews, learning steps
+1m 10m, relearning 10m, v3 scheduler, 20-minute learn-ahead. The export includes your full review
+history (81k reviews), so the real Anki scheduler can run on it in tests here (section 4.6).
+
 **What I reuse:** Cram Dungeon's raw-provider approach with its verify, retry and journal
 logic, ported to Kotlin. I use it for adding notes as well, not `AddContentApi`.
 `AddContentApi` hard-codes the AnkiDroid authority, which would stop me pointing the app
@@ -83,10 +99,11 @@ Kotlin and test them against your `cases*.json`.
 ## 4. Anki layer
 
 ### 4.1 Which words are "my deck"
-- Settings pick the **review decks** (default: your Core 5k deck and `RP`), the
-  **note types and the field holding the word** (default `Japanese Core 5k` / `Lemma`),
-  and **the recognition template** (default: the template named like "Recognition", otherwise
-  ord 0). Only recognition cards are ever graded. Other cards of the same note are ignored.
+- Settings pick the **review decks**, the **note types with their word field**, and **which
+  templates are recognition**. The defaults are the four rows of the table in section 1 plus `RP`.
+  Only those cards are ever graded.
+- A V2K note has two recognition cards. If both are due, one read answers both, because the story
+  shows the word in kanji without furigana, which is at least as hard as either card.
 - The deck index is built from note fields (`query(notes, 'note:"Japanese Core 5k"')`).
   Each lemma has HTML and furigana stripped and is normalised to a JMdict entry, so
   spelling variants of the same entry share one key (section 5.2).
@@ -118,7 +135,10 @@ card is graded at most once per passage.
 | New card offered by Anki, first appearance (meaning shown inline under the word) | Again (1), which starts its learning steps |
 | New-then-learning card later, due again, untapped | Good. Repeated at each due moment until Anki graduates it |
 | Card in deck, in the text, **not** due | nothing (free exposure) |
-| Card in deck, tapped, **not** due | **see question Q1**: by default an Again is held and sent at the card's next due moment |
+| Card in deck, tapped, **not** due (review or learning card) | Again, right away (your answer to Q1) |
+| Card in deck, tapped, never studied and not offered by Anki today | nothing. An answer would bring the card in past Anki's new-card limit. It comes when Anki offers it |
+| Suspended or buried card, tapped | nothing |
+| Any deck word, tapped, then **I know it** in the popup | the tap is cancelled (mis-tap); nothing is sent for it |
 | Optional (off by default): review card with interval < 21 days | needs two untapped reads in separate passages. The first is recorded and sends nothing. The second sends Good. A tap at any point sends Again |
 
 - The answer time sent is the passage's reading time split across its graded cards,
@@ -162,15 +182,39 @@ card is graded at most once per passage.
     break your "never change intervals directly" rule.
 
 ### 4.6 A copy of your collection, never the real one
-- The provider authority is a setting. During development the app targets an **AnkiDroid
-  parallel build** (AnkiDroid publishes side-by-side installs with their own package). You
-  import a backup of your collection into it, and the real AnkiDroid is never touched.
-  In step 1 I'll verify that the parallel build exposes its own provider and permission.
-- Switching to the real `com.ichi2.anki` needs a typed confirmation in the app, and **I will
-  ask you before any step that does it**.
-- In this container I test against a `FakeAnkiGateway` that implements the scheduler rules
-  (learning steps, new limit, due times), plus the optional Python harness that runs the real
-  Anki scheduler (`pip install anki`) on a copy of a collection, if you send one.
+**How it works.** AnkiDroid publishes "parallel" builds on its GitHub releases page: the same app
+under a different package name, so it installs next to your AnkiDroid as a second, independent
+app. It has its own collection, its own settings and its own content provider, with its own
+address and permission. You import a backup of your collection into it. Cramtale is pointed at
+that package, so every query and write goes to the copy's database. Your real AnkiDroid is a
+different app that Cramtale isn't connected to. Uninstalling the parallel build deletes the copy
+and nothing else.
+
+**Two ways it could still touch the real collection, and the guards:**
+1. **Sync.** If the copy logged into your sync account, a sync could push sandbox answers into
+   the real collection. Rule: **never log the parallel build into sync.** The app's setup screen
+   repeats this, and the step 1 probe reports the copy's sync status if the provider exposes it.
+2. **Shared folder.** Old AnkiDroid installs kept the collection in `/sdcard/AnkiDroid`. If both
+   apps pointed there, they would share one file. Check once in the copy: *Settings → Advanced →
+   AnkiDroid directory* must not be your real AnkiDroid's folder (a new install defaults to its
+   own private folder).
+
+**How the app makes sure it talks to the copy:**
+- **Target package:** a setting, shown in a banner on every screen ("SANDBOX: com.ichi2.anki.A" in
+  green, or "REAL COLLECTION" in red).
+- **Marker deck:** in the copy you create an empty deck named `CRAMTALE-SANDBOX`. Any write (an
+  added note or an answer) is refused unless the target collection has that deck. Your real
+  collection never will, so even a wrong package setting can't write there. Reads work anywhere.
+- **Real collection:** writing to `com.ichi2.anki` needs a separate switch with a typed confirmation.
+  **I'll ask you before any step that uses it.**
+- **Step 1 probe** confirms the parallel build's package, provider address and permission on your
+  phone before anything relies on them.
+
+**Tests here:** a `FakeAnkiGateway` with the scheduler rules (learning steps, new limit, due times),
+and a Python harness that imports your export into a scratch collection with the real Anki
+scheduler (`pip install anki`). I've checked that this works: the import succeeds and the real
+scheduler reports your deck options. The grading engine is tested against it in step 4, and the
+dry-run report against its revlog.
 
 ## 5. Matcher and checker
 
@@ -291,8 +335,9 @@ history to its summary. That keeps the context short and stops habits from compo
   show their meaning in small text under the word. Tapped words stay marked. Each passage has
   **Reroll** and **Edit** (edit the text; it is re-checked). Your messages show their corrections beside them.
 - **Popup** (bottom sheet): reading, JMdict senses, a one-line meaning in this sentence (a Haiku
-  call, cached), and **I know it** (makes no card). For words outside the deck it also says
-  "will be added to RP" or "queued".
+  call, cached), and **I know it**. For a word outside the deck it marks the word known and makes
+  no card. For a deck word it cancels the tap, for mis-taps. For words outside the deck the popup
+  also says "will be added to RP" or "queued".
 - **Settings:** mode, AnkiDroid target, decks, note types, recognition template, two-read
   option, caps, models and effort, thresholds, the key.
 - **Logs:** writes, the dry-run report, costs, proposed cards awaiting approval.
@@ -306,7 +351,7 @@ note goes to deck `RP`:
 - `English Gloss`: the JMdict sense Haiku picks for this sentence.
 - `Sentence`: the story sentence. `Sentence Pronunciation`: furigana by the Miner's method.
 - `Sentence Translation`: Haiku.
-- `Sentence Audio`: empty for now (see Q5).
+- `Sentence Audio`: generated the way the Miner does it (see Audio below).
 - Tagged `cramtale`, with a duplicate check on `Lemma`.
 
 At most N notes a day (default 10). The rest wait in a queue kept on the phone. Anki's new-card
@@ -318,16 +363,29 @@ They show beside your message. The second time the same key comes up, the app pr
 which you approve or reject. Your top recent keys go to the writer as "use these correctly where
 natural".
 
-**Proposed mistake-card format:** your Core 5k type doesn't fit (its front would show the answer).
-I propose Anki's **stock `Cloze` note type**, which every collection has. That means no new note
-type is created:
-- `Text`: your corrected sentence with the spot blanked: `今日は本当に{{c1::暑い::hot (weather)}}ね。`
-- `Back Extra`: `You wrote 熱い. 暑い is for weather and air, 熱い for things you touch.  key: 熱い↔暑い`
-- Deck `RP`, tags `cramtale cramtale-mistake`.
+**Mistake-card format: your `Japanese Core 5k` type, as the Miner uses it.** No new note type.
+Its only template shows `{{Lemma}}` on the front, so the blanked sentence goes there:
 
-Cloze cards are recall cards, so these are the one exception to "recognition only", and only
-because you asked for them. If your collection has no `Cloze` type, or you'd rather have a
-dedicated type, that needs a new note type, and I'll stop and ask (Q2).
+| Field | Content (example: you wrote 今日は本当に熱いね) |
+|---|---|
+| `Lemma` (front) | `今日は本当に＿＿ね。　(hot · weather)`, with the spot blanked and an English hint so only one word fits |
+| `Part of Speech` | the error type, e.g. `word choice`, `particle`, `conjugation` |
+| `English Gloss` | `暑い, not 熱い. 暑い is for weather and air, 熱い for things you touch.` |
+| `Sentence` / `Sentence Pronunciation` | your corrected sentence / with furigana |
+| `Sentence Translation` | English |
+| `Sentence Audio` | the corrected sentence (Audio below) |
+| `Sentence Gloss` (behind the template's hint toggle) | `You wrote: 今日は本当に熱いね。` |
+| `Hint` (not shown by your template) | the key `熱い↔暑い`, so the same mistake isn't proposed twice |
+
+Deck `RP`, tags `cramtale cramtale-mistake`. One cosmetic catch: the back repeats the blanked
+sentence under "Word:", because the template prints `{{Lemma}}` twice. These are the one exception
+to "recognition only", because you asked for them.
+
+**Audio:** the same route as the Miner. Cramtale asks Termux, through the RUN_COMMAND intent, to run
+the `edge-tts` your Miner setup already installed. It uses the same voice and rate settings
+(default `ja-JP-NanamiNeural`, 0%), reads the MP3 back through a Termux home-folder grant, and hands
+it to AnkiDroid as media through the provider. If Termux or edge-tts fails, the note is added
+without audio and the log says so, as in the Miner. Nothing is generated in read-only mode.
 
 ## 9. Build order
 
@@ -366,19 +424,13 @@ Each step ends with a report: what works, what is untested, and how to run it.
   SDK here if the network allows) and test `core` locally. On-device behaviour stays "untested"
   until you run it.
 
-## 11. Decisions I need from you
+## 11. Decisions
 
-- **Q1: tapping a deck word that isn't due.** You want this graded Again, but you also say a card
-  is answered only when Anki says it is due. My default keeps both rules: hold the Again and send
-  it the next time Anki says the card is due, even if the word doesn't appear in that passage.
-  The alternative is to answer Again right away (an early answer).
-- **Q2: mistake-card format.** Is stock `Cloze` (Text + Back Extra) acceptable, or do you want a
-  dedicated note type? A dedicated type is a new note type, so I'll stop and design it with you.
-- **Q3: decks and templates.** Which deck(s) hold your 4–5k words, and is the recognition card
-  ord 0 of `Japanese Core 5k`? I can also just read this off the step 1 probe.
-- **Q4: development copy.** Is an AnkiDroid parallel build with an imported backup the right
-  "copy" for you?
-- **Q5: audio on RP cards.** Empty for now? Later options are Android TTS to a file, or handing
-  the note to your Miner's Termux edge-tts.
-- **Q6: "I know it" on deck words.** I show it only for words outside the deck. A tap on a deck
-  word stays a tap.
+Settled (your answers on 2026-11-17):
+- **Q1:** tapping a deck word that isn't due sends Again **right away** (section 4.3). Never-studied
+  cards that Anki hasn't offered yet are the exception.
+- **Q2:** mistake cards use `Japanese Core 5k` (section 8).
+- **Q3:** the four decks in section 1.
+- **Q4:** the parallel-build copy with the marker-deck guard (section 4.6).
+- **Q5:** audio from Termux edge-tts, as the Miner does it (section 8).
+- **Q6:** **I know it** stays on deck words and cancels a mis-tap (section 4.3).

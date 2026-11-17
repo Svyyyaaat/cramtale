@@ -1,0 +1,10 @@
+local/
+*.apkg
+*.colpkg
+*.anki2
+*.anki21b
+.gradle/
+build/
+.idea/
+local.properties
+keystore.properties
