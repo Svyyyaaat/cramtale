@@ -19,6 +19,10 @@
         <package android:name="com.ichi2.anki.c" />
         <package android:name="com.ichi2.anki.d" />
         <package android:name="com.ichi2.anki.e" />
+        <!-- the phone's text-to-speech engine (Listen, and the word popup's speaker) -->
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
     </queries>
 
     <application

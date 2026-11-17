@@ -132,7 +132,7 @@ class Shots {
             busy = null, error = error, onRetry = if (error != null) ({}) else null,
             reply = if (error != null) "すみません、もう少し待ってくれませんか。" else "", proposals = emptyList(), tapVersion = 0,
             isTapped = { it.surface == "布" }, statusOf = { if (it.surface == "返済") Status.UNKNOWN else Status.DECK },
-            onBack = {}, onTap = { _, _ -> }, onGrammar = {}, onReroll = {}, onEdit = {}, onSend = {}, onDecide = { _, _ -> })
+            onBack = {}, onTap = { _, _ -> }, onGrammar = {}, onReroll = {}, onEdit = {}, onSend = {}, onDecide = { _, _ -> }, onListen = {})
     }
 
     @Test fun c2_home_dark() = shot(dark = true) {
@@ -174,7 +174,7 @@ class Shots {
     }
 
     @Test fun d3_word_sheet() = shot {
-        WordSheetBody(WordInfo("返済", "へんさい", "repaying the loan", listOf("repayment; reimbursement; refund"), true, card = "repayment"), {}, {})
+        WordSheetBody(WordInfo("返済", "へんさい", "repaying the loan", listOf("repayment; reimbursement; refund"), true, card = "repayment"), {}, {}, onSay = {})
     }
 
     @Test fun d4_name_sheet() = shot {

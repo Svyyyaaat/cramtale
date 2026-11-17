@@ -72,6 +72,9 @@ class AppState(val context: Context) {
             .getOrDefault(com.cramtale.core.story.PassageLength.NORMAL)
         set(v) = prefs.edit().putString("passageLength", v.name).apply()
 
+    /** Japanese text-to-speech (the phone's own engine). */
+    val speaker by lazy { com.cramtale.app.speech.Speaker(context) }
+
     val story by lazy { com.cramtale.app.story.StoryController(context, this) }
 
     var lists: KnownLists = KnownListsStore.load(listsDir)

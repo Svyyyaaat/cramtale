@@ -1,5 +1,7 @@
 package com.cramtale.app.ui
 
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import com.cramtale.app.story.StoryController
@@ -144,7 +146,7 @@ fun PassageText(p: ShownPassage, interactive: Boolean, isTapped: (Span) -> Boole
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PassageTools(p: ShownPassage, enabled: Boolean, onReroll: () -> Unit, onEdit: () -> Unit, onGrammar: (GrammarPatterns.Found) -> Unit,
-                  onVersion: (Int) -> Unit = {}) {
+                  onVersion: (Int) -> Unit = {}, listening: Boolean = false, onListen: (() -> Unit)? = null) {
     var notes by remember { mutableStateOf(false) }
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.Center) {
         if (p.versions > 1) Row(verticalAlignment = Alignment.CenterVertically) {
@@ -156,6 +158,8 @@ fun PassageTools(p: ShownPassage, enabled: Boolean, onReroll: () -> Unit, onEdit
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Next version")
             }
         }
+        if (onListen != null) AssistChip(onListen, { Text(if (listening) "Stop" else "Listen") },
+            leadingIcon = { Icon(if (listening) Icons.Filled.Stop else Icons.AutoMirrored.Filled.VolumeUp, null, Modifier.size(18.dp)) })
         AssistChip(onReroll, { Text("Reroll") }, enabled = enabled, leadingIcon = { Icon(Icons.Filled.Refresh, null, Modifier.size(18.dp)) })
         AssistChip(onEdit, { Text("Edit") }, enabled = enabled, leadingIcon = { Icon(Icons.Filled.Edit, null, Modifier.size(18.dp)) })
         AssistChip({ notes = !notes }, { Text("Notes") }, leadingIcon = { Icon(Icons.Filled.Casino, null, Modifier.size(18.dp)) })
@@ -223,6 +227,8 @@ fun StoryContent(
     intro: String? = null,
     /** Why there are no review words (no AnkiDroid, nothing due…), shown above the reply box. */
     notice: String? = null,
+    listening: Boolean = false,
+    onListen: ((String) -> Unit)? = null,
     onInfo: (() -> Unit)? = null,
 ) {
     val listState = rememberLazyListState()
@@ -257,7 +263,8 @@ fun StoryContent(
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     current.player?.let { PlayerBubble(it, current.corrections) }
                     PassageText(current.passage, true, isTapped, statusOf, tapVersion) { onTap(it, current.passage) }
-                    PassageTools(current.passage, busy == null, onReroll, onEdit, onGrammar, onVersion)
+                    PassageTools(current.passage, busy == null, onReroll, onEdit, onGrammar, onVersion, listening,
+                        onListen?.let { l -> { l(current.passage.text) } })
                 }
             } else if (busy != null) item { Busy(busy) }
             if (error != null) item { ErrorNote(error, onRetry) }
@@ -285,18 +292,22 @@ fun nameReading(surface: String): String? {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WordSheet(info: WordInfo, onKnow: () -> Unit, onClose: () -> Unit) {
+fun WordSheet(info: WordInfo, onKnow: () -> Unit, onClose: () -> Unit, onSay: (() -> Unit)? = null) {
     ModalBottomSheet(onDismissRequest = onClose, containerColor = MaterialTheme.colorScheme.surfaceContainerLowest) {
-        WordSheetBody(info, onKnow, onClose)
+        WordSheetBody(info, onKnow, onClose, onSay)
     }
 }
 
 @Composable
-fun WordSheetBody(info: WordInfo, onKnow: () -> Unit, onClose: () -> Unit) {
+fun WordSheetBody(info: WordInfo, onKnow: () -> Unit, onClose: () -> Unit, onSay: (() -> Unit)? = null) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.Bottom) {
             Text(info.word, style = WordText.copy(fontSize = 40.sp))
             info.reading?.let { Text("  $it", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp)) }
+            if (onSay != null) {
+                Spacer(Modifier.weight(1f))
+                IconButton(onSay) { Icon(Icons.AutoMirrored.Filled.VolumeUp, "Say it", tint = MaterialTheme.colorScheme.primary) }
+            }
         }
         Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = MaterialTheme.shapes.medium) {
             Column(Modifier.fillMaxWidth().padding(16.dp)) {
@@ -346,6 +357,7 @@ fun StoryScreen(state: AppState, onBack: () -> Unit) {
     var role by remember { mutableStateOf<String?>(null) }
     var infoWanted by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { role = withContext(Dispatchers.IO) { story.role() } }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { state.speaker.stop() } }
     LaunchedEffect(infoWanted) { if (infoWanted) { info = withContext(Dispatchers.IO) { story.storyInfo() }; infoWanted = false } }
     var grammar by remember { mutableStateOf<GrammarPatterns.Found?>(null) }
     var editing by remember { mutableStateOf<String?>(null) }
@@ -367,7 +379,10 @@ fun StoryScreen(state: AppState, onBack: () -> Unit) {
         reply = story.replyDraft, onReply = { story.replyDraft = it }, onRetry = story.retry,
         onVersion = { story.selectVersion(it); tapVersion++ },
         onLookup = { s, p -> lookupOnly = true; picked = s to p },
-        intro = role, onInfo = { infoWanted = true }, notice = story.ankiNote,
+        intro = role, onInfo = { infoWanted = true },
+        notice = state.speaker.problem() ?: story.ankiNote,
+        listening = state.speaker.speaking,
+        onListen = { text -> if (state.speaker.speaking) state.speaker.stop() else state.speaker.say(text) },
     )
     info?.let { i -> StoryInfoSheet(i) { info = null } }
 
@@ -382,7 +397,8 @@ fun StoryScreen(state: AppState, onBack: () -> Unit) {
                 span.entries.take(2).flatMap { e -> dict?.senses(e).orEmpty().take(3).map { it.gloss } }, span.deck.isNotEmpty(),
                 earlier = lookupOnly, card = span.deck.firstNotNullOfOrNull { it.meaning })
         }
-        WordSheet(info, onKnow = { story.iKnowIt(span); tapVersion++; picked = null }, onClose = { picked = null })
+        WordSheet(info, onKnow = { story.iKnowIt(span); tapVersion++; picked = null }, onClose = { picked = null },
+            onSay = { state.speaker.say(span.surface, rate = 0.8f) })
     }
     grammar?.let { g ->
         AlertDialog(onDismissRequest = { grammar = null }, title = { Text(g.pattern.id, style = WordText.copy(fontSize = 28.sp)) },
