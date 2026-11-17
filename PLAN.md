@@ -236,11 +236,11 @@ suffixes and prefixes are attached to their word.
 - **Multi-word deck entries** (腹が立つ, 気がする, 仕方ない) are matched over token sequences on
   base forms, **longest first**, before single words.
 - **Known** = deck ∪ frequency list ∪ words you marked known ∪ names.
-- **Frequency list:** jpdb.io's ranks, keyed by JMdict entry id. The rank used is the median of the
-  Anime, Visual Novel, Books, Web Novel and Live Action ranks, so it reflects fiction and dialogue,
-  not news. Collected from the vocabulary lists of four light-novel series by `tools/jpdb_ranks.py`.
-  Words it lacks fall back to JMdict's priority tags. Step 1 calibrates the threshold on your marks.
-  (A list built from news corpora was tried first and dropped: it ranked サービス above どきどき.)
+- **Frequency list:** the JPDB v2.2 frequency dictionary (jpdb.io's anime, light novel, visual
+  novel and drama corpus), tied to JMdict entries by spelling and reading, with separate ranks for
+  kana-written forms. Words it lacks fall back to JMdict's priority tags. Step 1 calibrates the
+  threshold on your marks. (A list built from news corpora was tried first and dropped: it ranked
+  サービス far above どきどき.) The list stays out of the public repo; see `freq/SOURCES.md`.
 
 ### 5.3 Checks on every passage, before you see it
 1. **Target words:** the writer returns `{lemma, form}` for each due word it used. Code
