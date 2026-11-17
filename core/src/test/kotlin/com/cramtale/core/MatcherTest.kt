@@ -138,3 +138,34 @@ class MatcherTest {
         assertEquals(2, s.unknown)
     }
 }
+
+/** Regressions found by `cli deck-selftest` on the user's deck (each note's word in its own sentence). */
+class DeckSelftestRegressionTest {
+    private val dict = TestDict.fixture
+
+    private fun deckHits(text: String, vararg deck: String): List<String> {
+        val m = Matcher(dict, DeckIndex(deck.map { TestDict.word(it) }, dict))
+        return m.analyze(text).spans.flatMap { s -> s.deck.map { it.word } }
+    }
+
+    @Test
+    fun `suru verbs read as -su by IPADIC still match`() {
+        assertEquals(listOf("属する"), deckHits("彼はサッカーチームに属している。", "属する"))
+    }
+
+    @Test
+    fun `a JMdict compound does not swallow a deck word`() {
+        assertEquals(listOf("企業"), deckHits("兄は日本企業で働いている。", "企業"))
+    }
+
+    @Test
+    fun `adverb and honorific forms find the deck word inside`() {
+        assertEquals(listOf("一気"), deckHits("彼女は水を一気に飲み干した。", "一気"))
+        assertEquals(listOf("弁当"), deckHits("お弁当を買いに行く。", "弁当"))
+    }
+
+    @Test
+    fun `one read can stand for two cards of the same word`() {
+        assertEquals(setOf("一気", "一気に"), deckHits("彼女は水を一気に飲み干した。", "一気", "一気に").toSet())
+    }
+}

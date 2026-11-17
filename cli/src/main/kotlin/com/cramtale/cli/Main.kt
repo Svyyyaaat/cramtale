@@ -24,6 +24,7 @@ private const val USAGE = """cramtale CLI (matcher calibration)
                (e.g. JPDB v2.2 Frequency Kana; rows become JMdict entry id, spelling, rank)
   vocab-check  --jmdict <db> --deck <deck.jsonl>   (asks y/n per word, suggests a cut-off)
   deck-report  --jmdict <db> --deck <deck.jsonl>
+  deck-selftest --jmdict <db> --deck <deck.jsonl>   (finds each note's word in its own example sentence)
   analyze      --jmdict <db> --deck <deck.jsonl> [--lists <dir>] [--threshold N]
                [--new-suspended-unknown] [--no-studied-suspended] <text file | ->
 """
@@ -35,6 +36,7 @@ fun main(args: Array<String>) {
         "import-freq" -> importFreq(Opts(args.drop(1)))
         "vocab-check" -> vocabCheck(Opts(args.drop(1)))
         "deck-report" -> deckReport(Opts(args.drop(1)))
+        "deck-selftest" -> deckSelftest(Opts(args.drop(1)))
         "analyze" -> analyze(Opts(args.drop(1)))
         else -> { print(USAGE); exitProcess(1) }
     }
@@ -140,6 +142,48 @@ private fun vocabCheck(o: Opts) {
     val results = com.cramtale.core.match.VocabCheck.results(answers)
     for (r in results) println("%6d-%-6d  %d/%d known".format(r.from, r.to, r.known, r.asked))
     println("Suggested cut-off: ${com.cramtale.core.match.VocabCheck.suggestedThreshold(results)}")
+}
+
+/** Matching check on real data: is each note's word found, as that note, in the note's own example sentence? */
+private fun deckSelftest(o: Opts) {
+    val dict = Jmdict(JdbcSql(o.need("--jmdict")))
+    val notes = File(o.need("--deck")).useLines { DeckExport.parse(it) }.associateBy { it.noteId }
+    val words = DeckReader.words(notes.values.toList())
+    val matcher = Matcher(dict, DeckIndex(words, dict), frequency)
+    val sentenceField = mapOf("Japanese Core 5k" to "Sentence", "基本" to "表")
+    val tag = Regex("<[^>]*>")
+    var tested = 0
+    var found = 0
+    val misses = ArrayList<String>()
+    for (w in words) {
+        val raw = notes[w.noteId]?.fields?.get(sentenceField[w.noteType] ?: continue) ?: continue
+        val sentence = raw.replace(tag, "").replace("&nbsp;", " ").trim()
+        if (sentence.isEmpty()) continue
+        tested++
+        val spans = matcher.analyze(sentence).spans
+        if (spans.any { s -> s.deck.any { it.noteId == w.noteId } }) found++
+        else misses += "${why(w.word, sentence)}\t${w.word}\t${sentence}\t" + spans.filter { it.isWord }.joinToString(" ") { it.lemma }
+    }
+    println("Notes with an example sentence: $tested   word found as that note: $found (${"%.1f".format(100.0 * found / tested)}%)")
+    println("Misses by cause:")
+    misses.groupingBy { it.substringBefore('\t') }.eachCount().entries.sortedByDescending { it.value }
+        .forEach { println("  %-40s %d".format(it.key, it.value)) }
+    println("Misses (cause, word, sentence, what the matcher saw):")
+    misses.sorted().forEach { println("  $it") }
+}
+
+/** Rough cause of a self-test miss, from how Kuromoji reads the deck word on its own. */
+private fun why(word: String, sentence: String): String {
+    val toks = com.cramtale.core.text.Tokenizer.tokenize(word).filterNot { it.isSymbol }
+    val t = toks.singleOrNull()
+    return when {
+        toks.any { it.pos1 == "名詞" && it.pos2 == "数" } || word.any { it.isDigit() } -> "number / counter (skipped by rule)"
+        t != null && t.pos1 == "名詞" && t.pos2 == "固有名詞" -> "name / place (skipped by rule)"
+        t != null && t.pos1 in setOf("助詞", "助動詞", "感動詞", "フィラー") -> "particle / auxiliary / interjection (skipped by rule)"
+        toks.size > 1 && toks.any { it.pos1 == "助詞" || it.pos1 == "助動詞" } -> "grammar pattern (によれば, こともある)"
+        word !in sentence && toks.none { it.base in sentence || it.surface in sentence } -> "sentence doesn't contain the word as written"
+        else -> "other"
+    }
 }
 
 private fun deckReport(o: Opts) {

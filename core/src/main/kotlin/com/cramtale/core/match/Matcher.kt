@@ -109,7 +109,8 @@ class Matcher(
     private val frequency: FrequencyList? = null,
 ) {
 
-    fun analyze(text: String): Analysis {
+    fun analyze(text: String): Analysis = synchronized(this) {
+        wordCache.clear()
         val toks = Tokenizer.tokenize(text)
         val spans = ArrayList<Span>()
         var i = 0
@@ -125,8 +126,15 @@ class Matcher(
             spans += single(t)
             i++
         }
-        return Analysis(text, spans)
+        Analysis(text, spans)
     }
+
+    /**
+     * The spec's skip list (particles, auxiliaries, interjections, numbers, names) always applies.
+     * The rest (suffixes, function nouns, helper verbs, prefixes) is skipped only when the deck
+     * doesn't have the word: 倍, 末 or 都度 are cards worth reviewing.
+     */
+    private fun alwaysIgnored(reason: String) = reason in setOf("particle", "auxiliary", "interjection", "filler", "other", "number", "name")
 
     private fun ignoreReason(t: Tok): String? = when {
         t.pos1 == "助詞" -> "particle"
@@ -168,6 +176,8 @@ class Matcher(
             // a JMdict join must end on a content word: 今日は|雨 is not こんにちは, 知ら|ない is 知る
             val last = window.last()
             if (last.pos1 == "助詞" || last.pos1 == "助動詞") continue
+            // never let a JMdict compound swallow a deck word: 日本|企業 keeps 企業, すぐ|側 keeps 側
+            if (window.any { t -> ignoreReason(t) == null && wordSpan(t).deck.isNotEmpty() }) continue
             for (c in candidates) {
                 val entries = Normalize.entriesFor(dict, c, null)
                 if (entries.isEmpty()) continue
@@ -186,23 +196,62 @@ class Matcher(
         return Span(
             start, end, window.joinToString("") { it.surface }, lemma, entries,
             rank(entries, lemma),
-            index.find(listOf(lemma), entries), null, window.size,
+            (index.find(listOf(lemma), entries) + affixFallback(lemma)).distinct(), null, window.size,
             parts = window.map(::single),
         )
     }
 
     private fun single(t: Tok): Span {
-        ignoreReason(t)?.let { return Span(t.start, t.end, t.surface, t.base, emptySet(), null, emptyList(), it, 1) }
+        val reason = ignoreReason(t)
+        if (reason != null && alwaysIgnored(reason)) return ignored(t, reason)
+        val span = wordSpan(t)
+        if (reason != null && span.deck.isEmpty()) return ignored(t, reason)
+        return span
+    }
+
+    private fun ignored(t: Tok, reason: String) = Span(t.start, t.end, t.surface, t.base, emptySet(), null, emptyList(), reason, 1)
+
+    private val wordCache = HashMap<Tok, Span>()
+
+    /** The token as a word, ignoring the skip rules. */
+    private fun wordSpan(t: Tok): Span = wordCache.getOrPut(t) {
         var lemma = t.base
         var entries = Normalize.entriesFor(dict, lemma, readingIfPlain(t))
         if (entries.isEmpty() && t.surface != lemma) {
             val e = Normalize.entriesFor(dict, t.surface, null)
             if (e.isNotEmpty()) { lemma = t.surface; entries = e }
         }
-        return Span(
-            t.start, t.end, t.surface, lemma, entries, rank(entries, lemma),
-            index.find(listOf(lemma, t.surface).distinct(), entries), null, 1,
-        )
+        val texts = mutableListOf(lemma, t.surface)
+        // IPADIC reads 属し as 属す; dictionaries and decks list 属する (and 要する, 愛する…)
+        if (t.pos1 == "動詞" && t.base.length >= 2 && t.base.endsWith("す")) {
+            val suru = t.base.dropLast(1) + "する"
+            val e = Normalize.entriesFor(dict, suru, null)
+            if (e.isNotEmpty() || index.hasText(suru)) {
+                if (entries.isEmpty()) lemma = suru
+                entries = entries + e
+                texts += suru
+            }
+        }
+        // both: 一気に is your V2K card 一気に and your Core 5k card 一気
+        val deck = (index.find(texts.distinct(), entries) + affixFallback(lemma)).distinct()
+        Span(t.start, t.end, t.surface, lemma, entries, rank(entries, lemma), deck, null, 1)
+    }
+
+    /**
+     * IPADIC reads many adverbs as one word (完全に, 一気に, 依然として, 心から) and keeps honorific
+     * お/ご attached (お祝い). Reading those means knowing the deck word inside, so they match it.
+     */
+    private fun affixFallback(lemma: String): List<DeckWord> {
+        val stems = ArrayList<String>()
+        for (suffix in listOf("として", "から", "に", "と", "で")) {
+            if (lemma.length > suffix.length && lemma.endsWith(suffix)) stems += lemma.dropLast(suffix.length)
+        }
+        if (lemma.length > 1 && (lemma.startsWith("お") || lemma.startsWith("ご") || lemma.startsWith("御"))) stems += lemma.drop(1)
+        for (stem in stems) {
+            val found = index.find(listOf(stem), Normalize.entriesFor(dict, stem, null))
+            if (found.isNotEmpty()) return found
+        }
+        return emptyList()
     }
 
     /** jpdb's fiction rank when the list has the word, else JMdict's coarser priority rank. */

@@ -683,6 +683,92 @@ various information fields.
 </sense>
 </entry>
 <entry>
+<ent_seq>1161720</ent_seq>
+<k_ele>
+<keb>一気</keb>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf03</ke_pri>
+</k_ele>
+<r_ele>
+<reb>いっき</reb>
+<re_pri>news1</re_pri>
+<re_pri>nf03</re_pri>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<gloss>one breath</gloss>
+</sense>
+<sense>
+<pos>&int;</pos>
+<s_inf>chanted repeatedly as a party cheer</s_inf>
+<gloss>chug!</gloss>
+<gloss>drink!</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1161730</ent_seq>
+<k_ele>
+<keb>一気に</keb>
+<ke_pri>ichi1</ke_pri>
+</k_ele>
+<r_ele>
+<reb>いっきに</reb>
+<re_pri>ichi1</re_pri>
+</r_ele>
+<sense>
+<pos>&adv;</pos>
+<gloss>in one go</gloss>
+<gloss>in one gulp</gloss>
+<gloss>in one breath</gloss>
+<gloss>without stopping</gloss>
+<gloss>without pausing</gloss>
+<gloss>without a rest</gloss>
+<gloss>in one sitting</gloss>
+<gloss>at a stretch</gloss>
+</sense>
+<sense>
+<pos>&adv;</pos>
+<gloss>suddenly</gloss>
+<gloss>all of a sudden</gloss>
+<gloss>all at once</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1169780</ent_seq>
+<k_ele>
+<keb>飲み干す</keb>
+<ke_pri>news2</ke_pri>
+<ke_pri>nf40</ke_pri>
+</k_ele>
+<k_ele>
+<keb>飲み乾す</keb>
+<ke_inf>&rK;</ke_inf>
+</k_ele>
+<k_ele>
+<keb>飲干す</keb>
+<ke_inf>&sK;</ke_inf>
+</k_ele>
+<k_ele>
+<keb>飲みほす</keb>
+<ke_inf>&sK;</ke_inf>
+</k_ele>
+<r_ele>
+<reb>のみほす</reb>
+<re_pri>news2</re_pri>
+<re_pri>nf40</re_pri>
+</r_ele>
+<sense>
+<pos>&v5s;</pos>
+<pos>&vt;</pos>
+<gloss>to drink up</gloss>
+<gloss>to drink to the last drop</gloss>
+<gloss>to drink (a glass) dry</gloss>
+<gloss>to drain (one's glass)</gloss>
+<gloss>to empty</gloss>
+<gloss>to down (a drink)</gloss>
+</sense>
+</entry>
+<entry>
 <ent_seq>1171900</ent_seq>
 <k_ele>
 <keb>雨</keb>
@@ -976,6 +1062,50 @@ various information fields.
 </sense>
 </entry>
 <entry>
+<ent_seq>1211510</ent_seq>
+<k_ele>
+<keb>完全</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf04</ke_pri>
+</k_ele>
+<r_ele>
+<reb>かんぜん</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf04</re_pri>
+</r_ele>
+<sense>
+<pos>&adj-na;</pos>
+<pos>&adj-no;</pos>
+<pos>&n;</pos>
+<gloss>perfect</gloss>
+<gloss>complete</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1218190</ent_seq>
+<k_ele>
+<keb>企業</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf01</ke_pri>
+</k_ele>
+<r_ele>
+<reb>きぎょう</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf01</re_pri>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<gloss>enterprise</gloss>
+<gloss>business</gloss>
+<gloss>company</gloss>
+<gloss>corporation</gloss>
+</sense>
+</entry>
+<entry>
 <ent_seq>1220210</ent_seq>
 <k_ele>
 <keb>机</keb>
@@ -1094,6 +1224,32 @@ various information fields.
 <misc>&arch;</misc>
 <gloss>to advance (against one's enemy)</gloss>
 <gloss>to charge (on horseback)</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1249900</ent_seq>
+<k_ele>
+<keb>兄</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf05</ke_pri>
+</k_ele>
+<r_ele>
+<reb>あに</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf05</re_pri>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<xref>弟・1</xref>
+<gloss>older brother</gloss>
+<gloss>elder brother</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<xref>義兄・1</xref>
+<gloss>brother-in-law (spouse's older brother or older sister's husband)</gloss>
 </sense>
 </entry>
 <entry>
@@ -1911,6 +2067,48 @@ various information fields.
 </sense>
 </entry>
 <entry>
+<ent_seq>1371260</ent_seq>
+<k_ele>
+<keb>水</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf01</ke_pri>
+</k_ele>
+<r_ele>
+<reb>みず</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf01</re_pri>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<xref>湯・ゆ・1</xref>
+<gloss>water (esp. cool or cold)</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<gloss>fluid (esp. in an animal tissue)</gloss>
+<gloss>liquid</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<gloss>flood</gloss>
+<gloss>floodwaters</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<xref>力水</xref>
+<field>&sumo;</field>
+<gloss>water offered to wrestlers just prior to a bout</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<xref>水入り</xref>
+<field>&sumo;</field>
+<gloss>break granted to wrestlers engaged in a prolonged bout</gloss>
+</sense>
+</entry>
+<entry>
 <ent_seq>1387870</ent_seq>
 <k_ele>
 <keb>先週</keb>
@@ -2017,6 +2215,29 @@ various information fields.
 <gloss>to do (the job)</gloss>
 <gloss>to serve</gloss>
 <gloss>to answer</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1405710</ent_seq>
+<k_ele>
+<keb>属する</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf11</ke_pri>
+</k_ele>
+<r_ele>
+<reb>ぞくする</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf11</re_pri>
+</r_ele>
+<sense>
+<pos>&vs-s;</pos>
+<pos>&vi;</pos>
+<gloss>to belong to</gloss>
+<gloss>to come under</gloss>
+<gloss>to be affiliated with</gloss>
+<gloss>to be subject to</gloss>
 </sense>
 </entry>
 <entry>
@@ -2242,6 +2463,49 @@ various information fields.
 <sense>
 <pos>&n;</pos>
 <gloss>Tokyo</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1451150</ent_seq>
+<k_ele>
+<keb>働く</keb>
+<ke_pri>ichi1</ke_pri>
+</k_ele>
+<r_ele>
+<reb>はたらく</reb>
+<re_pri>ichi1</re_pri>
+</r_ele>
+<sense>
+<pos>&v5k;</pos>
+<pos>&vi;</pos>
+<gloss>to work</gloss>
+<gloss>to labor</gloss>
+<gloss>to labour</gloss>
+</sense>
+<sense>
+<pos>&v5k;</pos>
+<pos>&vi;</pos>
+<gloss>to function</gloss>
+<gloss>to operate</gloss>
+<gloss>to be effective</gloss>
+<gloss>to work (i.e. ... works)</gloss>
+<gloss>to come into play</gloss>
+</sense>
+<sense>
+<pos>&v5k;</pos>
+<pos>&vi;</pos>
+<gloss>to commit (e.g. a crime)</gloss>
+<gloss>to perpetrate</gloss>
+<gloss>to do</gloss>
+<gloss>to act</gloss>
+<gloss>to practise</gloss>
+<gloss>to practice</gloss>
+</sense>
+<sense>
+<pos>&v5k;</pos>
+<pos>&vi;</pos>
+<field>&ling;</field>
+<gloss>to be conjugated</gloss>
 </sense>
 </entry>
 <entry>
@@ -2638,6 +2902,60 @@ various information fields.
 <pos>&vi;</pos>
 <gloss>discount</gloss>
 <gloss>price reduction</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1513060</ent_seq>
+<k_ele>
+<keb>弁当</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf07</ke_pri>
+</k_ele>
+<k_ele>
+<keb>辨當</keb>
+<ke_inf>&oK;</ke_inf>
+</k_ele>
+<k_ele>
+<keb>弁當</keb>
+<ke_inf>&oK;</ke_inf>
+</k_ele>
+<k_ele>
+<keb>辨当</keb>
+<ke_inf>&oK;</ke_inf>
+</k_ele>
+<r_ele>
+<reb>べんとう</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf07</re_pri>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<xref>お弁当</xref>
+<gloss>bento</gloss>
+<gloss g_type="expl">Japanese box lunch</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1513065</ent_seq>
+<k_ele>
+<keb>お弁当</keb>
+<ke_pri>spec1</ke_pri>
+</k_ele>
+<k_ele>
+<keb>御弁当</keb>
+<ke_inf>&sK;</ke_inf>
+</k_ele>
+<r_ele>
+<reb>おべんとう</reb>
+<re_pri>spec1</re_pri>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<xref>弁当</xref>
+<gloss>bento</gloss>
+<gloss g_type="expl">Japanese box lunch</gloss>
 </sense>
 </entry>
 <entry>
@@ -3548,6 +3866,21 @@ various information fields.
 </sense>
 </entry>
 <entry>
+<ent_seq>2143410</ent_seq>
+<k_ele>
+<keb>日本企業</keb>
+<ke_pri>spec1</ke_pri>
+</k_ele>
+<r_ele>
+<reb>にほんきぎょう</reb>
+<re_pri>spec1</re_pri>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<gloss>Japanese company (business, firm)</gloss>
+</sense>
+</entry>
+<entry>
 <ent_seq>2146440</ent_seq>
 <k_ele>
 <keb>好き</keb>
@@ -3568,6 +3901,64 @@ various information fields.
 <pos>&suf;</pos>
 <gloss>being attractive to</gloss>
 <gloss>being liked by</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>2153780</ent_seq>
+<k_ele>
+<keb>水</keb>
+</k_ele>
+<r_ele>
+<reb>すい</reb>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<xref>水曜日</xref>
+<misc>&abbr;</misc>
+<gloss>Wednesday</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<xref>氷水・2</xref>
+<gloss>shaved ice (served with flavored syrup)</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<xref>五行・1</xref>
+<gloss>water (fifth of the five elements)</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>2200990</ent_seq>
+<k_ele>
+<keb>兄</keb>
+</k_ele>
+<r_ele>
+<reb>けい</reb>
+</r_ele>
+<sense>
+<pos>&pn;</pos>
+<misc>&fam;</misc>
+<misc>&hon;</misc>
+<misc>&male;</misc>
+<s_inf>used in letters to address a male friend or superior</s_inf>
+<gloss>you</gloss>
+</sense>
+<sense>
+<pos>&suf;</pos>
+<misc>&fam;</misc>
+<misc>&hon;</misc>
+<misc>&male;</misc>
+<s_inf>used in letters after the name of a male friend or superior</s_inf>
+<gloss>Mr</gloss>
+<gloss>Mister</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<xref>兄・あに・1</xref>
+<s_inf>orig. meaning</s_inf>
+<gloss>older brother</gloss>
+<gloss>elder brother</gloss>
 </sense>
 </entry>
 <entry>
@@ -3655,6 +4046,99 @@ various information fields.
 </sense>
 </entry>
 <entry>
+<ent_seq>2254970</ent_seq>
+<k_ele>
+<keb>兄</keb>
+</k_ele>
+<r_ele>
+<reb>にい</reb>
+</r_ele>
+<sense>
+<pos>&n-suf;</pos>
+<xref>お兄さん・1</xref>
+<misc>&fam;</misc>
+<gloss>older brother</gloss>
+<gloss>elder brother</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>2410030</ent_seq>
+<k_ele>
+<keb>嘱する</keb>
+</k_ele>
+<k_ele>
+<keb>属する</keb>
+</k_ele>
+<r_ele>
+<reb>しょくする</reb>
+</r_ele>
+<sense>
+<pos>&vs-s;</pos>
+<pos>&vt;</pos>
+<misc>&form;</misc>
+<gloss>to entrust (someone) with</gloss>
+<gloss>to pin one's hopes on (someone's future)</gloss>
+<gloss>to have great expectations for</gloss>
+</sense>
+<sense>
+<pos>&vs-s;</pos>
+<pos>&vt;</pos>
+<misc>&form;</misc>
+<gloss>to have (someone) deliver (a letter, etc.)</gloss>
+<gloss>to leave (a message)</gloss>
+<gloss>to send word</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>2410040</ent_seq>
+<k_ele>
+<keb>属す</keb>
+</k_ele>
+<r_ele>
+<reb>ぞくす</reb>
+</r_ele>
+<sense>
+<pos>&v5s;</pos>
+<pos>&vs-c;</pos>
+<pos>&vi;</pos>
+<xref>属する・ぞくする</xref>
+<gloss>to belong to</gloss>
+<gloss>to come under</gloss>
+<gloss>to be affiliated with</gloss>
+<gloss>to be subject to</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>2410050</ent_seq>
+<k_ele>
+<keb>嘱す</keb>
+</k_ele>
+<k_ele>
+<keb>属す</keb>
+</k_ele>
+<r_ele>
+<reb>しょくす</reb>
+</r_ele>
+<sense>
+<pos>&v5s;</pos>
+<pos>&vt;</pos>
+<xref>嘱する・1</xref>
+<misc>&form;</misc>
+<gloss>to entrust (someone) with</gloss>
+<gloss>to pin one's hopes on (someone's future)</gloss>
+<gloss>to have great expectations for</gloss>
+</sense>
+<sense>
+<pos>&v5s;</pos>
+<pos>&vt;</pos>
+<xref>嘱する・2</xref>
+<misc>&form;</misc>
+<gloss>to have (someone) deliver (a letter, etc.)</gloss>
+<gloss>to leave (a message)</gloss>
+<gloss>to send word</gloss>
+</sense>
+</entry>
+<entry>
 <ent_seq>2586260</ent_seq>
 <k_ele>
 <keb>学生</keb>
@@ -3697,6 +4181,50 @@ various information fields.
 <xref>猫・1</xref>
 <misc>&arch;</misc>
 <gloss>cat</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>2712010</ent_seq>
+<k_ele>
+<keb>兄</keb>
+</k_ele>
+<k_ele>
+<keb>首</keb>
+</k_ele>
+<k_ele>
+<keb>氏上</keb>
+</k_ele>
+<r_ele>
+<reb>このかみ</reb>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<xref>長男</xref>
+<misc>&arch;</misc>
+<gloss>eldest son</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<misc>&arch;</misc>
+<gloss>older brother</gloss>
+<gloss>older sister</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<misc>&arch;</misc>
+<gloss>older person</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<xref>氏上</xref>
+<misc>&arch;</misc>
+<gloss>head of a clan</gloss>
+<gloss>head of a region</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<misc>&arch;</misc>
+<gloss>skilled craftsman</gloss>
 </sense>
 </entry>
 <entry>

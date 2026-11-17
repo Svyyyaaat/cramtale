@@ -9,7 +9,7 @@ import com.cramtale.core.match.RawCard
 import java.io.File
 
 object TestDict {
-    /** JMdict built from the checked-in fixture (78 real entries, CC BY-SA 4.0, EDRDG). */
+    /** JMdict built from the checked-in fixture (real entries, CC BY-SA 4.0, EDRDG). */
     val fixture: Jmdict by lazy {
         val f = File.createTempFile("jmdict-fixture", ".sqlite").apply { delete(); deleteOnExit() }
         val db = JdbcSql(f.path)
