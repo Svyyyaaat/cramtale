@@ -178,6 +178,11 @@ class Shots {
         WordSheetBody(WordInfo("返済", "へんさい", "repaying the loan", listOf("repayment; reimbursement; refund"), true, card = "repayment"), {}, {}, onSay = {})
     }
 
+    @Test fun d3b_new_card_sheet() = shot {
+        WordSheetBody(WordInfo("書類", "しょるい", "the festival papers Sakaki brought", listOf("documents; official papers"), true,
+            card = "documents, papers", newCard = true), {}, {}, onSay = {})
+    }
+
     @Test fun d4_name_sheet() = shot {
         WordSheetBody(WordInfo("榊", nameReading("榊"), "Sakaki, the visitor who brought the papers", emptyList(), false, isName = true), {}, {})
     }

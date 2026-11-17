@@ -1,5 +1,6 @@
 package com.cramtale.app.ui
 
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import kotlinx.coroutines.withContext
@@ -281,7 +282,9 @@ data class WordInfo(val word: String, val reading: String?, val inSentence: Stri
                     /** Looked up in an earlier passage: not graded, nothing to cancel. */
                     val earlier: Boolean = false,
                     /** The meaning on your own card, for deck words. */
-                    val card: String? = null)
+                    val card: String? = null,
+                    /** A new card: offer "Already know it" (skip it; would be suspended in Anki). */
+                    val newCard: Boolean = false)
 
 /** How a name is read, from the tokenizer, in hiragana; null when it's already all kana. */
 fun nameReading(surface: String): String? {
@@ -292,14 +295,14 @@ fun nameReading(surface: String): String? {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WordSheet(info: WordInfo, onKnow: () -> Unit, onClose: () -> Unit, onSay: (() -> Unit)? = null) {
+fun WordSheet(info: WordInfo, onKnow: () -> Unit, onClose: () -> Unit, onSay: (() -> Unit)? = null, onKnownNew: () -> Unit = {}) {
     ModalBottomSheet(onDismissRequest = onClose, containerColor = MaterialTheme.colorScheme.surfaceContainerLowest) {
-        WordSheetBody(info, onKnow, onClose, onSay)
+        WordSheetBody(info, onKnow, onClose, onSay, onKnownNew)
     }
 }
 
 @Composable
-fun WordSheetBody(info: WordInfo, onKnow: () -> Unit, onClose: () -> Unit, onSay: (() -> Unit)? = null) {
+fun WordSheetBody(info: WordInfo, onKnow: () -> Unit, onClose: () -> Unit, onSay: (() -> Unit)? = null, onKnownNew: () -> Unit = {}) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.Bottom) {
             Text(info.word, style = WordText.copy(fontSize = 40.sp))
@@ -331,13 +334,17 @@ fun WordSheetBody(info: WordInfo, onKnow: () -> Unit, onClose: () -> Unit, onSay
             Spacer(Modifier.width(8.dp))
             Text(when {
                 info.isName -> "A name: not graded, and no card is made."
+                info.newCard -> "A new card. If you already know it, it's skipped from now on (and would be suspended in Anki once the app may write)."
                 info.earlier && info.inDeck -> "In your deck. Looking words up in earlier passages doesn't count against them."
                 info.inDeck -> "In your deck: this tap counts as Again. If it was a mis-tap, say you know it."
                 else -> "Not in your deck. From the next version, unknown words go to your RP deck."
             }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (info.isName || (info.earlier && info.inDeck)) PrimaryButton("Close", onClose, Modifier.weight(1f))
+            if (info.newCard) {
+                SecondaryButton("Close", onClose, Modifier.weight(1f))
+                PrimaryButton("Already know it", onKnownNew, Modifier.weight(1f), icon = Icons.Filled.Check)
+            } else if (info.isName || (info.earlier && info.inDeck)) PrimaryButton("Close", onClose, Modifier.weight(1f))
             else {
                 SecondaryButton("Close", onClose, Modifier.weight(1f))
                 PrimaryButton("I know it", onKnow, Modifier.weight(1f))
@@ -401,11 +408,13 @@ fun StoryScreen(state: AppState, onBack: () -> Unit) {
                 if (story.isName(span)) WordInfo(span.surface, nameReading(span.surface), meaning, emptyList(), false, isName = true)
                 else WordInfo(span.lemma, span.entries.firstOrNull()?.let { dict?.forms(it)?.kana?.firstOrNull() }, meaning,
                     span.entries.take(2).flatMap { e -> dict?.senses(e).orEmpty().take(3).map { it.gloss } }, span.deck.isNotEmpty(),
-                    earlier = lookupOnly, card = span.deck.firstNotNullOfOrNull { it.meaning })
+                    earlier = lookupOnly, card = span.deck.firstNotNullOfOrNull { it.meaning },
+                    newCard = story.newCardsIn(span).isNotEmpty())
             }
         }
         WordSheet(info, onKnow = { story.iKnowIt(span); tapVersion++; picked = null }, onClose = { picked = null },
-            onSay = { state.speaker.say(span.surface, rate = 0.8f) })
+            onSay = { state.speaker.say(span.surface, rate = 0.8f) },
+            onKnownNew = { story.alreadyKnow(story.newCardsIn(span)); tapVersion++; picked = null })
     }
     grammar?.let { g ->
         AlertDialog(onDismissRequest = { grammar = null }, title = { Text(g.pattern.id, style = WordText.copy(fontSize = 28.sp)) },

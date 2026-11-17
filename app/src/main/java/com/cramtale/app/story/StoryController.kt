@@ -79,6 +79,8 @@ class StoryController(
     private val planner = ReviewPlanner(grammar, File(dir, "log/skips.json"))
     val mistakes = MistakeLog(File(dir, "log/mistakes.json"))
     val gradeLog = GradeLog(File(dir, "log/grades.jsonl"))
+    /** New cards you already know: skipped here, would be suspended in Anki once writing is on. */
+    val knownNew = com.cramtale.core.review.KnownNewCards(File(dir, "log/known-new.json"))
     private val grading = GradingEngine(twoReads = app.twoReads, pendingReads = PendingReads(File(dir, "log/two-reads.json")))
 
     var busy by mutableStateOf<String?>(null)
@@ -126,7 +128,7 @@ class StoryController(
      */
     fun archiveAndReset(): File? {
         if (isWorking) return null
-        val keep = listOf("log/mistakes.json", "log/grades.jsonl", "log/skips.json", "log/two-reads.json", "log/costs.jsonl", "log/not-vocab.txt")
+        val keep = listOf("log/mistakes.json", "log/grades.jsonl", "log/skips.json", "log/two-reads.json", "log/costs.jsonl", "log/not-vocab.txt", "log/known-new.json")
         val archive = File(context.filesDir, "story-archive/" + java.text.SimpleDateFormat("yyyy-MM-dd_HHmm", java.util.Locale.US).format(java.util.Date()))
         archive.parentFile?.mkdirs()
         if (!dir.renameTo(archive)) return null
@@ -272,6 +274,8 @@ class StoryController(
             snap
         }
         val snap = result.getOrElse { return noReviews("Couldn't read Anki's queue (${it.message}). This passage has no review words.") }
+            // new cards you already know are neither offered nor graded
+            .let { s -> DueSnapshot(s.cards.filter { it.ref.noteId !in knownNew }, s.takenAt, s.unknownNotes) }
         snapshot = snap
         pool = planner.pool(snap, mistakes.weakPoints(), maxWords = app.passageLength.maxWords)
         ankiNote = if (snap.cards.isEmpty()) "Nothing is due in Anki right now: this is reading practice." else null
@@ -468,6 +472,31 @@ class StoryController(
         if (span.deck.isEmpty() || isName(span) || isWorking) return
         span.deck.forEach { w -> tappedNotes += w.noteId; tappedWords[w.noteId] = w }
         saveTaps()
+    }
+
+    /** A new card in the current passage (Anki says it's new now, or the deck snapshot does). */
+    fun newCardsIn(span: Span): List<DeckWord> =
+        span.deck.filter { it.noteId in (current?.passage?.newNotes ?: emptySet()) || it.state == com.cramtale.core.match.CardState.NEW }
+            .filter { it.noteId !in knownNew }
+
+    /**
+     * "Already know it" on a new card: it leaves the story's reviews, the word counts as known, and it's
+     * listed as would-be suspended (this build doesn't write to Anki).
+     */
+    fun alreadyKnow(words: List<DeckWord>) {
+        if (words.isEmpty()) return
+        words.forEach { w -> knownNew.add(w.noteId, w.word); tappedNotes -= w.noteId; tappedWords.remove(w.noteId) }
+        app.lists = app.lists.copy(known = app.lists.known + words.map { it.word })
+        saveTaps()
+        // its inline meaning goes away at once
+        val ids = words.map { it.noteId }.toSet()
+        current?.let { t -> current = t.copy(passage = t.passage.copy(newNotes = t.passage.newNotes - ids)) }
+    }
+
+    /** Undo from the log: the card is a new card again. */
+    fun undoAlreadyKnow(noteId: Long) {
+        val e = knownNew.remove(noteId) ?: return
+        app.lists = app.lists.copy(known = app.lists.known - e.word)
     }
 
     /** "I know it": on a deck word it cancels the tap (a mis-tap); on other words it marks the word known. */

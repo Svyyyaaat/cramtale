@@ -89,6 +89,22 @@ fun LogsScreen(state: AppState) {
             }
         }
 
+        SectionTitle("New cards you already know")
+        PaperCard {
+            var known by remember { mutableStateOf(story.knownNew.all.reversed()) }
+            if (known.isEmpty()) Text("None. Tap a new card's word in the story and choose Already know it.",
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            else Text("Skipped in the story. They'd be suspended in AnkiDroid once the app may write to it.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            known.forEachIndexed { i, k ->
+                if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(k.word, Modifier.weight(1f), style = ReadingText.copy(fontSize = 18.sp, lineHeight = 26.sp))
+                    androidx.compose.material3.TextButton({ story.undoAlreadyKnow(k.noteId); known = story.knownNew.all.reversed() }) { Text("Undo") }
+                }
+            }
+        }
+
         SectionTitle("Your mistakes")
         PaperCard {
             val keys = story.mistakes.all.sortedByDescending { it.count }

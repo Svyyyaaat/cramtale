@@ -181,4 +181,18 @@ class StoryControllerTest {
         assertEquals("ありがとう。", again.current!!.player)
         assertTrue(!File(again.dir, "log/outbox.txt").exists())
     }
+
+    @Test
+    fun `already knowing a new card skips it and counts the word as known, with undo`() {
+        val app = AppState(context)
+        val c = StoryController(context, app, llmFor = { llm }, fixedKey = "test")
+        val w = com.cramtale.core.match.DeckWord(42, "Core", "Japanese Core 5k", "書類", null, com.cramtale.core.match.CardState.NEW,
+            listOf(com.cramtale.core.match.RawCard(0, "Recognition", 0, 0)))
+        c.alreadyKnow(listOf(w))
+        assertTrue(42L in c.knownNew)
+        assertTrue("書類" in app.lists.known)
+        c.undoAlreadyKnow(42)
+        assertTrue(42L !in c.knownNew)
+        assertTrue("書類" !in app.lists.known)
+    }
 }
