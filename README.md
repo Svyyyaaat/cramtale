@@ -29,6 +29,12 @@ read today, about how many passages that takes). The vocabulary check, calibrati
 decks, the review log and costs, the prompt and story files, the AnkiDroid connection (with its probe) and
 *Settings* (text size, passage length, writing style, API key, new story) are one tap away.
 
+Passages stream in as they're written; the independent checks run side by side and the scribe works in the
+background while you read. Waits that can't stream (planning a session, checks, setup) show flashcards from
+your Anki queue that the passage won't use: reviews (Show, then Again/Good) and new cards to triage. A new card
+you already know: *Already know it* (in its popup or as a flashcard) skips it from then on and lists it in the
+review log as would-be suspended, with Undo.
+
 In the story: tap any word (names too) for its reading, your card's meaning and the dictionary's; *Listen*
 reads the passage aloud with the phone's Japanese voice; *Reroll* keeps every version (‹ 1/3 ›); words in
 earlier passages can be looked up without counting. The passage on screen, its versions and your taps are

@@ -17,11 +17,25 @@ Still read-only: nothing is written to AnkiDroid. What to try, and what to look 
   MISMATCH or FAILED, send me the probe text.
 - Home → *Today*: the due number should match AnkiDroid's deck list (sum of your vocabulary decks).
 
+## Waiting less
+- Send a reply: the passage should appear word by word (greyed until checked), not after a long spinner.
+- While "Checking your Japanese…" or "Planning this session…" shows, a flashcard appears: Show, then Again/Good.
+  Those cards shouldn't come up in the story again today. New cards show "For the story" / "Already know it".
+- Sending should feel quicker than before: the "Recording what changed…" step mostly happens while you read.
+
+## New cards you know
+- Tap a word with an inline meaning (a new card): the popup says *New card*; *Already know it* removes the
+  meaning from the passage. Review log → *New cards you already know* lists it, with Undo.
+
 ## Reading
 - Tap 榊-type names: reading and who it is, no "I know it". Story characters aren't underlined as unknown.
 - Tap a Core 5k word: *Your card* shows the card's English Gloss.
 - *Listen* and the speaker in the word popup. If the phone has no Japanese voice, a note says how to add one.
 - Settings → Text size: the passage changes size at once.
+
+## Looks
+- New icon on the home screen (themed icon on Android 13+ if you use those). Light and dark both get the new
+  indigo/vermilion palette; tell me what still feels off.
 
 ## Settings
 - Passage length *Long*: longer passages with more review words (aim about 12). *Short*: about 4.
