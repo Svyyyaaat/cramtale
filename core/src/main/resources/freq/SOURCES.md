@@ -7,5 +7,8 @@ each word's rank is jpdb's own global rank. The rank used is the median of jpdb'
 Books, Web Novels and Live Action ranks, so it reflects fiction and dialogue rather than news.
 
 Columns: JMdict entry id, spelling, rank, per-media ranks. jpdb's vocabulary ids are JMdict sequence
-numbers, which is how the matcher looks words up. The data is jpdb's; it is used here for a personal
-study tool. Don't redistribute it as a dataset.
+numbers, which is how the matcher looks words up.
+
+The file is **not in git**: the data is jpdb's and this repository is public. Build it locally with
+`python3 tools/jpdb_ranks.py pick|crawl|build` (writes here); APKs built without it fall back to
+JMdict's priority tags.

@@ -8,3 +8,4 @@ build/
 .idea/
 local.properties
 keystore.properties
+core/src/main/resources/freq/jpdb_ranks.tsv
