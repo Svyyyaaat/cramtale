@@ -36,6 +36,7 @@ fun main(args: Array<String>) {
         "import-freq" -> importFreq(Opts(args.drop(1)))
         "vocab-check" -> vocabCheck(Opts(args.drop(1)))
         "deck-report" -> deckReport(Opts(args.drop(1)))
+        "story-smoke" -> storySmoke(Opts(args.drop(1)))
         "tokens" -> generateSequence(::readLine).forEach { line ->
             println(com.cramtale.core.text.Tokenizer.tokenize(line).joinToString(" ") { "${it.surface}/${it.base}/${it.pos1}-${it.pos2}" })
         }
@@ -225,6 +226,83 @@ private fun grammarScan(o: Opts) {
         }
     }
     System.err.println("$lines lines; matches per pattern: " + counts.entries.sortedByDescending { it.value }.joinToString(" ") { "${it.key}=${it.value}" })
+}
+
+/**
+ * A real run of the story loop against the API: setup, style picker, a session, three turns.
+ * The key comes from ANTHROPIC_API_KEY, or a network secret the proxy injects. --dir must be a new
+ * or empty folder.
+ */
+private fun storySmoke(o: Opts) {
+    val (dict, index, words) = load(o)
+    val out = File(o.need("--dir"))
+    require(!out.exists() || out.list().isNullOrEmpty()) { "--dir must be a new or empty folder" }
+    out.mkdirs()
+    val matcher = Matcher(dict, index, frequency)
+    val policy = KnownPolicy()
+    val lists = KnownLists()
+    val llm = com.cramtale.core.llm.AnthropicLlm(System.getenv("ANTHROPIC_API_KEY") ?: "sk-ant-injected-by-proxy")
+    val costs = com.cramtale.core.llm.CostLog(File(out, "costs.jsonl"))
+    val rnd = kotlin.random.Random(7)
+    val studied = words.filter { it.state == CardState.STUDIED && it.noteType == "Japanese Core 5k" && it.word.none { c -> c.isDigit() } }
+        .filter { w -> frequency?.rank(com.cramtale.core.match.Normalize.entriesFor(dict, w.word, null), w.word)?.let { it in 1500..8000 } == true }
+        .shuffled(rnd)
+    val newOnes = words.filter { it.state == CardState.NEW }.shuffled(rnd).take(2)
+    val pool = com.cramtale.core.story.DuePool(
+        words = studied.take(12).map { com.cramtale.core.story.DueWord(it.word, it.noteId, false) } +
+            newOnes.map { com.cramtale.core.story.DueWord(it.word, it.noteId, true) },
+        grammar = listOf("ことにする", "にもかかわらず").mapNotNull { grammar.byId(it) }
+            .mapIndexed { i, p -> com.cramtale.core.story.DueGrammar(p.id, p.meaning, -1L - i) },
+        weakPoints = listOf("い-adjective past: 〜いでした → 〜かったです"),
+    )
+    val unknown = com.cramtale.core.story.UnknownWords { text ->
+        val a = matcher.analyze(text)
+        val reviewing = pool.words.map { it.word }.toSet()
+        val counted = a.words().filter { s -> s.status(policy, lists).let { it != Status.IGNORED && it != Status.NAME } }
+        val unk = counted.filter { s ->
+            s.status(policy, lists) in setOf(Status.UNKNOWN, Status.DECK_NEW) && s.deck.none { it.word in reviewing } && s.lemma !in reviewing
+        }
+        (if (counted.isEmpty()) 0.0 else unk.size.toDouble() / counted.size) to unk.map { it.lemma }.distinct()
+    }
+    val engine = com.cramtale.core.story.StoryEngine(out, llm, costs, "smoke", unknown)
+    fun step(name: String) = println("\n======== $name  (spent so far $${"%.3f".format(costs.total("smoke"))})")
+
+    step("setup")
+    engine.setup()
+    println(File(out, "state/world.md").readText())
+    println(File(out, "state/player.md").readText())
+    engine.state.characterNames().forEach { println("--- $it\n" + engine.state.character(it)) }
+
+    step("style picker")
+    val rated = engine.styleOptions().map { it to unknown.check(it.passage).first }
+    rated.forEach { (s, r) -> println("--- ${s.name} (${"%.1f".format(r * 100)}% unknown): ${s.line}\n${s.passage}") }
+    engine.pickStyle(rated.minByOrNull { it.second }!!.first)
+
+    step("session")
+    engine.startSession(pool).forEach(::println)
+    println("Review words offered: " + pool.words.joinToString("、") { it.word + if (it.isNew) "(new)" else "" })
+
+    val replies = listOf<String?>(
+        null,
+        "すみません、もう少し待ってくれませんか。お金はまだ準備するができません。昨日は忙しいでした。",
+        "わかった。明日の朝、倉庫に行く。",
+    )
+    for ((i, msg) in replies.withIndex()) {
+        step("turn ${i + 1}" + (msg?.let { ": $it" } ?: ""))
+        val t = engine.playerTurn(msg, pool, emptyList())
+        t.corrections.forEach { println("✎ ${it.wrong} → ${it.right} [${it.key}] ${it.reason}") }
+        t.roll?.let { println("Roll: $it") }
+        t.complication?.let { println("Complication: $it") }
+        println(t.draft.passage)
+        println("used: " + t.draft.used.joinToString { "${it.first}=${it.second}" } + "  grammar: " + t.draft.grammar + "  rewritten: " + t.draft.rewritten)
+        t.draft.checks.forEach { println("  check ${it.name}: ${if (it.passed) "ok" else it.detail}") }
+        engine.commit().forEach { println("  state: $it") }
+    }
+    step("costs by call")
+    costs.byPurpose("smoke").forEach { (k, v) -> println("  $k: $${"%.4f".format(v)}") }
+    costs.entries.filter { it.purpose == "writer" }.forEach {
+        println("  writer call: in ${it.usage.input}, cache read ${it.usage.cacheRead}, cache write ${it.usage.cacheWrite}, out ${it.usage.output}")
+    }
 }
 
 /** Rough cause of a self-test miss, from how Kuromoji reads the deck word on its own. */
