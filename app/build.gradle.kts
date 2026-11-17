@@ -50,4 +50,27 @@ dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.compose.material:material-icons-extended")
     testImplementation("junit:junit:4.13.2")
+    // runs core on Android's own libraries (org.json, …) on the JVM: catches desktop-only API use before the phone does
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+}
+
+// Robolectric's Android libraries, fetched by Gradle (Robolectric's own downloader can't use a proxy's
+// certificates) and handed to it offline.
+// one configuration each: in one, Gradle would keep only the newer version
+val robolectricSdks = listOf(
+    "8.0.0_r4-robolectric-r1-i7",   // minSdk 26
+    "15-robolectric-12650502-i7",   // targetSdk 35
+).mapIndexed { i, v ->
+    configurations.create("robolectricSdk$i").also { dependencies.add(it.name, "org.robolectric:android-all-instrumented:$v") }
+}
+val robolectricDir = layout.buildDirectory.dir("robolectric-sdks")
+val copyRobolectricSdks by tasks.registering(Copy::class) {
+    from(robolectricSdks)
+    into(robolectricDir)
+}
+tasks.withType<Test>().configureEach {
+    dependsOn(copyRobolectricSdks)
+    systemProperty("robolectric.offline", "true")
+    systemProperty("robolectric.dependency.dir", robolectricDir.get().asFile.absolutePath)
 }

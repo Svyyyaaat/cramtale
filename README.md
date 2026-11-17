@@ -32,6 +32,12 @@ are all one tap away, and *Run setup again* repeats the walk-through.
 `app/src/main/assets/jmdict.sqlite.gz`, gitignored); the phone only unpacks it. Builds without it (CI)
 download JMdict and build the database on the phone.
 
+**Android checks without a phone** (`./gradlew :core:check :app:testDebugUnitTest`): core is compiled a
+second time against Android 8.0's own Java library (minSdk 26; `sdkmanager "platforms;android-26"`), every
+regex in the code and data is scanned for what Android's ICU engine rejects, and a Robolectric test runs the
+story (setup, styles, turns, reroll, edit, chapter) on Android's libraries through the real Claude SDK
+against a local stand-in server. No emulator here (no KVM), so UI and AnkiDroid still need the phone.
+
 **Screens:** `./gradlew :app:recordPaparazziDebug` renders every screen from sample data to
 `app/src/test/snapshots/images/` (light and dark).
 

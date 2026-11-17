@@ -48,7 +48,7 @@ class AnthropicLlm(apiKey: String, private val fallbacks: Boolean = true, baseUr
         }
         val output = LinkedHashMap<String, Any>()
         req.effort?.let { output["effort"] = it }
-        req.jsonSchema?.let { output["format"] = mapOf("type" to "json_schema", "schema" to org.json.JSONObject(it).toMap()) }
+        req.jsonSchema?.let { output["format"] = mapOf("type" to "json_schema", "schema" to jsonToPlain(org.json.JSONObject(it))) }
         if (output.isNotEmpty()) b.putAdditionalBodyProperty("output_config", JsonValue.from(output))
         if (!req.thinking) b.putAdditionalBodyProperty("thinking", JsonValue.from(mapOf("type" to "disabled")))
         if (fallbacks && req.model == Models.WRITER) {
@@ -78,4 +78,12 @@ class AnthropicLlm(apiKey: String, private val fallbacks: Boolean = true, baseUr
             model = msg.model().asString(),
         )
     }
+}
+
+/** org.json → plain maps and lists. Android's org.json has no toMap(), only the desktop one does. */
+internal fun jsonToPlain(v: Any?): Any? = when (v) {
+    is org.json.JSONObject -> v.keys().asSequence().associateWith { jsonToPlain(v.opt(it)) }
+    is org.json.JSONArray -> (0 until v.length()).map { jsonToPlain(v.opt(it)) }
+    org.json.JSONObject.NULL -> null
+    else -> v
 }
