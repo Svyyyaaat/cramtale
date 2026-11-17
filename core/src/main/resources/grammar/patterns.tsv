@@ -1,0 +1,91 @@
+# Grammar patterns: id<TAB>meaning<TAB>rule ;; rule …   (syntax: core/.../match/Grammar.kt)
+# The id is the spelling a deck card uses, so cards map to patterns by text.
+# Core particles (は が を に で と へ も の や か よ ね), the copula and interjections are not here: they are
+# never reviewed by reading.
+かもしれない	might; maybe	かも @しれる|@知れる ;; かもしれ
+ことがある	have (once) done; sometimes happens	<V こと が @ある ;; <V こと が @ない|@無い ;; た|だ こと は @ない|@無い ;; た|だ こと は ありません
+こともある	sometimes also happens	<V こと も @ある
+ことができる	can, be able to	<V こと が @できる ;; <V こと が @出来る
+ことにする	decide to	<V こと に @する
+ことになる	it is decided that; end up	<V こと に @なる
+こととなる	it will be that (formal ことになる)	<V こと と @なる
+ことはない	there is no need to	<P こと は @ない|@無い ;; <P こと は ありません
+ざるを得ない	cannot help but; have no choice but	ざる を @得る|@える
+しかない	have no choice but to	<V しか @ない|@無い ;; <V しか ありません
+たがる	(someone else) wants to	@たい @がる ;; ~(?<=\p{IsHan}|[\u3041-\u3096])たが(る|ら|り|っ(て[いおる]|た))
+ために	for; in order to; because of	ため|為 に >!なる|@なる
+だけでなく	not only … but also	だけ で なく
+つつある	is in the process of	<V つつ @ある
+つつ	while (doing); even though	<V つつ
+ていただく	(humbly) have someone do	て|で @いただく|@頂く|@いただける|@頂ける ;; ~[てで](いただ|頂)[かきくけこい]
+てもいい	may; it's fine to	<V て|で も @いい|@よい|@良い ;; <V て|で も 構い|かまい
+ても	even if	<V て|で も
+ては	if (… then, usually bad)	<V て|で は
+である	is (written style)	で @ある
+ではない	is not	で は @ない|@無い ;; では @ない|@無い ;; ~ではな[いくかけ]
+ではありません	is not (polite)	では ありません
+という	called; that says	と @いう|@言う ;; という
+といった	such as	<N といった ;; <N と いっ た
+といっても	although one says	と いっ て も ;; といっても ;; と 言っ て も
+としたら	if we assume	と し たら ;; と すれ ば
+として	as (in the role of)	<Q として ;; <Q と し て
+としても	even if; even as	として も
+とともに	together with; as … also	とともに ;; と とも に ;; と 共 に ;; と共に
+とはいえ	although; that said	~とは(いえ|言え)(?!な|ませ)
+ないといけない	must, have to	ない と @いける ;; ~なきゃ(いけ|なら|だめ|ダメ|駄目|[。！？!?、…」]|$)
+ながら	while (doing); though	<V ながら ;; <N ながら
+なくてはいけない	must, have to	なく て は @いける
+なくてはならない	must, have to	なく て は @なる
+なければいけない	must, have to	なけれ ば @いける
+なければならない	must, have to	なけれ ば @なる
+ねばならない	must (written)	ね ば @なる
+にあたって	on the occasion of	<S にあたって ;; <S にあたり ;; <S に あたっ て ;; <S に 当たっ て ;; <S に あたり ;; に際して
+において	in; at (formal)	において ;; <N に おい て >!は|は
+における	in; at (formal, before a noun)	における ;; に おける
+にしても	even if; even granting	<V にしても ;; <V に し て も ;; それにしても
+にしろ	whether … or; even if	<V にしろ ;; <V に しろ ;; いずれにしろ ;; いずれ に しろ ;; いずれにせよ
+にすぎない	is no more than	に @すぎる|@過ぎる
+について	about; concerning	について ;; に つい て
+につれて	as (one thing changes, so does another)	<S につれて ;; <S につれ ;; <S に つれ て
+にとって	for; to (from the viewpoint of)	にとって ;; に とっ て
+にもかかわらず	despite	に も @かかわる|@関わる|@拘わる|@拘る ず ;; にもかかわらず ;; にも関わらず
+によって	by; depending on; due to	によって ;; に よっ て
+によっては	depending on	によって は ;; に よっ て は
+により	by; due to (formal)	により
+による	by; due to (before a noun)	による ;; に よる
+によると	according to	による と ;; に よる と
+によれば	according to	に よれ ば ;; によれば
+にわたって	over; throughout	にわたって ;; にわたり ;; に わたっ て
+に対し	toward; against; in contrast to	に対し ;; に 対し
+に対して	toward; against; in contrast to	に対して ;; に 対し て
+に対する	toward (before a noun)	に対する ;; に 対する
+に関して	about; regarding	に関して ;; に 関し て ;; に関し ;; に 関し
+に関する	about; regarding (before a noun)	に関する ;; に 関する
+のだ	(explanation) it's that …	<V の|ん だ
+のです	(explanation) it's that …	<V の|ん です
+のではない	it's not that …	<V の|ん で は @ない|@無い|@無い
+のに	even though; in order to	<V の に ;; のに:接続助詞
+のみならず	not only	のみ なら ず ;; のみならず
+ものの	although	ものの:接続助詞
+までもない	there is no need to	<V まで も @ない|@無い ;; ~までもな[いく]
+をもって	with; by means of; as of	~をもって(?![いきくけこおたっ])
+を通して	through; via	<N を通して >!くれる|もらう|ください|下さい ;; <N を 通し て >!くれる|もらう|ください|下さい
+を通じて	through; throughout	を通じて ;; を 通じ て
+さえ	even	さえ
+すら	even	すら
+こそ	precisely; it is … that	こそ
+しか	only (with a negative)	しか
+ばかり	only; just; nothing but	ばかり
+ほど	to the extent; about	ほど ;; 程
+ずつ	each; at a time	ずつ
+など	and so on; such as	など ;; なんか:副助詞 ;; <N 等
+のみ	only (written)	のみ
+らしい	seems; apparently	@らしい
+べし	should (classical)	べし ;; べき ;; べく
+まい	will probably not; won't	<V まい:*
+ごとし	like; as if (classical)	ごとし ;; ごとく ;; ごとき
+やがる	(rude) does	@やがる
+たり	doing things like …	たり ;; だり
+ので	because	ので:接続助詞 ;; ん で:接続助詞
+けれど	but; although	けれど ;; けれども ;; けど
+際に	when; on the occasion of	際 に

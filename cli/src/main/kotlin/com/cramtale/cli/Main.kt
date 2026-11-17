@@ -36,7 +36,16 @@ fun main(args: Array<String>) {
         "import-freq" -> importFreq(Opts(args.drop(1)))
         "vocab-check" -> vocabCheck(Opts(args.drop(1)))
         "deck-report" -> deckReport(Opts(args.drop(1)))
+        "tokens" -> generateSequence(::readLine).forEach { line ->
+            println(com.cramtale.core.text.Tokenizer.tokenize(line).joinToString(" ") { "${it.surface}/${it.base}/${it.pos1}-${it.pos2}" })
+        }
         "deck-selftest" -> deckSelftest(Opts(args.drop(1)))
+        "grammar-selftest" -> grammarSelftest(Opts(args.drop(1)))
+        "grammar-scan" -> grammarScan(Opts(args.drop(1)))
+        "grammar-tag" -> File(Opts(args.drop(1)).positional.first()).forEachLine { line ->
+            val s = line.trim()
+            println(s + "\t" + grammar.find(com.cramtale.core.text.Tokenizer.tokenize(s)).joinToString("|") { "${it.pattern.id}@${it.start}-${it.end}" })
+        }
         "analyze" -> analyze(Opts(args.drop(1)))
         else -> { print(USAGE); exitProcess(1) }
     }
@@ -170,6 +179,52 @@ private fun deckSelftest(o: Opts) {
         .forEach { println("  %-40s %d".format(it.key, it.value)) }
     println("Misses (cause, word, sentence, what the matcher saw):")
     misses.sorted().forEach { println("  $it") }
+}
+
+private val grammar by lazy { com.cramtale.core.match.GrammarPatterns.bundled() ?: error("no grammar/patterns.tsv") }
+
+/** Each grammar card found in its own example sentence? */
+private fun grammarSelftest(o: Opts) {
+    val notes = File(o.need("--deck")).useLines { DeckExport.parse(it) }.associateBy { it.noteId }
+    val words = DeckReader.words(notes.values.toList())
+    val sentenceField = mapOf("Japanese Core 5k" to "Sentence", "基本" to "表")
+    val tag = Regex("<[^>]*>")
+    var tested = 0
+    var found = 0
+    for (w in words) {
+        val p = w.variants.firstNotNullOfOrNull { grammar.byId(it) } ?: continue
+        val raw = notes[w.noteId]?.fields?.get(sentenceField[w.noteType] ?: continue) ?: continue
+        val sentence = raw.replace(tag, "").replace("&nbsp;", " ").trim()
+        if (sentence.isEmpty()) continue
+        tested++
+        val hits = grammar.find(com.cramtale.core.text.Tokenizer.tokenize(sentence))
+        val ok = hits.any { it.pattern.id == p.id }
+        if (ok) found++
+        println("${if (ok) "OK  " else "MISS"} ${p.id}\t$sentence\t" + hits.joinToString(" ") { "[${sentence.substring(it.start, it.end)}=${it.pattern.id}]" })
+    }
+    println("Grammar cards with a sentence: $tested   found: $found")
+}
+
+/** Every pattern match in a text file (one sentence per line, last tab field), for checking false matches. */
+private fun grammarScan(o: Opts) {
+    val max = o.named["--per-pattern"]?.toInt() ?: 5
+    val seen = HashMap<String, Int>()
+    val counts = HashMap<String, Int>()
+    var lines = 0
+    File(o.positional.first()).useLines { all ->
+        for (line in all) {
+            val s = line.substringAfterLast('\t').trim()
+            if (s.isEmpty()) continue
+            lines++
+            for (f in grammar.find(com.cramtale.core.text.Tokenizer.tokenize(s))) {
+                counts.merge(f.pattern.id, 1, Int::plus)
+                if (seen.merge(f.pattern.id, 1, Int::plus)!! <= max) {
+                    println("${f.pattern.id}\t${s.substring(0, f.start)}【${s.substring(f.start, f.end)}】${s.substring(f.end)}")
+                }
+            }
+        }
+    }
+    System.err.println("$lines lines; matches per pattern: " + counts.entries.sortedByDescending { it.value }.joinToString(" ") { "${it.key}=${it.value}" })
 }
 
 /** Rough cause of a self-test miss, from how Kuromoji reads the deck word on its own. */
