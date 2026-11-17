@@ -29,8 +29,8 @@ data class KnownPolicy(
     val frequencyThreshold: Int = 6000,
     /** Studied cards you suspended (leeches) still count as known. */
     val studiedSuspendedKnown: Boolean = true,
-    /** Never-studied cards you suspended (e.g. tagged suspend_me) count as known. */
-    val newSuspendedKnown: Boolean = false,
+    /** Never-studied cards you suspended (tagged suspend_me): you suspended them because you know them. */
+    val newSuspendedKnown: Boolean = true,
 )
 
 /** The user's own lists, keyed by dictionary form. */

@@ -35,7 +35,7 @@ class AppState(private val context: Context) {
         get() = KnownPolicy(
             frequencyThreshold = prefs.getInt("threshold", KnownPolicy().frequencyThreshold),
             studiedSuspendedKnown = prefs.getBoolean("studiedSuspendedKnown", true),
-            newSuspendedKnown = prefs.getBoolean("newSuspendedKnown", false),
+            newSuspendedKnown = prefs.getBoolean("newSuspendedKnown", KnownPolicy().newSuspendedKnown),
         )
         set(p) = prefs.edit()
             .putInt("threshold", p.frequencyThreshold)

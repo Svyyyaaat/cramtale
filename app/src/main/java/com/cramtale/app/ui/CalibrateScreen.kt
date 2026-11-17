@@ -98,7 +98,7 @@ fun CalibrateScreen(state: AppState) {
         Toggle("Studied cards you suspended (leeches) count as known", policy.studiedSuspendedKnown) {
             policy = policy.copy(studiedSuspendedKnown = it); state.policy = policy
         }
-        Toggle("Never-studied suspended cards (suspend_me) count as known", policy.newSuspendedKnown) {
+        Toggle("Suspended never-studied cards (suspend_me, already known) count as known", policy.newSuspendedKnown) {
             policy = policy.copy(newSuspendedKnown = it); state.policy = policy
         }
 

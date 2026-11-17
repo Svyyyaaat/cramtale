@@ -98,8 +98,8 @@ class MatcherTest {
     fun `suspended new cards follow the policy`() {
         val m = Matcher(dict, DeckIndex(listOf(TestDict.word("猫", CardState.NEW_SUSPENDED)), dict))
         val span = m.analyze("猫").words().single()
-        assertEquals(Status.DECK_NEW, span.status(policy, none))
-        assertEquals(Status.DECK, span.status(policy.copy(newSuspendedKnown = true), none))
+        assertEquals(Status.DECK, span.status(policy, none))
+        assertEquals(Status.DECK_NEW, span.status(policy.copy(newSuspendedKnown = false), none))
     }
 
     @Test

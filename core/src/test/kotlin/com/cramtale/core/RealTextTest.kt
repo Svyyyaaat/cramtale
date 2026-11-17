@@ -71,7 +71,7 @@ class RealTextTest {
         val m = Matcher(dict!!, DeckIndex(words, dict), com.cramtale.core.match.FrequencyList.bundled())
         val lists = KnownLists(names = setOf("佐伯", "北村", "メロス", "セリヌンティウス", "ディオニス", "カンダタ"))
         val policy = KnownPolicy(frequencyThreshold = 6000)
-        println("== Unknown rate with the real deck (studied + leeches known, threshold columns) ==")
+        println("== Unknown rate with the real deck (studied, leeches and suspend_me known; threshold columns) ==")
         println("text".padEnd(36) + Calibration.THRESHOLDS.joinToString("") { "%7d".format(it) })
         for (name in texts) {
             val a = m.analyze(TestDict.text(name))

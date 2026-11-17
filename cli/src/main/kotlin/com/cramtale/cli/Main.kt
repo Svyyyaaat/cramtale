@@ -24,7 +24,7 @@ private const val USAGE = """cramtale CLI (matcher calibration)
                (e.g. JPDB v2.2 Frequency Kana; rows become JMdict entry id, spelling, rank)
   deck-report  --jmdict <db> --deck <deck.jsonl>
   analyze      --jmdict <db> --deck <deck.jsonl> [--lists <dir>] [--threshold N]
-               [--new-suspended-known] [--no-studied-suspended] <text file | ->
+               [--new-suspended-unknown] [--no-studied-suspended] <text file | ->
 """
 
 fun main(args: Array<String>) {
@@ -48,7 +48,7 @@ private class Opts(args: List<String>) {
         while (i < args.size) {
             val a = args[i]
             when {
-                a in setOf("--new-suspended-known", "--no-studied-suspended") -> flags += a
+                a in setOf("--new-suspended-unknown", "--no-studied-suspended") -> flags += a
                 a.startsWith("--") -> { named[a] = args.getOrNull(i + 1) ?: error("$a needs a value"); i++ }
                 else -> positional += a
             }
@@ -141,7 +141,7 @@ private fun analyze(o: Opts) {
     val policy = KnownPolicy(
         frequencyThreshold = o.named["--threshold"]?.toInt() ?: KnownPolicy().frequencyThreshold,
         studiedSuspendedKnown = "--no-studied-suspended" !in o.flags,
-        newSuspendedKnown = "--new-suspended-known" in o.flags,
+        newSuspendedKnown = "--new-suspended-unknown" !in o.flags,
     )
     val path = o.positional.firstOrNull() ?: "-"
     val text = if (path == "-") generateSequence(::readLine).joinToString("\n") else File(path).readText()
