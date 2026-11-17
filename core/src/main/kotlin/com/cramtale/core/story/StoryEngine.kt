@@ -1,5 +1,7 @@
 package com.cramtale.core.story
 
+import com.cramtale.core.jsonLines
+import com.cramtale.core.writeAtomic
 import com.cramtale.core.llm.CostLog
 import com.cramtale.core.llm.Llm
 import com.cramtale.core.llm.LlmRequest
@@ -44,7 +46,67 @@ class PendingTurn(
     var current = 0
     /** The facts sent with this turn; rerolls reuse them, and history keeps them. */
     var packet: String? = null
+    /** Deck notes the reader tapped on any version (the app keeps this; saved with the turn). */
+    val tapped: MutableSet<Long> = LinkedHashSet()
+    /** The player's mistakes from this turn are in the mistake log (once, even if writing was retried). */
+    var mistakesRecorded = false
     val draft get() = drafts[current]
+    /** Written yet? A turn whose writer call failed has no drafts and resumes from here. */
+    val ready get() = drafts.isNotEmpty()
+
+    fun toJson(): JSONObject = JSONObject()
+        .put("turn", turn).put("player", player ?: JSONObject.NULL).put("rollNote", rollNote ?: JSONObject.NULL)
+        .put("complication", complication ?: JSONObject.NULL).put("packet", packet ?: JSONObject.NULL).put("current", current)
+        .put("corrections", JSONArray(corrections.map { JSONObject().put("wrong", it.wrong).put("right", it.right)
+            .put("type", it.type).put("reason", it.reason).put("key", it.key) }))
+        .put("roll", roll?.let { r -> JSONObject().put("dice", JSONArray(r.dice)).put("modifier", r.modifier).put("outcome", r.outcome.name) }
+            ?: JSONObject.NULL)
+        .put("pool", JSONObject()
+            .put("words", JSONArray(pool.words.map { JSONObject().put("word", it.word).put("noteId", it.noteId).put("isNew", it.isNew) }))
+            .put("grammar", JSONArray(pool.grammar.map { JSONObject().put("id", it.id).put("meaning", it.meaning).put("noteId", it.noteId) }))
+            .put("weakPoints", JSONArray(pool.weakPoints)))
+        .put("drafts", JSONArray(drafts.map { d -> JSONObject().put("passage", d.passage)
+            .put("used", JSONArray(d.used.map { JSONObject().put("word", it.first).put("form", it.second) }))
+            .put("grammar", JSONArray(d.grammar)).put("rewritten", d.rewritten)
+            .put("checks", JSONArray(d.checks.map { JSONObject().put("name", it.name).put("passed", it.passed).put("detail", it.detail) })) }))
+        .put("tapped", JSONArray(tapped.toList())).put("mistakesRecorded", mistakesRecorded)
+
+    companion object {
+        private fun JSONArray?.objects() = if (this == null) emptyList() else (0 until length()).map { getJSONObject(it) }
+        private fun JSONObject.str(k: String) = if (isNull(k)) null else optString(k)
+
+        fun fromJson(o: JSONObject): PendingTurn {
+            val p = o.getJSONObject("pool")
+            val t = PendingTurn(
+                turn = o.getInt("turn"), player = o.str("player"),
+                corrections = o.optJSONArray("corrections").objects().map {
+                    Correction(it.getString("wrong"), it.getString("right"), it.optString("type"), it.optString("reason"), it.getString("key"))
+                },
+                roll = o.optJSONObject("roll")?.let { r ->
+                    val d = r.getJSONArray("dice")
+                    Dice.Roll((0 until d.length()).map { d.getInt(it) }, r.getInt("modifier"), Dice.Outcome.valueOf(r.getString("outcome")))
+                },
+                rollNote = o.str("rollNote"), complication = o.str("complication"),
+                pool = DuePool(
+                    p.optJSONArray("words").objects().map { DueWord(it.getString("word"), it.getLong("noteId"), it.getBoolean("isNew")) },
+                    p.optJSONArray("grammar").objects().map { DueGrammar(it.getString("id"), it.getString("meaning"), it.getLong("noteId")) },
+                    p.optJSONArray("weakPoints")?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty(),
+                ),
+            )
+            o.optJSONArray("drafts").objects().forEach { d ->
+                t.drafts += Draft(d.getString("passage"),
+                    d.optJSONArray("used").objects().map { it.getString("word") to it.getString("form") },
+                    d.optJSONArray("grammar")?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty(),
+                    d.optJSONArray("checks").objects().map { CheckResult(it.getString("name"), it.getBoolean("passed"), it.optString("detail")) },
+                    d.optBoolean("rewritten"))
+            }
+            t.current = o.optInt("current").coerceIn(0, (t.drafts.size - 1).coerceAtLeast(0))
+            t.packet = o.str("packet")
+            t.mistakesRecorded = o.optBoolean("mistakesRecorded")
+            o.optJSONArray("tapped")?.let { a -> (0 until a.length()).forEach { t.tapped += a.getLong(it) } }
+            return t
+        }
+    }
 }
 
 /** Measures a passage against what the reader knows (backed by the matcher in the app). */
@@ -71,17 +133,43 @@ class StoryEngine(
         val length: String = "about 150–350 Japanese characters; a quiet beat can be much shorter",
         val firmStyleRules: Boolean = false,
         val chapterTurns: Int = 30,
+        /** Away longer than this, and the next turn starts a new session (off-screen moves, new beats). */
+        val sessionGapMs: Long = 3 * 60 * 60 * 1000L,
     )
 
     val prompts = Prompts(dir)
     val state = StoryState(dir)
     private val logFile = File(dir, "log/turns.jsonl")
     private val chaptersDir = File(dir, "state/chapters")
+    private val pendingFile = File(dir, "state/pending.json")
+
+    /** The turn on screen, kept on disk: a restart shows the same passage, a failed write resumes it. */
     var pending: PendingTurn? = null
         private set
 
+    /** Told which job is running ("writer", "judge"…), for the progress line. */
+    var onCall: (String) -> Unit = {}
+
     init {
         prompts.installDefaults(Prompts.PROMPTS + Prompts.CONFIG)
+        pending = runCatching { if (pendingFile.exists()) PendingTurn.fromJson(JSONObject(pendingFile.readText())) else null }.getOrNull()
+    }
+
+    fun savePending() {
+        val t = pending
+        if (t == null) pendingFile.delete() else pendingFile.writeAtomic(t.toJson().toString())
+    }
+
+    /** No session yet, or the player has been away long enough that the world should move. */
+    fun needsNewSession(now: Long = System.currentTimeMillis()): Boolean {
+        val s = state.scene()
+        return s.session == 0 || s.beats.isEmpty() || now - s.lastActive > settings.sessionGapMs
+    }
+
+    private fun touch() {
+        val s = state.scene()
+        s.lastActive = System.currentTimeMillis()
+        state.save(s)
     }
 
     // ------------------------------------------------------------------ calls
@@ -98,6 +186,7 @@ class StoryEngine(
             messages = if (oneShot) listOf(Msg(Role.USER, system.trimEnd() + "\n\n" + messages.joinToString("\n") { it.text })) else messages, maxTokens = maxTokens, effort = "low", jsonSchema = schema,
             thinking = model != Models.CHECKS,
         )
+        onCall(purpose)
         var resp = llm.call(req)
         costs.record(session, req, resp)
         if (resp.stopReason == "max_tokens") {
@@ -146,16 +235,16 @@ class StoryEngine(
         }
         val stateDir = File(dir, "state").apply { mkdirs() }
         val clocks = o.optJSONArray("clocks")
-        File(stateDir, "world.md").writeText(o.getString("world").trimEnd() + "\n\n## Clocks\n" +
+        File(stateDir, "world.md").writeAtomic(o.getString("world").trimEnd() + "\n\n## Clocks\n" +
             (0 until (clocks?.length() ?: 0)).joinToString("\n") { i ->
                 val c = clocks!!.getJSONObject(i)
                 "- ${c.getString("name")}: 0/${c.optInt("size", 6)} — when full: ${c.optString("when_full")}"
             } + "\n")
-        File(stateDir, "player.md").writeText(o.optString("player") + "\n")
+        File(stateDir, "player.md").writeAtomic(o.optString("player") + "\n")
         val chars = o.getJSONArray("characters")
         for (i in 0 until chars.length()) chars.getJSONObject(i).let { state.writeCharacter(it.getString("name"), it.getString("file")) }
         val secrets = o.optJSONArray("secrets")
-        File(stateDir, "secrets.md").writeText("# Secrets (game master only)\n\n" + (0 until (secrets?.length() ?: 0)).joinToString("\n") { i ->
+        File(stateDir, "secrets.md").writeAtomic("# Secrets (game master only)\n\n" + (0 until (secrets?.length() ?: 0)).joinToString("\n") { i ->
             val s = secrets!!.getJSONObject(i)
             "- S${i + 1}: ${s.getString("text")} [knows: ${(0 until s.getJSONArray("knows").length()).joinToString(", ") { s.getJSONArray("knows").getString(it) }}]"
         } + "\n")
@@ -187,8 +276,8 @@ class StoryEngine(
 
     fun pickStyle(o: StyleOption) {
         File(dir, "config").mkdirs()
-        File(dir, "config/style_sample.md").writeText(o.passage.trim() + "\n")
-        File(dir, "config/style_line.txt").writeText(o.line.trim() + "\n")
+        File(dir, "config/style_sample.md").writeAtomic(o.passage.trim() + "\n")
+        File(dir, "config/style_line.txt").writeAtomic(o.line.trim() + "\n")
     }
 
     fun hasStyle() = !prompts.config("style_sample.md").isNullOrBlank()
@@ -199,10 +288,11 @@ class StoryEngine(
     fun startSession(pool: DuePool): List<String> {
         val scene = state.scene()
         val log = ArrayList<String>()
-        if (scene.session > 0 && scene.turn > 0) {
+        if (scene.session > 0 && scene.turn > 0 && scene.movedForSession != scene.session + 1) {
             val text = call("offscreen", Models.WRITER, Prompts.fill(prompts.prompt("offscreen"), records()),
                 listOf(Msg(Role.USER, "What happened off-screen?")), schema = StateOp.SCHEMA, maxTokens = 12000)
             log += state.apply(StateOp.parse(text), offscreen = true)
+            state.save(state.scene().also { it.movedForSession = scene.session + 1 })
         }
         val s = state.scene()
         val weak = (pool.weakPoints + pool.grammar.map { "${it.id} (${it.meaning})" }).distinct()
@@ -227,6 +317,8 @@ class StoryEngine(
                 (0 until (b.optJSONArray("characters")?.length() ?: 0)).map { b.getJSONArray("characters").getString(it) }, b.optString("pressure"))
         }.toMutableList()
         s.session += 1
+        s.movedForSession = s.session
+        s.lastActive = System.currentTimeMillis()
         s.openingsThisSession = if (o.optString("opening").isNotBlank()) 1 else 0
         s.complication = null
         s.complicationFor = null
@@ -242,6 +334,11 @@ class StoryEngine(
      * code rolls and draws the scene's complication, then the writer, then the checks.
      */
     fun playerTurn(message: String?, pool: DuePool, knownMistakeKeys: List<String> = emptyList()): PendingTurn {
+        pending?.let { p ->
+            check(!p.ready) { "a passage is already waiting for its reply" }
+            return resume()
+        }
+        maybeNewChapter()
         val scene = state.scene()
         val corrections = if (message.isNullOrBlank()) emptyList() else checkMistakes(message, knownMistakeKeys)
         var roll: Dice.Roll? = null
@@ -271,9 +368,31 @@ class StoryEngine(
             state.save(s)
         }
         val turn = PendingTurn(s.turn, message, corrections, roll, rollNote, s.complication, pool)
-        turn.drafts += write(turn)
+        // saved before the writer runs: if that call fails, the roll and its consequence are already
+        // decided and a retry resumes this turn instead of rolling again
         pending = turn
-        return turn
+        savePending()
+        touch()
+        return resume()
+    }
+
+    /** Writes the pending turn's passage if it has none yet (after a failed or interrupted call). */
+    fun resume(): PendingTurn {
+        val t = pending ?: error("no pending turn")
+        if (!t.ready) {
+            t.drafts += write(t)
+            t.current = 0
+            savePending()
+        }
+        return t
+    }
+
+    /** Shows an earlier version again (reroll keeps every version). */
+    fun selectDraft(i: Int): Draft {
+        val t = pending ?: error("no pending turn")
+        t.current = i.coerceIn(0, t.drafts.size - 1)
+        savePending()
+        return t.draft
     }
 
     /** A fresh version of the pending passage (taps on earlier versions still count). */
@@ -282,6 +401,7 @@ class StoryEngine(
         val d = write(t)
         t.drafts += d
         t.current = t.drafts.size - 1
+        savePending()
         return d
     }
 
@@ -291,12 +411,14 @@ class StoryEngine(
         val d = Draft(text, t.draft.used.filter { it.second in text }, t.draft.grammar, cheapChecks(text), t.draft.rewritten)
         t.drafts += d
         t.current = t.drafts.size - 1
+        savePending()
         return d
     }
 
     /** The passage is final: the scribe records what changed, the turn is logged, chapters roll over. */
     fun commit(): List<String> {
         val t = pending ?: error("no pending turn")
+        check(t.ready) { "the passage hasn't been written yet" }
         val s = state.scene()
         val ops = StateOp.parse(call("scribe", Models.CHECKS, Prompts.fill(prompts.prompt("scribe"), records() + mapOf(
             "present" to s.present.joinToString(), "place" to s.place,
@@ -307,7 +429,7 @@ class StoryEngine(
         val applied = state.apply(ops)
         unknownWords?.check(t.draft.passage)?.second?.let { words ->
             seenFile.parentFile.mkdirs()
-            seenFile.writeText((seenWords() + words).sorted().joinToString("\n") + "\n")
+            seenFile.writeAtomic((seenWords() + words).sorted().joinToString("\n") + "\n")
         }
         logFile.parentFile.mkdirs()
         logFile.appendText(JSONObject()
@@ -320,11 +442,17 @@ class StoryEngine(
             .toString() + "\n")
         val s2 = state.scene()
         s2.turn += 1
+        s2.lastActive = System.currentTimeMillis()
         state.save(s2)
         pending = null
-        if (turnsInChapter(s2.chapter).size >= settings.chapterTurns) return applied + newChapter()
-        return applied
+        savePending()
+        // a failed summary call is tried again before the next turn (maybeNewChapter in playerTurn)
+        return applied + listOfNotNull(runCatching { maybeNewChapter() }.getOrNull())
     }
+
+    /** Closes the chapter once it has enough turns. */
+    fun maybeNewChapter(): String? =
+        if (turnsInChapter(state.scene().chapter).size >= settings.chapterTurns) newChapter() else null
 
     /** A summary closes the chapter; the next one starts from it, keeping the writer's context short. */
     fun newChapter(): String {
@@ -335,7 +463,7 @@ class StoryEngine(
         val summary = call("summary", Models.WRITER, Prompts.fill(prompts.prompt("summary"), mapOf("chapter" to text)),
             listOf(Msg(Role.USER, "Summarize.")), maxTokens = 6000)
         chaptersDir.mkdirs()
-        File(chaptersDir, "${s.chapter}.md").writeText(summary.trim() + "\n")
+        File(chaptersDir, "${s.chapter}.md").writeAtomic(summary.trim() + "\n")
         s.chapter += 1
         state.save(s)
         return "chapter ${s.chapter} begins"
@@ -344,7 +472,7 @@ class StoryEngine(
     // ------------------------------------------------------------------ the writer and its checks
 
     private fun turnsInChapter(chapter: Int): List<JSONObject> =
-        if (!logFile.exists()) emptyList() else logFile.readLines().filter { it.isNotBlank() }.map(::JSONObject).filter { it.optInt("chapter") == chapter }
+        logFile.jsonLines().filter { it.optInt("chapter") == chapter }
 
     private fun writerSystem(): List<Msg> {
         val fixed = Prompts.fill(prompts.prompt("writer"), mapOf(

@@ -1,5 +1,6 @@
 package com.cramtale.core.story
 
+import com.cramtale.core.writeAtomic
 import java.io.File
 
 /**
@@ -23,7 +24,7 @@ class Prompts(private val dir: File?) {
             if (f.exists()) continue
             val text = Prompts::class.java.getResourceAsStream("/$n")?.use { it.readBytes().decodeToString() } ?: continue
             f.parentFile.mkdirs()
-            f.writeText(text)
+            f.writeAtomic(text)
         }
     }
 

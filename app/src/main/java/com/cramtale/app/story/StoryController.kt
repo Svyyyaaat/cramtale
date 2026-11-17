@@ -28,7 +28,13 @@ import com.cramtale.core.story.Draft
 import com.cramtale.core.story.DuePool
 import com.cramtale.core.story.StoryEngine
 import com.cramtale.core.story.UnknownWords
+import com.cramtale.core.llm.ErrorText
+import com.cramtale.core.story.PendingTurn
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
@@ -45,6 +51,9 @@ data class ShownPassage(
     val glosses: Map<Long, String>,
     val checks: List<String>,
     val gmNotes: List<String>,
+    /** Which version of this passage is shown, of how many (Reroll and Edit add versions). */
+    val version: Int = 0,
+    val versions: Int = 1,
 )
 
 data class ShownTurn(val player: String?, val corrections: List<Correction>, val passage: ShownPassage)
@@ -53,7 +62,14 @@ data class ShownTurn(val player: String?, val corrections: List<Correction>, val
  * Runs the story on the phone: Anki's due cards in, a passage out, taps and grades in read-only
  * mode (PLAN.md §4.4: nothing is sent to AnkiDroid in this build).
  */
-class StoryController(private val context: Context, private val app: AppState) {
+class StoryController(
+    private val context: Context,
+    private val app: AppState,
+    /** The Claude client for a key (tests pass a scripted one). */
+    private val llmFor: (String) -> com.cramtale.core.llm.Llm = { AnthropicLlm(it) },
+    /** A key that bypasses the keystore (tests). */
+    private val fixedKey: String? = null,
+) {
     val dir = File(context.filesDir, "story").apply { mkdirs() }
     private val keys = ApiKeyStore(context)
     val costs = CostLog(File(dir, "log/costs.jsonl"), Prices.DEFAULT)
@@ -77,18 +93,31 @@ class StoryController(private val context: Context, private val app: AppState) {
     private var pool = DuePool()
     private val meaningCache = HashMap<String, String>()
 
-    /** The error and its causes, so a failure shows what actually went wrong, not just a class name. */
-    private fun describe(e: Throwable): String = generateSequence(e) { it.cause }.take(4)
-        .joinToString("\n← ") { "${it.javaClass.simpleName}: ${it.message ?: ""}" }
+    /** What to do about a failure, then its causes (so a screenshot tells what actually went wrong). */
+    private fun describe(e: Throwable): String = ErrorText.explain(e)
 
-    fun hasKey() = keys.load() != null
+    /** The reply being typed: kept here so leaving the screen or a failed send doesn't lose it. */
+    var replyDraft by mutableStateOf("")
+    /** Repeats the action that failed ("Try again"). */
+    var retry by mutableStateOf<(() -> Unit)?>(null)
+        private set
+
+    /** Story work runs here, not in a screen's scope: leaving the screen doesn't cancel a turn halfway. */
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val running = AtomicBoolean(false)
+    /** True while an action runs (between the tap and its result). */
+    val isWorking get() = running.get()
+
+    fun launch(block: suspend StoryController.() -> Unit) { scope.launch { block() } }
+
+    fun hasKey() = (fixedKey ?: keys.load()) != null
     fun saveKey(k: String) { keys.save(k); engine = null }
 
     private var engine: StoryEngine? = null
 
     private fun engine(): StoryEngine {
         engine?.let { return it }
-        val key = keys.load() ?: error("Add your Claude API key first")
+        val key = fixedKey ?: keys.load() ?: error("Add your Claude API key first")
         val unknown = UnknownWords { text ->
             val m = app.matcher() ?: return@UnknownWords 0 to emptyList()
             val a = m.analyze(text)
@@ -100,23 +129,55 @@ class StoryController(private val context: Context, private val app: AppState) {
             }
             counted.size to unknown.map { it.lemma }
         }
-        return StoryEngine(dir, AnthropicLlm(key), costs, session, unknown,
-            settings = StoryEngine.Settings(firmStyleRules = app.firmStyleRules)).also { engine = it }
+        return StoryEngine(dir, llmFor(key), costs, session, unknown,
+            settings = StoryEngine.Settings(firmStyleRules = app.firmStyleRules)).also { e ->
+            engine = e
+            e.onCall = { purpose -> STEP_LABELS[purpose]?.let { busy = it } }
+        }
     }
 
-    private suspend fun <T> work(label: String, block: () -> T): T? = withContext(Dispatchers.IO) {
-        busy = label
-        error = null
-        try { block() } catch (e: Throwable) { error = describe(e); null } finally { busy = null }
+    /**
+     * Runs one action off the main thread: one at a time (a double tap doesn't start a second turn), with
+     * a progress line per model call, and on failure the error plus a way to try the same action again.
+     */
+    private suspend fun <T> work(label: String, again: (suspend () -> Unit)? = null, block: () -> T): T? {
+        if (!running.compareAndSet(false, true)) return null
+        return withContext(Dispatchers.IO) {
+            busy = label
+            error = null
+            retry = null
+            engine?.onCall = { purpose -> busy = STEP_LABELS[purpose] ?: label }
+            try {
+                block()
+            } catch (e: Throwable) {
+                error = describe(e)
+                retry = again?.let { a -> { scope.launch { a() } } }
+                null
+            } finally {
+                busy = null
+                running.set(false)
+            }
+        }
     }
 
     fun isSetUp() = File(dir, "state/world.md").exists()
     fun hasStyle() = File(dir, "config/style_sample.md").let { it.exists() && it.readText().isNotBlank() }
 
-    suspend fun setup(seed: String) = work("Creating the story…") { engine().setup(seed) }
+    suspend fun setup(seed: String): Unit? = work("Creating the story…", again = { setup(seed) }) { engine().setup(seed) }
 
-    suspend fun styleOptions(): List<Pair<StoryEngine.StyleOption, Double>>? = work("Writing four styles…") {
-        engine().styleOptions().map { o ->
+    private val styleCache = File(dir, "state/style_options.json")
+
+    /** The four samples, kept on disk: a rebuilt screen shows the same ones instead of paying for new ones. */
+    suspend fun styleOptions(fresh: Boolean = false): List<Pair<StoryEngine.StyleOption, Double>>? = work("Writing four styles…") {
+        val cached = if (fresh) null else runCatching {
+            val a = org.json.JSONArray(styleCache.readText())
+            (0 until a.length()).map { a.getJSONObject(it) }.map { StoryEngine.StyleOption(it.getString("name"), it.getString("line"), it.getString("passage")) }
+        }.getOrNull()?.takeIf { it.isNotEmpty() }
+        val options = cached ?: engine().styleOptions().also { list ->
+            styleCache.parentFile?.mkdirs()
+            styleCache.writeText(org.json.JSONArray(list.map { org.json.JSONObject().put("name", it.name).put("line", it.line).put("passage", it.passage) }).toString())
+        }
+        options.map { o ->
             val rate = app.matcher()?.analyze(o.passage)?.stats(app.policy, app.lists)?.unknownRate ?: 0.0
             o to rate
         }
@@ -137,35 +198,73 @@ class StoryController(private val context: Context, private val app: AppState) {
         pool = planner.pool(snapshot!!, mistakes.weakPoints())
     }
 
-    /** Session start: the world moves, the director plans, and the first passage (or the next one) is written. */
-    suspend fun start() = work("Starting the session…") {
+    /** Keys of mistakes seen so far, so the checker reuses them. */
+    private fun knownKeys() = mistakes.all.map { it.key }
+
+    /** A reply that was sent but has no passage yet: kept on disk so a crash or failed call doesn't lose it. */
+    private val outbox = File(dir, "log/outbox.txt")
+
+    /**
+     * Opening the story: the passage that was waiting (restored with its taps), or a turn whose writing
+     * failed (finished now), or the next passage. A new session (off-screen moves, new beats) only
+     * starts after a long break, not on every open.
+     */
+    suspend fun start(): Unit? = work("Opening the story…", again = { start() }) {
         loadHistory()
         takeSnapshot()
-        engine().startSession(pool)
-        val t = engine().playerTurn(null, pool)
-        show(t.player, t.corrections, t.draft, t.turn, t.roll?.toString(), t.complication)
+        val e = engine()
+        if (e.pending == null && e.needsNewSession()) e.startSession(pool)
+        val message = outbox.takeIf { it.exists() }?.readText()?.ifBlank { null }
+        // a waiting passage comes back as it was; a half-done turn is finished; otherwise the next one
+        val t = if (e.pending != null) e.resume() else e.playerTurn(message, pool, knownKeys())
+        afterTurn(t)
     }
 
     /** Your reply: the current passage is graded (read-only: logged), then the next one is written. */
-    suspend fun send(message: String) = work("Writing…") {
-        commitCurrent()
+    suspend fun send(message: String): Unit? = work("Sending…", again = { send(message) }) {
+        val e = engine()
+        // decided before this turn touches the clock
+        val newSession = e.needsNewSession()
+        outbox.parentFile?.mkdirs()
+        outbox.writeText(message)
+        if (current != null && e.pending?.ready == true) commitCurrent()
         takeSnapshot()
-        val keysKnown = mistakes.all.map { it.key }
-        val t = engine().playerTurn(message.takeIf { it.isNotBlank() }, pool, keysKnown)
-        if (!message.isBlank()) {
-            proposals += mistakes.record(message, t.corrections, engine().lastCorrectKeys)
+        if (newSession && e.pending == null) e.startSession(pool)
+        val t = if (e.pending != null) e.resume() else e.playerTurn(message.takeIf { it.isNotBlank() }, pool, knownKeys())
+        afterTurn(t)
+        replyDraft = ""
+    }
+
+    private fun afterTurn(t: PendingTurn) {
+        outbox.delete()
+        // mistakes count once per turn, even if writing the passage needed a retry
+        if (!t.player.isNullOrBlank() && !t.mistakesRecorded) {
+            proposals += mistakes.record(t.player!!, t.corrections, engine().lastCorrectKeys)
+            t.mistakesRecorded = true
+            engine().savePending()
         }
-        show(t.player, t.corrections, t.draft, t.turn, t.roll?.toString(), t.complication)
+        restoreTaps(t)
+        show(t)
     }
 
-    suspend fun reroll() = work("Rewriting…") {
-        val t = engine().pending ?: return@work
-        show(t.player, t.corrections, engine().reroll(), t.turn, t.roll?.toString(), t.complication, keepTaps = true)
+    suspend fun reroll(): Unit? = work("Rewriting…", again = { reroll() }) {
+        if (engine().pending?.ready != true) return@work
+        engine().reroll()
+        show(engine().pending!!)
     }
 
-    suspend fun edit(text: String) = work("Checking…") {
-        val t = engine().pending ?: return@work
-        show(t.player, t.corrections, engine().edit(text), t.turn, t.roll?.toString(), t.complication, keepTaps = true)
+    suspend fun edit(text: String): Unit? = work("Checking…", again = { edit(text) }) {
+        if (engine().pending?.ready != true) return@work
+        engine().edit(text)
+        show(engine().pending!!)
+    }
+
+    /** Switches between the versions of this passage (Reroll keeps all of them). */
+    fun selectVersion(i: Int) {
+        val e = engine
+        if (e?.pending?.ready != true || busy != null) return
+        e.selectDraft(i)
+        show(e.pending!!)
     }
 
     private fun commitCurrent() {
@@ -174,25 +273,52 @@ class StoryController(private val context: Context, private val app: AppState) {
         val shown = current ?: return
         val m = app.matcher()
         val snap = snapshot
-        if (m != null && snap != null) {
+        // grades are decided first (Anki is asked now), but logged only once the turn is committed,
+        // so a failed commit retried later doesn't log them twice
+        var log: (() -> Unit)? = null
+        if (m != null && snap != null && app.target != null) {
             val reader = AnkiReader(context, app.target!!)
             val inText = planner.notesInText(Analysis(shown.passage.text, shown.passage.spans), t.draft, t.pool)
             val read = PassageRead("t${t.turn}-$session", inText, tappedNotes.toSet(), tappedWords.values.toList(),
                 System.currentTimeMillis() - shownAt)
             val grades = grading.decide(snap, read, reader::card)
-            // read-only build: nothing is sent; the log records what would have been
-            grading.commit(grades, Mode.READ_ONLY, reader, null, gradeLog)
-            planner.recordSkips(t.pool, inText)
+            log = {
+                // read-only build: nothing is sent; the log records what would have been
+                grading.commit(grades, Mode.READ_ONLY, reader, null, gradeLog)
+                planner.recordSkips(t.pool, inText)
+            }
         }
         e.commit()
+        log?.invoke()
         history += shown
         current = null
         tappedNotes.clear()
         tappedWords.clear()
     }
 
-    private fun show(player: String?, corrections: List<Correction>, d: Draft, turn: Int, roll: String?, complication: String?, keepTaps: Boolean = false) {
-        if (!keepTaps) { tappedNotes.clear(); tappedWords.clear() }
+    /** Taps saved with the turn come back after a restart. */
+    private fun restoreTaps(t: PendingTurn) {
+        tappedNotes.clear()
+        tappedWords.clear()
+        if (t.tapped.isEmpty()) return
+        val byNote = app.deck().associateBy { it.noteId }
+        for (id in t.tapped) { tappedNotes += id; byNote[id]?.let { tappedWords[id] = it } }
+    }
+
+    private fun saveTaps() {
+        val t = engine?.pending ?: return
+        t.tapped.clear()
+        t.tapped += tappedNotes
+        runCatching { engine?.savePending() }
+    }
+
+    private fun show(t: PendingTurn) {
+        val d = t.draft
+        val player = t.player
+        val corrections = t.corrections
+        val turn = t.turn
+        val roll = t.roll?.toString()
+        val complication = t.complication
         refreshCast()
         val m = app.matcher()
         val analysis = m?.analyze(d.passage)
@@ -207,9 +333,10 @@ class StoryController(private val context: Context, private val app: AppState) {
         }
         val passage = ShownPassage(turn, d.passage, analysis?.spans.orEmpty(), grammarFound, newNotes, glosses,
             d.checks.map { "${it.name}: ${if (it.passed) "ok" else it.detail}" },
-            listOfNotNull(roll?.let { "Roll: $it" }, complication?.let { "Complication: $it" }, if (d.rewritten) "Rewritten once by the checks" else null))
+            listOfNotNull(roll?.let { "Roll: $it" }, complication?.let { "Complication: $it" }, if (d.rewritten) "Rewritten once by the checks" else null),
+            version = t.current, versions = t.drafts.size)
         current = ShownTurn(player, corrections, passage)
-        shownAt = System.currentTimeMillis()
+        if (shownAt == 0L || current?.passage?.turn != turn) shownAt = System.currentTimeMillis()
     }
 
     private fun loadHistory() {
@@ -239,11 +366,12 @@ class StoryController(private val context: Context, private val app: AppState) {
     fun tap(span: Span) {
         if (span.deck.isEmpty() || isName(span)) return
         span.deck.forEach { w -> tappedNotes += w.noteId; tappedWords[w.noteId] = w }
+        saveTaps()
     }
 
     /** "I know it": on a deck word it cancels the tap (a mis-tap); on other words it marks the word known. */
     fun iKnowIt(span: Span) {
-        if (span.deck.isNotEmpty()) span.deck.forEach { tappedNotes -= it.noteId; tappedWords.remove(it.noteId) }
+        if (span.deck.isNotEmpty()) { span.deck.forEach { tappedNotes -= it.noteId; tappedWords.remove(it.noteId) }; saveTaps() }
         else app.lists = app.lists.copy(known = app.lists.known + span.lemma)
     }
 
@@ -276,4 +404,15 @@ class StoryController(private val context: Context, private val app: AppState) {
     /** Every session's costs, from the log file. */
     fun totalCost(): Double = File(dir, "log/costs.jsonl").takeIf { it.exists() }?.readLines()
         ?.mapNotNull { runCatching { JSONObject(it).optDouble("dollars") }.getOrNull() }?.sum() ?: 0.0
+
+    companion object {
+        /** The progress line while each model call runs. */
+        val STEP_LABELS = mapOf(
+            "mistakes" to "Checking your Japanese…", "adjudicator" to "Deciding what's at stake…",
+            "offscreen" to "The world moves while you were away…", "director" to "Planning this session…",
+            "writer" to "Writing…", "rewrite" to "Fixing the passage…", "judge" to "Checking the passage…",
+            "leak" to "Checking the review words…", "scribe" to "Recording what changed…",
+            "summary" to "Closing the chapter…", "setup" to "Building the world…", "style_picker" to "Writing four styles…",
+        )
+    }
 }

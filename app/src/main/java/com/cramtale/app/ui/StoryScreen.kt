@@ -36,6 +36,9 @@ import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -135,9 +138,19 @@ fun PassageText(p: ShownPassage, interactive: Boolean, isTapped: (Span) -> Boole
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun PassageTools(p: ShownPassage, enabled: Boolean, onReroll: () -> Unit, onEdit: () -> Unit, onGrammar: (GrammarPatterns.Found) -> Unit) {
+fun PassageTools(p: ShownPassage, enabled: Boolean, onReroll: () -> Unit, onEdit: () -> Unit, onGrammar: (GrammarPatterns.Found) -> Unit,
+                  onVersion: (Int) -> Unit = {}) {
     var notes by remember { mutableStateOf(false) }
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.Center) {
+        if (p.versions > 1) Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton({ onVersion(p.version - 1) }, enabled = enabled && p.version > 0) {
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Previous version")
+            }
+            Text("${p.version + 1} / ${p.versions}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            IconButton({ onVersion(p.version + 1) }, enabled = enabled && p.version < p.versions - 1) {
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Next version")
+            }
+        }
         AssistChip(onReroll, { Text("Reroll") }, enabled = enabled, leadingIcon = { Icon(Icons.Filled.Refresh, null, Modifier.size(18.dp)) })
         AssistChip(onEdit, { Text("Edit") }, enabled = enabled, leadingIcon = { Icon(Icons.Filled.Edit, null, Modifier.size(18.dp)) })
         AssistChip({ notes = !notes }, { Text("Notes") }, leadingIcon = { Icon(Icons.Filled.Casino, null, Modifier.size(18.dp)) })
@@ -168,13 +181,12 @@ fun ProposalCard(p: MistakeLog.Key, onDecide: (Boolean) -> Unit) {
 }
 
 @Composable
-fun ReplyBar(busy: String?, canSend: Boolean, onSend: (String) -> Unit) {
-    var input by remember { mutableStateOf("") }
+fun ReplyBar(busy: String?, canSend: Boolean, input: String, onInput: (String) -> Unit, onSend: (String) -> Unit) {
     Surface(color = MaterialTheme.colorScheme.surfaceContainer, tonalElevation = 2.dp) {
         Column(Modifier.navigationBarsPadding()) {
             if (busy != null) LinearProgressIndicator(Modifier.fillMaxWidth())
             Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(input, { input = it }, Modifier.weight(1f).heightIn(min = 52.dp),
+                OutlinedTextField(input, onInput, Modifier.weight(1f).heightIn(min = 52.dp),
                     placeholder = { Text(busy ?: "日本語で返事…") }, shape = RoundedCornerShape(26.dp), maxLines = 5,
                     colors = OutlinedTextFieldDefaults.colors(unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
                         focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest))
@@ -182,7 +194,7 @@ fun ReplyBar(busy: String?, canSend: Boolean, onSend: (String) -> Unit) {
                 if (input.isBlank()) {
                     FilledTonalButton({ onSend("") }, enabled = canSend && busy == null, contentPadding = PaddingValues(horizontal = 18.dp)) { Text("Continue") }
                 } else {
-                    FilledIconButton({ val m = input; input = ""; onSend(m) }, Modifier.size(52.dp), enabled = canSend && busy == null) {
+                    FilledIconButton({ onSend(input) }, Modifier.size(52.dp), enabled = canSend && busy == null) {
                         Icon(Icons.AutoMirrored.Filled.Send, "Send")
                     }
                 }
@@ -199,6 +211,9 @@ fun StoryContent(
     isTapped: (Span) -> Boolean, statusOf: (Span) -> Status,
     onBack: () -> Unit, onTap: (Span, ShownPassage) -> Unit, onGrammar: (GrammarPatterns.Found) -> Unit,
     onReroll: () -> Unit, onEdit: () -> Unit, onSend: (String) -> Unit, onDecide: (String, Boolean) -> Unit,
+    reply: String = "", onReply: (String) -> Unit = {}, onRetry: (() -> Unit)? = null, onVersion: (Int) -> Unit = {},
+    /** A word in an earlier passage: looked up only, never graded. */
+    onLookup: (Span, ShownPassage) -> Unit = { _, _ -> },
 ) {
     val listState = rememberLazyListState()
     LaunchedEffect(history.size, current) {
@@ -215,7 +230,7 @@ fun StoryContent(
             items(history) { t ->
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     t.player?.let { PlayerBubble(it, t.corrections) }
-                    PassageText(t.passage, false, isTapped, statusOf, tapVersion) {}
+                    PassageText(t.passage, true, { false }, statusOf, tapVersion) { onLookup(it, t.passage) }
                     Ornament()
                 }
             }
@@ -223,18 +238,20 @@ fun StoryContent(
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     current.player?.let { PlayerBubble(it, current.corrections) }
                     PassageText(current.passage, true, isTapped, statusOf, tapVersion) { onTap(it, current.passage) }
-                    PassageTools(current.passage, busy == null, onReroll, onEdit, onGrammar)
+                    PassageTools(current.passage, busy == null, onReroll, onEdit, onGrammar, onVersion)
                 }
             } else if (busy != null) item { Busy(busy) }
-            if (error != null) item { ErrorNote(error) }
+            if (error != null) item { ErrorNote(error, onRetry) }
             items(proposals) { p -> ProposalCard(p) { onDecide(p.key, it) } }
         }
-        ReplyBar(busy, current != null, onSend)
+        ReplyBar(busy, current != null, reply, onReply, onSend)
     }
 }
 
 data class WordInfo(val word: String, val reading: String?, val inSentence: String?, val senses: List<String>, val inDeck: Boolean,
-                    val isName: Boolean = false)
+                    val isName: Boolean = false,
+                    /** Looked up in an earlier passage: not graded, nothing to cancel. */
+                    val earlier: Boolean = false)
 
 /** How a name is read, from the tokenizer, in hiragana; null when it's already all kana. */
 fun nameReading(surface: String): String? {
@@ -274,12 +291,13 @@ fun WordSheetBody(info: WordInfo, onKnow: () -> Unit, onClose: () -> Unit) {
             Spacer(Modifier.width(8.dp))
             Text(when {
                 info.isName -> "A name: not graded, and no card is made."
+                info.earlier && info.inDeck -> "In your deck. Looking words up in earlier passages doesn't count against them."
                 info.inDeck -> "In your deck: this tap counts as Again. If it was a mis-tap, say you know it."
                 else -> "Not in your deck. From the next version, unknown words go to your RP deck."
             }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (info.isName) PrimaryButton("Close", onClose, Modifier.weight(1f))
+            if (info.isName || (info.earlier && info.inDeck)) PrimaryButton("Close", onClose, Modifier.weight(1f))
             else {
                 SecondaryButton("Close", onClose, Modifier.weight(1f))
                 PrimaryButton("I know it", onKnow, Modifier.weight(1f))
@@ -293,12 +311,12 @@ fun WordSheetBody(info: WordInfo, onKnow: () -> Unit, onClose: () -> Unit) {
 @Composable
 fun StoryScreen(state: AppState, onBack: () -> Unit) {
     val story = state.story
-    val scope = rememberCoroutineScope()
     var picked by remember { mutableStateOf<Pair<Span, ShownPassage>?>(null) }
+    var lookupOnly by remember { mutableStateOf(false) }
     var grammar by remember { mutableStateOf<GrammarPatterns.Found?>(null) }
     var editing by remember { mutableStateOf<String?>(null) }
     var tapVersion by remember { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) { if (story.current == null && story.busy == null) story.start() }
+    LaunchedEffect(Unit) { if (story.current == null && story.busy == null && story.error == null) story.launch { start() } }
 
     StoryContent(
         title = story.place() ?: "Story", cost = story.sessionCost(), history = story.history, current = story.current,
@@ -306,12 +324,15 @@ fun StoryScreen(state: AppState, onBack: () -> Unit) {
         isTapped = story::isTapped,
         statusOf = { if (story.isName(it)) Status.NAME else it.status(state.policy, state.lists) },
         onBack = onBack,
-        onTap = { s, p -> story.tap(s); tapVersion++; picked = s to p },
+        onTap = { s, p -> story.tap(s); tapVersion++; lookupOnly = false; picked = s to p },
         onGrammar = { grammar = it },
-        onReroll = { scope.launch { story.reroll() } },
+        onReroll = { story.launch { reroll() } },
         onEdit = { editing = story.current?.passage?.text },
-        onSend = { m -> scope.launch { story.send(m) } },
+        onSend = { m -> story.launch { send(m) } },
         onDecide = story::decideProposal,
+        reply = story.replyDraft, onReply = { story.replyDraft = it }, onRetry = story.retry,
+        onVersion = { story.selectVersion(it); tapVersion++ },
+        onLookup = { s, p -> lookupOnly = true; picked = s to p },
     )
 
     picked?.let { (span, p) ->
@@ -322,7 +343,8 @@ fun StoryScreen(state: AppState, onBack: () -> Unit) {
         val info = remember(span, meaning) {
             if (story.isName(span)) WordInfo(span.surface, nameReading(span.surface), meaning, emptyList(), false, isName = true)
             else WordInfo(span.lemma, span.entries.firstOrNull()?.let { dict?.forms(it)?.kana?.firstOrNull() }, meaning,
-                span.entries.take(2).flatMap { e -> dict?.senses(e).orEmpty().take(3).map { it.gloss } }, span.deck.isNotEmpty())
+                span.entries.take(2).flatMap { e -> dict?.senses(e).orEmpty().take(3).map { it.gloss } }, span.deck.isNotEmpty(),
+                earlier = lookupOnly)
         }
         WordSheet(info, onKnow = { story.iKnowIt(span); tapVersion++; picked = null }, onClose = { picked = null })
     }
@@ -335,7 +357,7 @@ fun StoryScreen(state: AppState, onBack: () -> Unit) {
         var t by remember { mutableStateOf(text) }
         AlertDialog(onDismissRequest = { editing = null }, title = { Text("Edit the passage") },
             text = { OutlinedTextField(t, { t = it }, Modifier.fillMaxWidth().heightIn(min = 220.dp), textStyle = ReadingText.copy(fontSize = 16.sp, lineHeight = 26.sp)) },
-            confirmButton = { TextButton({ editing = null; scope.launch { story.edit(t) } }) { Text("Save") } },
+            confirmButton = { TextButton({ editing = null; story.launch { edit(t) } }) { Text("Save") } },
             dismissButton = { TextButton({ editing = null }) { Text("Cancel") } })
     }
 }

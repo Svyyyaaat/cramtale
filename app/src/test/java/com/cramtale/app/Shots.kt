@@ -116,14 +116,16 @@ class Shots {
         return out
     }
 
-    private fun storyShot(dark: Boolean) = shot(dark) {
-        val p = ShownPassage(3, passage, spans(passage), emptyList(), setOf("早朝".hashCode().toLong()), mapOf("早朝".hashCode().toLong() to "early morning"), emptyList(), emptyList())
+    private fun storyShot(dark: Boolean, error: String? = null, versions: Int = 1) = shot(dark) {
+        val p = ShownPassage(3, passage, spans(passage), emptyList(), setOf("早朝".hashCode().toLong()), mapOf("早朝".hashCode().toLong() to "early morning"), emptyList(), emptyList(),
+            version = versions - 1, versions = versions)
         val prev = ShownPassage(2, "午前八時。事務所の暖房はまだ効いていない。", spans("午前八時。事務所の暖房はまだ効いていない。"), emptyList(), emptySet(), emptyMap(), emptyList(), emptyList())
         StoryContent("西田製作所", 0.18,
             history = listOf(ShownTurn(null, emptyList(), prev)),
-            current = ShownTurn("すみません、もう少し待ってくれませんか。昨日は忙しいでした。",
+            current = if (error != null) null else ShownTurn("すみません、もう少し待ってくれませんか。昨日は忙しいでした。",
                 listOf(Correction("忙しいでした", "忙しかったです", "conjugation", "い-adjective past: 〜かったです, not 〜いでした", "k")), p),
-            busy = null, error = null, proposals = emptyList(), tapVersion = 0,
+            busy = null, error = error, onRetry = if (error != null) ({}) else null,
+            reply = if (error != null) "すみません、もう少し待ってくれませんか。" else "", proposals = emptyList(), tapVersion = 0,
             isTapped = { it.surface == "布" }, statusOf = { if (it.surface == "返済") Status.UNKNOWN else Status.DECK },
             onBack = {}, onTap = { _, _ -> }, onGrammar = {}, onReroll = {}, onEdit = {}, onSend = {}, onDecide = { _, _ -> })
     }
@@ -140,6 +142,10 @@ class Shots {
 
     @Test fun d1_story() = storyShot(false)
     @Test fun d2_story_dark() = storyShot(true)
+
+    @Test fun d1b_story_versions() = storyShot(false, versions = 3)
+    @Test fun d1c_story_error() = storyShot(false, error = com.cramtale.core.llm.ErrorText.explain(
+        com.cramtale.core.llm.LlmException("network: Request failed", cause = java.net.UnknownHostException("Unable to resolve host \"api.anthropic.com\""))))
 
     @Test fun d3_word_sheet() = shot {
         WordSheetBody(WordInfo("返済", "へんさい", "repaying the loan", listOf("repayment; reimbursement; refund"), false), {}, {})

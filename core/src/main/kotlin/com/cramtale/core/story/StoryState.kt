@@ -1,5 +1,6 @@
 package com.cramtale.core.story
 
+import com.cramtale.core.writeAtomic
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -39,6 +40,10 @@ class StoryState(val dir: File) {
         var usedComplications: MutableList<String> = ArrayList(),
         /** Grammar or weak-point openings the director planned this session (at most one). */
         var openingsThisSession: Int = 0,
+        /** When the player last did anything (ms): a long gap ends the session. */
+        var lastActive: Long = 0,
+        /** The session whose off-screen moves are done (so a retry after a failed plan doesn't move the world twice). */
+        var movedForSession: Int = 0,
     )
 
     // ---------- characters (free text) ----------
@@ -60,7 +65,7 @@ class StoryState(val dir: File) {
     fun writeCharacter(name: String, text: String) {
         charDir.mkdirs()
         val f = characterFiles()[name] ?: File(charDir, "c${(charDir.list()?.size ?: 0) + 1}.md")
-        f.writeText("# $name\n" + text.trim() + "\n")
+        f.writeAtomic("# $name\n" + text.trim() + "\n")
     }
 
     // ---------- world and clocks ----------
@@ -83,7 +88,7 @@ class StoryState(val dir: File) {
             lines += line
         }
         f.parentFile.mkdirs()
-        f.writeText(lines.joinToString("\n").trimEnd() + "\n")
+        f.writeAtomic(lines.joinToString("\n").trimEnd() + "\n")
     }
 
     // ---------- secrets, consequences, chronicle (one item per line) ----------
@@ -122,7 +127,7 @@ class StoryState(val dir: File) {
 
     private fun writeItems(name: String, title: String, lines: List<String>) {
         stateDir.mkdirs()
-        listFile(name).writeText("$title\n\n" + lines.joinToString("\n") + "\n")
+        listFile(name).writeAtomic("$title\n\n" + lines.joinToString("\n") + "\n")
     }
 
     // ---------- scene (code-owned JSON) ----------
@@ -146,6 +151,7 @@ class StoryState(val dir: File) {
             complicationFor = o.optString("complicationFor").ifEmpty { null },
             usedComplications = o.optJSONArray("usedComplications").strings().toMutableList(),
             openingsThisSession = o.optInt("openingsThisSession"),
+            lastActive = o.optLong("lastActive"), movedForSession = o.optInt("movedForSession"),
         )
     }
 
@@ -162,7 +168,8 @@ class StoryState(val dir: File) {
             .put("complicationFor", s.complicationFor ?: "")
             .put("usedComplications", JSONArray(s.usedComplications))
             .put("openingsThisSession", s.openingsThisSession)
-        sceneFile.writeText(o.toString(2))
+            .put("lastActive", s.lastActive).put("movedForSession", s.movedForSession)
+        sceneFile.writeAtomic(o.toString(2))
     }
 
     // ---------- applying proposed changes ----------

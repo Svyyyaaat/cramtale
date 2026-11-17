@@ -1,5 +1,6 @@
 package com.cramtale.core.review
 
+import com.cramtale.core.writeAtomic
 import com.cramtale.core.match.Analysis
 import com.cramtale.core.match.GrammarPatterns
 import com.cramtale.core.story.Correction
@@ -51,7 +52,7 @@ class ReviewPlanner(private val grammar: GrammarPatterns?, private val skipsFile
         for (id in pool.words.map { it.noteId } + pool.grammar.map { it.noteId }) {
             if (id in inText) skips.remove(id) else skips[id] = (skips[id] ?: 0) + 1
         }
-        skipsFile?.let { f -> f.parentFile?.mkdirs(); f.writeText(JSONObject(skips.mapKeys { it.key.toString() } as Map<*, *>).toString()) }
+        skipsFile?.let { f -> f.parentFile?.mkdirs(); f.writeAtomic(JSONObject(skips.mapKeys { it.key.toString() } as Map<*, *>).toString()) }
     }
 }
 
@@ -105,7 +106,7 @@ class MistakeLog(private val file: File?) {
     private fun save() {
         val f = file ?: return
         f.parentFile?.mkdirs()
-        f.writeText(JSONArray(keys.values.map { k ->
+        f.writeAtomic(JSONArray(keys.values.map { k ->
             JSONObject().put("key", k.key).put("count", k.count).put("correctSince", k.correctSince).put("proposed", k.proposed)
                 .put("decided", k.decided ?: "")
                 .put("examples", JSONArray(k.examples.map { (m, c) ->

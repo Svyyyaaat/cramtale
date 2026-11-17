@@ -174,9 +174,20 @@ fun Busy(text: String) {
 }
 
 @Composable
-fun ErrorNote(text: String) {
-    Text(text, Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).background(MaterialTheme.colorScheme.errorContainer).padding(14.dp),
-        color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodyMedium)
+fun ErrorNote(text: String, onRetry: (() -> Unit)? = null) {
+    // the first paragraph is what to do; the rest is the technical chain, smaller, for reports
+    val headline = text.substringBefore("\n\n")
+    val details = text.substringAfter("\n\n", "")
+    Column(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).background(MaterialTheme.colorScheme.errorContainer).padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(headline, color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodyMedium)
+        if (details.isNotBlank()) Text(details, color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f),
+            style = MaterialTheme.typography.bodySmall)
+        if (onRetry != null) androidx.compose.material3.FilledTonalButton(onRetry,
+            colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)) {
+            Text("Try again")
+        }
+    }
 }
 
 @Composable

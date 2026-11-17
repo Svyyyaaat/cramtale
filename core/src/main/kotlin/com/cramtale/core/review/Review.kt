@@ -1,5 +1,6 @@
 package com.cramtale.core.review
 
+import com.cramtale.core.writeAtomic
 import com.cramtale.core.match.DeckWord
 import org.json.JSONObject
 import java.io.File
@@ -172,7 +173,7 @@ class PendingReads(private val file: File?) {
     fun firstReadDone(ref: CardRef, passageId: String): Boolean = firsts[ref.key]?.let { it != passageId } == true
     fun recordFirst(ref: CardRef, passageId: String) { firsts[ref.key] = passageId; save() }
     fun clear(ref: CardRef) { if (firsts.remove(ref.key) != null) save() }
-    private fun save() { file?.writeText(JSONObject(firsts as Map<*, *>).toString()) }
+    private fun save() { file?.writeAtomic(JSONObject(firsts as Map<*, *>).toString()) }
 }
 
 /**

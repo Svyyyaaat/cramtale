@@ -202,7 +202,7 @@ fun StyleStepContent(options: List<Pair<StoryEngine.StyleOption, Double>>?, busy
         StepHeader(7, SETUP_STEPS, "Pick the one you like reading",
             "The same short scene in four styles. Your choice becomes the writer's style sample for the whole story.")
         if (busy != null) Busy(busy)
-        if (error != null) ErrorNote(error)
+        if (error != null) ErrorNote(error, onMore)
         for ((o, rate) in options.orEmpty()) {
             PaperCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -319,7 +319,7 @@ fun OnboardingFlow(state: AppState, onFinished: () -> Unit) {
             LaunchedEffect(Unit) { options = state.story.styleOptions() }
             StyleStepContent(options, state.story.busy, state.story.error,
                 onPick = { o -> scope.launch { state.story.pickStyle(o); state.onboardingDone = true; onFinished() } },
-                onMore = { scope.launch { options = state.story.styleOptions() } }, onBack = back)
+                onMore = { scope.launch { options = state.story.styleOptions(fresh = options != null) } }, onBack = back)
         }
     }
 }
