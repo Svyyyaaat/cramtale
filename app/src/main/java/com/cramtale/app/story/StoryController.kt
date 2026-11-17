@@ -502,7 +502,11 @@ class StoryController(
     }
 
     /** What the player's character knows: their role, who they've met, the chapters so far. Never secrets. */
-    data class StoryInfo(val role: String?, val met: List<String>, val chapters: List<Pair<Int, String>>)
+    data class StoryInfo(
+        val role: String?, val met: List<String>, val chapters: List<Pair<Int, String>>,
+        /** Today's reads (Anki's day): word and would-be grade (true = Good), latest first. */
+        val today: List<Pair<String, Boolean>> = emptyList(),
+    )
 
     fun role(): String? = File(dir, "state/player.md").takeIf { it.exists() }?.readText()?.trim()?.ifEmpty { null }
 
@@ -515,7 +519,11 @@ class StoryController(
         val met = cast.filter { n -> n in text || n.split(' ', '　', '・', '(', ')', '（', '）').any { it.length >= 2 && it in text } }
         val chapters = File(dir, "state/chapters").listFiles { f -> f.extension == "md" }.orEmpty()
             .mapNotNull { f -> f.nameWithoutExtension.toIntOrNull()?.let { it to f.readText().trim() } }.sortedBy { it.first }
-        return StoryInfo(role, met, chapters)
+        val start = GradeLog.ankiDayStart()
+        val today = gradeLog.snapshot().filter { it.optLong("at") >= start }
+            .associateBy { "${it.optLong("noteId")}/${it.optInt("ord")}" }.values
+            .sortedByDescending { it.optLong("at") }.map { it.optString("word") to (it.optInt("ease") == 3) }
+        return StoryInfo(role, met, chapters, today)
     }
 
     /** Every session's costs, from the log file. */

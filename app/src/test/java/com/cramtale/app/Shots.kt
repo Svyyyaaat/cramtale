@@ -166,7 +166,8 @@ class Shots {
         StoryInfoBody(com.cramtale.app.story.StoryController.StoryInfo(
             "狐火堂という小さな菓子屋の二代目。父の借金が残っていて、春祭りまでに返さなければならない。",
             listOf("榊", "コガネ", "ミナ"),
-            listOf(1 to "Sakaki from the guild brought the festival papers and a threat: sign, or lose the shop's permit. Kogane, the cat, watched.")))
+            listOf(1 to "Sakaki from the guild brought the festival papers and a threat: sign, or lose the shop's permit. Kogane, the cat, watched."),
+            listOf("供える" to true, "組合" to false, "許可" to true, "書類" to true, "保証人" to true, "手間" to false)))
     }
 
     @Test fun e1_settings() = shot {

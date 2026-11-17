@@ -430,6 +430,7 @@ fun StoryInfoSheet(info: StoryController.StoryInfo, onClose: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun StoryInfoBody(info: StoryController.StoryInfo) {
     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp).padding(bottom = 32.dp),
@@ -442,6 +443,18 @@ fun StoryInfoBody(info: StoryController.StoryInfo) {
         if (info.met.isNotEmpty()) {
             Text("People you've met", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
             Text(info.met.joinToString("、"), style = readingStyle().copy(fontSize = 18.sp, lineHeight = 28.sp))
+        }
+        if (info.today.isNotEmpty()) {
+            Text("Read today · ${info.today.count { it.second }} Good · ${info.today.count { !it.second }} Again",
+                style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                info.today.forEach { (w, good) ->
+                    Pill(w, if (good) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer,
+                        if (good) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer)
+                }
+            }
+            Text("Would-be grades: this build doesn't answer cards in Anki yet.", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Text("Chapters", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
         if (info.chapters.isEmpty()) Text("Chapter 1 is still being written. A summary appears here when it closes.",
