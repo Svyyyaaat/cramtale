@@ -1,6 +1,8 @@
 package com.cramtale.app
 
 import android.content.Context
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import com.cramtale.app.anki.AnkiReader
 import com.cramtale.app.anki.AnkiTarget
 import com.cramtale.app.dict.DictionarySetup
@@ -61,6 +63,21 @@ class AppState(val context: Context) {
     var firmStyleRules: Boolean
         get() = prefs.getBoolean("firmStyleRules", false)
         set(v) = prefs.edit().putBoolean("firmStyleRules", v).apply()
+
+    enum class ThemeMode(val label: String) { SYSTEM("System"), LIGHT("Light"), DARK("Dark") }
+
+    /** Light or dark: follows the phone unless set (Settings → Theme). Compose state, so a change shows at once. */
+    var themeMode by androidx.compose.runtime.mutableStateOf(
+        runCatching { ThemeMode.valueOf(prefs.getString("themeMode", "SYSTEM")!!) }.getOrDefault(ThemeMode.SYSTEM))
+        private set
+
+    fun setTheme(m: ThemeMode) { themeMode = m; prefs.edit().putString("themeMode", m.name).apply() }
+
+    /** Colours: the phone's Material You palette (default), or Cramtale's own. */
+    var materialYou by androidx.compose.runtime.mutableStateOf(prefs.getBoolean("materialYou", true))
+        private set
+
+    fun chooseMaterialYou(on: Boolean) { materialYou = on; prefs.edit().putBoolean("materialYou", on).apply() }
 
     /** Reading text size, as a multiple of the default. */
     var textScale: Float

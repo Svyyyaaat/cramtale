@@ -36,6 +36,8 @@ data class SettingsValues(
     val firmStyle: Boolean,
     val keyHint: String?,
     val styleLine: String? = null,
+    val theme: com.cramtale.app.AppState.ThemeMode = com.cramtale.app.AppState.ThemeMode.SYSTEM,
+    val materialYou: Boolean = true,
 )
 
 val TEXT_SCALES = listOf(0.85f to "Small", 1f to "Normal", 1.15f to "Large", 1.3f to "Larger")
@@ -44,7 +46,7 @@ val TEXT_SCALES = listOf(0.85f to "Small", 1f to "Normal", 1.15f to "Large", 1.3
 fun SettingsScreen(state: AppState, onNewStory: () -> Unit, onScale: (Float) -> Unit, onPickStyle: () -> Unit) {
     var v by remember {
         mutableStateOf(SettingsValues(state.textScale, state.passageLength, state.twoReads, state.firmStyleRules, state.story.keyHint(),
-            state.story.styleLine()))
+            state.story.styleLine(), state.themeMode, state.materialYou))
     }
     SettingsContent(v,
         onScale = { state.textScale = it; onScale(it); v = v.copy(textScale = it) },
@@ -54,6 +56,8 @@ fun SettingsScreen(state: AppState, onNewStory: () -> Unit, onScale: (Float) -> 
         onKey = { state.story.saveKey(it.trim()); v = v.copy(keyHint = state.story.keyHint()) },
         onNewStory = onNewStory,
         onPickStyle = onPickStyle,
+        onTheme = { state.setTheme(it); v = v.copy(theme = it) },
+        onColors = { state.chooseMaterialYou(it); v = v.copy(materialYou = it) },
     )
 }
 
@@ -61,12 +65,22 @@ fun SettingsScreen(state: AppState, onNewStory: () -> Unit, onScale: (Float) -> 
 fun SettingsContent(
     v: SettingsValues, onScale: (Float) -> Unit, onLength: (PassageLength) -> Unit, onTwoReads: (Boolean) -> Unit,
     onFirm: (Boolean) -> Unit, onKey: (String) -> Unit, onNewStory: () -> Unit, onPickStyle: () -> Unit = {},
+    onTheme: (com.cramtale.app.AppState.ThemeMode) -> Unit = {},
+    onColors: (Boolean) -> Unit = {},
 ) {
     var keyInput by remember { mutableStateOf<String?>(null) }
     var confirmNew by remember { mutableStateOf(false) }
     Page {
-        SectionTitle("Reading")
+        SectionTitle("Look and reading")
         PaperCard {
+            Text("Theme", style = MaterialTheme.typography.titleSmall)
+            val modes = com.cramtale.app.AppState.ThemeMode.entries
+            Segmented(modes.map { it.label }, v.theme.ordinal) { onTheme(modes[it]) }
+            Hint("System follows your phone's light or dark setting.")
+            Text("Colours", style = MaterialTheme.typography.titleSmall)
+            Segmented(listOf("Material You", "Cramtale"), if (v.materialYou) 0 else 1) { onColors(it == 0) }
+            Hint(if (android.os.Build.VERSION.SDK_INT >= 31) "Material You uses your wallpaper's palette." else "Material You needs Android 12; Cramtale's colours are used.")
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Text("Text size", style = MaterialTheme.typography.titleSmall)
             Segmented(TEXT_SCALES.map { it.second }, TEXT_SCALES.indexOfFirst { it.first == v.textScale }.coerceAtLeast(1)) { onScale(TEXT_SCALES[it].first) }
             androidx.compose.runtime.CompositionLocalProvider(LocalReadingScale provides v.textScale) {

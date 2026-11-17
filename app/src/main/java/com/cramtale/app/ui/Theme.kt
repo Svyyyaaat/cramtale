@@ -15,42 +15,37 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/**
- * 藍 indigo (main), 朱 vermilion (the one accent: what to do now, what's wrong), 翠 jade (right, known),
- * 金 amber (a word you tapped). Cool paper by day, deep indigo at night.
- */
+/** 藍 indigo, 朱 vermilion, 若竹 green on paper; ink-dark at night (the original palette). */
 private val Light = lightColorScheme(
-    primary = Color(0xFF2E3FA3), onPrimary = Color.White,
-    primaryContainer = Color(0xFFE2E6FC), onPrimaryContainer = Color(0xFF111A5A),
-    // Material's tonal parts (tonal buttons, selected segments) use secondary: a quiet slate, so the
-    // vermilion accent (Accents) stays rare
-    secondary = Color(0xFF515A7E), onSecondary = Color.White,
-    secondaryContainer = Color(0xFFE3E6F3), onSecondaryContainer = Color(0xFF1B2246),
-    tertiary = Color(0xFF0D8574), onTertiary = Color.White,
-    tertiaryContainer = Color(0xFFCDF2EA), onTertiaryContainer = Color(0xFF00382F),
-    background = Color(0xFFF3F4F8), onBackground = Color(0xFF141826),
-    surface = Color(0xFFF3F4F8), onSurface = Color(0xFF141826),
-    surfaceVariant = Color(0xFFE6E8F0), onSurfaceVariant = Color(0xFF575D72),
-    surfaceContainerLowest = Color(0xFFFFFFFF), surfaceContainerLow = Color(0xFFF9FAFC),
-    surfaceContainer = Color(0xFFECEEF5), surfaceContainerHigh = Color(0xFFE6E8F0), surfaceContainerHighest = Color(0xFFDFE2EC),
-    outline = Color(0xFFB9BED0), outlineVariant = Color(0xFFE1E4ED),
-    error = Color(0xFFC0321F), onError = Color.White, errorContainer = Color(0xFFFFE2DB), onErrorContainer = Color(0xFF5A1206),
+    primary = Color(0xFF2B4570), onPrimary = Color.White,
+    primaryContainer = Color(0xFFDCE4F2), onPrimaryContainer = Color(0xFF0F2445),
+    secondary = Color(0xFFB5482E), onSecondary = Color.White,
+    secondaryContainer = Color(0xFFF6DED5), onSecondaryContainer = Color(0xFF4A1508),
+    tertiary = Color(0xFF4F7A5A), onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFD9EBDC), onTertiaryContainer = Color(0xFF13301B),
+    background = Color(0xFFF6F2EA), onBackground = Color(0xFF1F1D1A),
+    surface = Color(0xFFFBF8F2), onSurface = Color(0xFF1F1D1A),
+    surfaceVariant = Color(0xFFECE5D8), onSurfaceVariant = Color(0xFF5E574D),
+    surfaceContainerLowest = Color(0xFFFFFDF9), surfaceContainerLow = Color(0xFFF8F4EC),
+    surfaceContainer = Color(0xFFF2EDE3), surfaceContainerHigh = Color(0xFFEDE7DB), surfaceContainerHighest = Color(0xFFE7E0D3),
+    outline = Color(0xFFBDB3A3), outlineVariant = Color(0xFFDDD5C7),
+    error = Color(0xFFA8322A), onError = Color.White, errorContainer = Color(0xFFF8DAD5), onErrorContainer = Color(0xFF410E0A),
 )
 
 private val Dark = darkColorScheme(
-    primary = Color(0xFF9EABFF), onPrimary = Color(0xFF0E1650),
-    primaryContainer = Color(0xFF283380), onPrimaryContainer = Color(0xFFDEE2FF),
-    secondary = Color(0xFFB9C1E6), onSecondary = Color(0xFF232A4E),
-    secondaryContainer = Color(0xFF2A3253), onSecondaryContainer = Color(0xFFDDE1F7),
-    tertiary = Color(0xFF52D7BE), onTertiary = Color(0xFF00382F),
-    tertiaryContainer = Color(0xFF00473C), onTertiaryContainer = Color(0xFFB9F5E8),
-    background = Color(0xFF0C0F1E), onBackground = Color(0xFFE9EBF6),
-    surface = Color(0xFF0C0F1E), onSurface = Color(0xFFE9EBF6),
-    surfaceVariant = Color(0xFF232A44), onSurfaceVariant = Color(0xFFA6ADC6),
-    surfaceContainerLowest = Color(0xFF141933), surfaceContainerLow = Color(0xFF12172C),
-    surfaceContainer = Color(0xFF1A2039), surfaceContainerHigh = Color(0xFF212844), surfaceContainerHighest = Color(0xFF29314F),
-    outline = Color(0xFF5B6383), outlineVariant = Color(0xFF262D48),
-    error = Color(0xFFFF8A70), onError = Color(0xFF4A0D02), errorContainer = Color(0xFF63200F), onErrorContainer = Color(0xFFFFDAD1),
+    primary = Color(0xFFAFC6EE), onPrimary = Color(0xFF0F2445),
+    primaryContainer = Color(0xFF253B60), onPrimaryContainer = Color(0xFFDCE4F2),
+    secondary = Color(0xFFF2A88F), onSecondary = Color(0xFF4A1508),
+    secondaryContainer = Color(0xFF6B2A19), onSecondaryContainer = Color(0xFFF6DED5),
+    tertiary = Color(0xFFA6D1AF), onTertiary = Color(0xFF13301B),
+    tertiaryContainer = Color(0xFF2F4C37), onTertiaryContainer = Color(0xFFD9EBDC),
+    background = Color(0xFF15171B), onBackground = Color(0xFFE9E4DA),
+    surface = Color(0xFF1A1D22), onSurface = Color(0xFFE9E4DA),
+    surfaceVariant = Color(0xFF2A2E35), onSurfaceVariant = Color(0xFFBDB6AA),
+    surfaceContainerLowest = Color(0xFF111316), surfaceContainerLow = Color(0xFF1C1F24),
+    surfaceContainer = Color(0xFF20242A), surfaceContainerHigh = Color(0xFF272B32), surfaceContainerHighest = Color(0xFF30353D),
+    outline = Color(0xFF6E685E), outlineVariant = Color(0xFF3A3F47),
+    error = Color(0xFFF0A49A), onError = Color(0xFF410E0A), errorContainer = Color(0xFF7A2A22), onErrorContainer = Color(0xFFF8DAD5),
 )
 
 /** Colours outside Material's slots. */
@@ -70,10 +65,10 @@ data class Accents(
     val onAccentContainer: Color,
 )
 
-private val LightAccents = Accents(Color(0xFFFFE6A8), Color(0xFF3D2A00), Color(0xFFFFB52E), Color(0xFF3449B8), Color(0xFF1B2470),
-    Color(0xFFD9412A), Color.White, Color(0xFFFFE2DB), Color(0xFF5A1206))
-private val DarkAccents = Accents(Color(0xFF5A4300), Color(0xFFFFE6A8), Color(0xFFFFC861), Color(0xFF2B3A9E), Color(0xFF151C52),
-    Color(0xFFFF7D5E), Color(0xFF4A0D02), Color(0xFF63200F), Color(0xFFFFDAD1))
+private val LightAccents = Accents(Color(0xFFF6DED5), Color(0xFF4A1508), Color(0xFFE2A93B), Color(0xFF34548A), Color(0xFF1E3356),
+    Color(0xFFB5482E), Color.White, Color(0xFFF6DED5), Color(0xFF4A1508))
+private val DarkAccents = Accents(Color(0xFF6B2A19), Color(0xFFF6DED5), Color(0xFFE8B865), Color(0xFF2E4A78), Color(0xFF1A2940),
+    Color(0xFFF2A88F), Color(0xFF4A1508), Color(0xFF6B2A19), Color(0xFFF6DED5))
 
 // the accent reads like a theme colour: MaterialTheme.colorScheme.accent
 val androidx.compose.material3.ColorScheme.accent: Color @Composable @androidx.compose.runtime.ReadOnlyComposable get() = LocalAccents.current.accent
@@ -107,11 +102,28 @@ private val AppShapes = Shapes(
 )
 
 @Composable
-fun CramtaleTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
-    androidx.compose.runtime.CompositionLocalProvider(LocalAccents provides if (dark) DarkAccents else LightAccents) {
-        MaterialTheme(colorScheme = if (dark) Dark else Light, typography = Type, shapes = AppShapes, content = content)
+fun CramtaleTheme(dark: Boolean = isSystemInDarkTheme(), materialYou: Boolean = false, content: @Composable () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    // Material You: the phone's wallpaper palette (Android 12+); otherwise Cramtale's own
+    val dynamic = materialYou && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
+    val scheme = when {
+        dynamic && dark -> androidx.compose.material3.dynamicDarkColorScheme(context)
+        dynamic -> androidx.compose.material3.dynamicLightColorScheme(context)
+        dark -> Dark
+        else -> Light
+    }
+    val accents = if (dynamic) accentsFrom(scheme) else if (dark) DarkAccents else LightAccents
+    androidx.compose.runtime.CompositionLocalProvider(LocalAccents provides accents) {
+        MaterialTheme(colorScheme = scheme, typography = Type, shapes = AppShapes, content = content)
     }
 }
+
+/** With Material You, the extra colours come from the wallpaper scheme too (tertiary for taps, error tones for the accent). */
+private fun accentsFrom(s: androidx.compose.material3.ColorScheme) = Accents(
+    tapped = s.tertiaryContainer, onTapped = s.onTertiaryContainer, amber = s.tertiary,
+    heroStart = s.primary, heroEnd = s.primary.copy(alpha = 1f).let { androidx.compose.ui.graphics.lerp(it, Color.Black, 0.35f) },
+    accent = s.error, onAccent = s.onError, accentContainer = s.errorContainer, onAccentContainer = s.onErrorContainer,
+)
 
 /** The reader's text size setting (Settings → Reading), as a multiple of [ReadingText]. */
 val LocalReadingScale = androidx.compose.runtime.staticCompositionLocalOf { 1f }

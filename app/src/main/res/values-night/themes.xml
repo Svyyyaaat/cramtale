@@ -2,5 +2,5 @@
     <style name="Theme.Cramtale" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/paper</item>
     </style>
-    <color name="paper">#FF0C0F1E</color>
+    <color name="paper">#FF15171B</color>
 </resources>

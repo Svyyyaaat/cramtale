@@ -38,7 +38,22 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         val state = (application as CramtaleApp).state
-        setContent { CramtaleTheme { App(state) } }
+        setContent {
+            val dark = when (state.themeMode) {
+                com.cramtale.app.AppState.ThemeMode.LIGHT -> false
+                com.cramtale.app.AppState.ThemeMode.DARK -> true
+                com.cramtale.app.AppState.ThemeMode.SYSTEM -> androidx.compose.foundation.isSystemInDarkTheme()
+            }
+            // status and navigation bar icons readable on the theme actually shown (also when it differs from the phone's)
+            val view = androidx.compose.ui.platform.LocalView.current
+            androidx.compose.runtime.SideEffect {
+                androidx.core.view.WindowCompat.getInsetsController(window, view).apply {
+                    isAppearanceLightStatusBars = !dark
+                    isAppearanceLightNavigationBars = !dark
+                }
+            }
+            CramtaleTheme(dark, materialYou = state.materialYou) { App(state) }
+        }
     }
 }
 
