@@ -9,6 +9,9 @@ import androidx.core.content.ContextCompat
 import com.cramtale.core.match.NoteTypeRule
 import com.cramtale.core.match.RawCard
 import com.cramtale.core.match.RawNote
+import com.cramtale.core.review.AnkiSource
+import com.cramtale.core.review.CardInfo
+import com.cramtale.core.review.CardRef
 
 /**
  * One AnkiDroid install: the real one (com.ichi2.anki) or a parallel build (com.ichi2.anki.a … .e).
@@ -38,7 +41,7 @@ data class NoteType(val id: Long, val name: String, val fields: List<String>)
  * provider and URI scheme Cram Dungeon uses (content://<authority>/notes, /decks, /models, /schedule).
  * Nothing here writes. Call off the main thread.
  */
-class AnkiReader(private val context: Context, val target: AnkiTarget) {
+class AnkiReader(private val context: Context, val target: AnkiTarget) : AnkiSource {
     private val resolver: ContentResolver get() = context.contentResolver
     private val base = Uri.parse("content://${target.authority}")
     private val notesUri = Uri.withAppendedPath(base, "notes")
@@ -113,11 +116,25 @@ class AnkiReader(private val context: Context, val target: AnkiTarget) {
         }
     }
 
-    /** The scheduler's queue for a deck (what Anki would show next), as (noteId, ord). */
-    fun queue(deckId: Long, limit: Int): List<Pair<Long, Int>> =
+    /** The scheduler's queue for a deck (what Anki would show next, with its own limits applied). */
+    override fun queue(deckId: Long, limit: Int): List<CardRef> =
         query(scheduleUri, null, "limit=?,deckID=?", arrayOf(limit.toString(), deckId.toString())) { c ->
-            c.long("note_id") to c.int("ord")
+            CardRef(c.long("note_id"), c.int("ord"))
         }
+
+    /** The card's scheduling state; reps and ivl only where this AnkiDroid reports them. */
+    override fun card(ref: CardRef): CardInfo? {
+        val uri = cardUri(ref.noteId, ref.ord)
+        for (cols in listOf(arrayOf("type", "queue", "due", "reps", "ivl"), arrayOf("type", "queue", "due", "reps"), arrayOf("type", "queue", "due"))) {
+            val r = runCatching {
+                query(uri, cols, null) { c ->
+                    CardInfo(c.getInt(0), c.getInt(1), c.getLong(2), if (cols.size > 3) c.getInt(3) else -1, if (cols.size > 4) c.getInt(4) else -1)
+                }.firstOrNull()
+            }
+            if (r.isSuccess) return r.getOrNull()
+        }
+        return null
+    }
 
     fun <T> query(uri: Uri, projection: Array<String>?, selection: String?, args: Array<String>? = null, row: (Cursor) -> T): List<T> {
         val out = ArrayList<T>()

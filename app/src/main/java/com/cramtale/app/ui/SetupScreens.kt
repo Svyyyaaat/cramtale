@@ -85,6 +85,14 @@ fun HomeScreen(state: AppState, go: (Screen) -> Unit) {
         }
     }
     Page {
+        Section("Story") {
+            Text("Read-only: due words from Anki are woven in and graded in a log; nothing is sent to AnkiDroid yet.")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { go(Screen.STORY) }) { Text("Play") }
+                OutlinedButton(onClick = { go(Screen.LOGS) }) { Text("Logs") }
+                OutlinedButton(onClick = { go(Screen.FILES) }) { Text("Files") }
+            }
+        }
         Section("1. AnkiDroid") {
             Text(state.target?.let { "Connected to ${it.packageName}" } ?: "Pick which AnkiDroid to read: your copy (parallel build) or the real one.")
             Button(onClick = { go(Screen.TARGET) }) { Text("Choose AnkiDroid") }

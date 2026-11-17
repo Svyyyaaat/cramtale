@@ -43,6 +43,18 @@ class AppState(private val context: Context) {
             .putBoolean("newSuspendedKnown", p.newSuspendedKnown)
             .apply()
 
+    /** Optional rule: review cards with an interval under 21 days need two untapped reads. Off by default. */
+    var twoReads: Boolean
+        get() = prefs.getBoolean("twoReads", false)
+        set(v) = prefs.edit().putBoolean("twoReads", v).apply()
+
+    /** Style rules as firm prohibitions instead of positive statements (until the A/B test decides). */
+    var firmStyleRules: Boolean
+        get() = prefs.getBoolean("firmStyleRules", false)
+        set(v) = prefs.edit().putBoolean("firmStyleRules", v).apply()
+
+    val story by lazy { com.cramtale.app.story.StoryController(context, this) }
+
     var lists: KnownLists = KnownListsStore.load(listsDir)
         set(v) { field = v; KnownListsStore.save(listsDir, v) }
 

@@ -32,7 +32,9 @@ android {
         compose = true
     }
     packaging {
-        resources.excludes += listOf("META-INF/{AL2.0,LGPL2.1}", "META-INF/CONTRIBUTORS.md", "META-INF/LICENSE.md")
+        resources.excludes += listOf("META-INF/{AL2.0,LGPL2.1}", "META-INF/CONTRIBUTORS.md", "META-INF/LICENSE.md",
+            "META-INF/LICENSE*", "META-INF/NOTICE*", "META-INF/DEPENDENCIES", "META-INF/versions/9/OSGI-INF/MANIFEST.MF",
+            "META-INF/*.kotlin_module", "META-INF/FastDoubleParser-*")
     }
 }
 
