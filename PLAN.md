@@ -257,6 +257,37 @@ suffixes and prefixes are attached to their word.
 - **Due-word pool:** the writer gets the pool and uses what fits. Words that were offered but
   skipped gain priority next passage (code-side counter).
 
+### 5.4 Grammar
+Everything here depends on detecting patterns well, so detection is measured before anything
+relies on it (build step 1b).
+
+1. **Grammar cards reviewed by reading.** A pattern list holds one rule per pattern, written over
+   Kuromoji tokens and base forms (〜ことにする = こと + に + any form of する, so ことにした and
+   ことにしよう match too). Your 57 grammar cards (によれば, ことにする, こともある, までもない…) are
+   matched through it. Due grammar cards join the writer's due pool and are graded exactly like
+   words: untapped Good, tapped Again, only when Anki says they're due.
+2. **Tappable grammar.** A tap on a construction highlights the whole pattern, even across several
+   tokens. The popup shows the pattern, its meaning from the list, a one-line meaning in this
+   sentence (Haiku), and **I know it**. Patterns that aren't in your deck can be tapped too.
+3. **Collecting grammar.** Tapping a pattern that isn't in your deck proposes a grammar card in the
+   RP deck (add-only mode, same daily cap and queue as words). Format: your own **基本** note type,
+   the story sentence with the pattern in bold on the front, the pattern and its meaning on the back,
+   like your 僕の日本語 cards. No new note type.
+4. **Openings for weak grammar, not forced.** When the mistake log or a due grammar card shows a
+   weak pattern, the director may plan one beat where it would come naturally (a negotiation that
+   invites a conditional, a decision to announce). At most one such beat per session, only if it
+   fits the scene the story already has, and never a prompt or hint to use the pattern. The mistake
+   checker logs correct uses as well as errors. A mistake key counts as fixed after three correct
+   uses without a repeat, and then stops being sent to the writer as a weak point.
+
+Not doing: a grammar-difficulty budget per passage, or quizzing mistake cards inside the story.
+Mistake cards are reviewed in AnkiDroid like any card.
+
+**The pattern list:** written by me, starting from your 57 grammar cards and then the common N5–N2
+patterns (a few hundred). Each rule has example sentences that must match and near-misses that must
+not, tested the same way as the word matcher, plus the deck self-test (each grammar card found in
+its own example sentence).
+
 ## 6. Story engine
 
 ### 6.1 Calls (each its own job)
@@ -402,12 +433,16 @@ Each step ends with a report: what works, what is untested, and how to run it.
      delete support) and the **calibration screen**: paste text, see flagged words with reasons,
      mark them known, a name or ignored, and see the unknown % at each frequency threshold.
    - Also a JVM CLI for the same, which runs here.
+
+   1b. **Grammar patterns** (§5.4): the pattern rules and matcher, your 57 grammar cards first, a
+   measured hit rate and false-match rate, then the wider N5–N2 list. Grammar in the tap popup and
+   on the calibration screen. If detection isn't reliable, grading grammar stays off.
 2. **Story loop, read-only:** the prompt research, prompts/ and config/, the Claude client with
    caching and cost log, director/writer/checks/dice/complications/scribe/state, the tap UI and
    popup, reroll and edit, chapters, the style picker, the dry-run log and report, and the style
    A/B harness (run only with your OK).
-3. **Add-only:** RP notes with the daily cap and queue, mistake cards with approval, the write
-   log, and note undo.
+3. **Add-only:** RP notes with the daily cap and queue, mistake cards and grammar cards with
+   approval, the write log, and note undo.
 4. **Grading:** answers with verify, retry and journal (ported from Cram Dungeon), the daily cap,
    and the two-read option. First against the parallel-build copy. The real collection only after
    you say so.
@@ -436,3 +471,8 @@ Settled (your answers on 2026-11-17):
 - **Q4:** the parallel-build copy with the marker-deck guard (section 4.6).
 - **Q5:** audio from Termux edge-tts, as the Miner does it (section 8).
 - **Q6:** **I know it** stays on deck words and cancels a mis-tap (section 4.3).
+- **Grammar:** reviewed by reading, tappable, collected into 基本 cards, and light openings for weak
+  points, if detection proves reliable (§5.4). No grammar budget per passage, and mistake cards are
+  reviewed in AnkiDroid, not quizzed in the story.
+- **Suspended never-studied cards** (`suspend_me`) count as known: you suspended them because you
+  know them.
