@@ -53,6 +53,17 @@ class GradingTest {
     private val words = listOf(鍵, 倉庫, 帳簿, 銀行, 一気)
 
     @Test
+    fun `queue notes the deck snapshot lacks are reported (cards added since it was read)`() {
+        val known = CardRef(1, 0)
+        val added = CardRef(99, 0)
+        val review = CardInfo(2, 2, 0, 5, 10)
+        val anki = FakeAnki(mutableMapOf(known to review, added to review), listOf(known, added), 1000)
+        val snap = DueSnapshot.take(anki, listOf(1L), listOf(鍵))
+        assertEquals(setOf(99L), snap.unknownNotes)
+        assertEquals(listOf(1L), snap.cards.map { it.ref.noteId })
+    }
+
+    @Test
     fun `snapshot - learning cards only once their step has really passed`() {
         val snap = DueSnapshot.take(anki(), listOf(1L), words)
         assertEquals(setOf(1L, 2L, 5L), snap.cards.map { it.ref.noteId }.toSet())

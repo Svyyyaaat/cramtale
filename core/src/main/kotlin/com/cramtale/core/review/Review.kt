@@ -46,7 +46,12 @@ data class DueCard(val ref: CardRef, val word: DeckWord, val info: CardInfo) {
  * recognition cards, with learning cards counted only once their step delay has really passed
  * (no learn-ahead).
  */
-class DueSnapshot(val cards: List<DueCard>, val takenAt: Long) {
+class DueSnapshot(
+    val cards: List<DueCard>,
+    val takenAt: Long,
+    /** Notes in Anki's queue that the deck snapshot doesn't have (added since it was read, or another note type). */
+    val unknownNotes: Set<Long> = emptySet(),
+) {
     val byNote: Map<Long, List<DueCard>> = cards.groupBy { it.ref.noteId }
 
     companion object {
@@ -56,15 +61,16 @@ class DueSnapshot(val cards: List<DueCard>, val takenAt: Long) {
             val byNote = words.associateBy { it.noteId }
             val now = source.nowSeconds()
             val out = LinkedHashMap<String, DueCard>()
+            val unknown = LinkedHashSet<Long>()
             for (deck in deckIds) for (ref in source.queue(deck, QUEUE_LIMIT)) {
-                val w = byNote[ref.noteId] ?: continue
+                val w = byNote[ref.noteId] ?: run { unknown += ref.noteId; null } ?: continue
                 if (w.cards.none { it.ord == ref.ord }) continue // not a recognition card
                 val info = source.card(ref) ?: continue
                 if (info.suspendedOrBuried) continue
                 if (info.queue == 1 && info.due > now) continue // learning step not over yet
                 out.putIfAbsent(ref.key, DueCard(ref, w, info))
             }
-            return DueSnapshot(out.values.toList(), now)
+            return DueSnapshot(out.values.toList(), now, unknown)
         }
     }
 }

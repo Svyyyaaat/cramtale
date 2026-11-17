@@ -221,6 +221,8 @@ fun StoryContent(
     onLookup: (Span, ShownPassage) -> Unit = { _, _ -> },
     /** Who you are in the story, shown above the first passage. */
     intro: String? = null,
+    /** Why there are no review words (no AnkiDroid, nothing due…), shown above the reply box. */
+    notice: String? = null,
     onInfo: (() -> Unit)? = null,
 ) {
     val listState = rememberLazyListState()
@@ -261,6 +263,8 @@ fun StoryContent(
             if (error != null) item { ErrorNote(error, onRetry) }
             items(proposals) { p -> ProposalCard(p) { onDecide(p.key, it) } }
         }
+        if (notice != null && busy == null) Text(notice, Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer)
+            .padding(horizontal = 20.dp, vertical = 8.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         ReplyBar(busy, current != null, reply, onReply, onSend)
     }
 }
@@ -355,7 +359,7 @@ fun StoryScreen(state: AppState, onBack: () -> Unit) {
         reply = story.replyDraft, onReply = { story.replyDraft = it }, onRetry = story.retry,
         onVersion = { story.selectVersion(it); tapVersion++ },
         onLookup = { s, p -> lookupOnly = true; picked = s to p },
-        intro = role, onInfo = { infoWanted = true },
+        intro = role, onInfo = { infoWanted = true }, notice = story.ankiNote,
     )
     info?.let { i -> StoryInfoSheet(i) { info = null } }
 

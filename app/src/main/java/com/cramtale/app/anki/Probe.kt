@@ -55,6 +55,13 @@ object Probe {
                 "${r.search("$q is:suspended").size} with a suspended card, ${r.search("$q is:due").size} with a due card")
         }
         line()
+        step("nid search") {
+            // new cards since the deck snapshot are read by note id (nid:1,2,3)
+            val ids = r.search("note:\"Japanese Core 5k\"").take(3).ifEmpty { r.search("-is:new").take(3) }
+            val found = r.search("nid:" + ids.joinToString(","))
+            line("nid: search for ${ids.size} notes found ${found.size} ${if (found.toSet() == ids.toSet()) "(works)" else "(MISMATCH)"}")
+        }
+        line()
         step("card columns") {
             val noteId = r.search("note:\"Japanese Core 5k\" -is:new").firstOrNull()
                 ?: r.search("-is:new").firstOrNull() ?: error("no studied note")

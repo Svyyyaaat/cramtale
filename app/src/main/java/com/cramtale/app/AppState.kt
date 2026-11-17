@@ -113,6 +113,30 @@ class AppState(val context: Context) {
         return deck()
     }
 
+    /**
+     * Notes added in Anki since the snapshot: read just those (read-only) and merge them in. Returns the
+     * ids that turned out to be vocabulary notes; the others (sentence or grammar cards) aren't.
+     */
+    fun addNotes(ids: Set<Long>): Set<Long> {
+        if (ids.isEmpty()) return emptySet()
+        val t = target ?: return emptySet()
+        val reader = AnkiReader(context, t)
+        if (!reader.hasPermission()) return emptySet()
+        val decks = reader.decks().associate { it.id to it.name }
+        val fresh = DeckDefaults.rules.flatMap { rule -> ids.chunked(200).flatMap { reader.notesFor(rule, decks, onlyNotes = it.toSet()) } }
+        if (fresh.isEmpty()) return emptySet()
+        synchronized(this) {
+            val byId = LinkedHashMap<Long, RawNote>()
+            if (deckFile.exists()) deckFile.useLines { DeckExport.parse(it) }.forEach { byId[it.noteId] = it }
+            fresh.forEach { byId[it.noteId] = it }
+            val tmp = File(deckFile.path + ".tmp")
+            tmp.bufferedWriter().use { DeckExport.write(byId.values.toList(), it) }
+            if (!tmp.renameTo(deckFile)) { deckFile.delete(); tmp.renameTo(deckFile) }
+            deckWords = null; matcher = null
+        }
+        return fresh.map { it.noteId }.toSet()
+    }
+
     @Synchronized
     fun matcher(): Matcher? {
         matcher?.let { return it }

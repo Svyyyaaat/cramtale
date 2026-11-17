@@ -78,11 +78,12 @@ class AnkiReader(private val context: Context, val target: AnkiTarget) : AnkiSou
      * from a few searches per template (is:new, is:suspended) instead of one query per card,
      * so 7000 notes take seconds rather than minutes.
      */
-    fun notesFor(rule: NoteTypeRule, deckNames: Map<Long, String>, progress: (String) -> Unit = {}): List<RawNote> {
+    fun notesFor(rule: NoteTypeRule, deckNames: Map<Long, String>, progress: (String) -> Unit = {}, onlyNotes: Set<Long>? = null): List<RawNote> {
         val type = noteTypes().firstOrNull { it.name == rule.noteType } ?: return emptyList()
         val templates = templates(type.id).filterValues { it in rule.recognitionTemplates }
         if (templates.isEmpty()) return emptyList()
-        val q = "note:\"${rule.noteType.replace("\"", "\\\"")}\""
+        // [onlyNotes]: just these notes (new since the snapshot), so every search below stays small
+        val q = "note:\"${rule.noteType.replace("\"", "\\\"")}\"" + (onlyNotes?.let { " nid:" + it.joinToString(",") } ?: "")
         progress("${rule.noteType}: notes")
         val notes = query(notesUri, arrayOf("_id", "flds", "tags"), q) { c ->
             Triple(c.long("_id"), c.string("flds") ?: "", c.string("tags") ?: "")

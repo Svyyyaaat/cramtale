@@ -4,7 +4,8 @@ import org.json.JSONObject
 
 /** Reads the JSON-lines note export written by tools/export_deck.py (same shape the app builds from AnkiDroid). */
 object DeckExport {
-    fun parse(lines: Sequence<String>): List<RawNote> = lines.filter { it.isNotBlank() }.map { line ->
+    // a line that doesn't parse (a write cut short) is skipped, not fatal
+    fun parse(lines: Sequence<String>): List<RawNote> = lines.filter { it.isNotBlank() }.mapNotNull { line -> runCatching {
         val o = JSONObject(line)
         val f = o.getJSONObject("fields")
         val cards = o.getJSONArray("cards")
@@ -19,7 +20,7 @@ object DeckExport {
             },
             tags = o.optString("tags"),
         )
-    }.toList()
+    }.getOrNull() }.toList()
 
     /** The same JSON-lines shape, so a deck read from AnkiDroid can be cached and reloaded. */
     fun write(notes: List<RawNote>, out: Appendable) {

@@ -133,7 +133,7 @@ class StoryController(
         dir.mkdirs()
         for (k in keep) File(archive, k).takeIf { it.exists() }?.let { f -> File(dir, k).also { it.parentFile?.mkdirs() }.writeBytes(f.readBytes()) }
         engine = null
-        history.clear(); current = null; error = null; retry = null; proposals.clear(); replyDraft = ""
+        history.clear(); current = null; error = null; retry = null; proposals.clear(); replyDraft = ""; ankiNote = null
         tappedNotes.clear(); tappedWords.clear(); meaningCache.clear()
         return archive
     }
@@ -212,15 +212,43 @@ class StoryController(
 
     // ------------------------------------------------------------------ turns
 
+    /** Why the story has no review words right now (shown above the reply box), or null. */
+    var ankiNote by mutableStateOf<String?>(null)
+        private set
+
+    /** Queue notes already looked up that aren't vocabulary notes (sentence or grammar cards): not asked again. */
+    private val notVocab = File(dir, "log/not-vocab.txt")
+    /** Reading new notes failed once (an AnkiDroid without nid: search?): don't retry every passage. */
+    private var addNotesBroken = false
+
     private fun takeSnapshot() {
-        val t = app.target ?: return run { snapshot = null; pool = DuePool(weakPoints = mistakes.weakPoints()) }
+        val noReviews = { why: String -> snapshot = null; pool = DuePool(weakPoints = mistakes.weakPoints()); ankiNote = why }
+        val t = app.target ?: return noReviews("AnkiDroid isn't connected, so this passage has no review words. Connect it from Home.")
         val reader = AnkiReader(context, t)
-        if (!reader.hasPermission()) { snapshot = null; pool = DuePool(weakPoints = mistakes.weakPoints()); return }
-        val words = app.deck()
-        val deckNames = words.map { it.deck }.toSet()
-        val deckIds = reader.decks().filter { it.name in deckNames }.map { it.id }
-        snapshot = DueSnapshot.take(reader, deckIds, words)
-        pool = planner.pool(snapshot!!, mistakes.weakPoints(), maxWords = app.passageLength.maxWords)
+        if (!reader.hasPermission()) return noReviews("Cramtale has no access to AnkiDroid, so no review words. Grant it in AnkiDroid connection.")
+        val result = runCatching {
+            var words = app.deck()
+            val deckNames = words.map { it.deck }.toSet()
+            val deckIds = reader.decks().filter { it.name in deckNames }.map { it.id }
+            var snap = DueSnapshot.take(reader, deckIds, words)
+            // cards added in Anki since the deck was read (the miner adds them daily): read just those notes
+            val skip = notVocab.takeIf { it.exists() }?.readLines()?.mapNotNull { it.toLongOrNull() }?.toSet().orEmpty()
+            val missing = snap.unknownNotes - skip
+            if (missing.isNotEmpty() && !addNotesBroken) {
+                // never fatal: without the new notes the passage still has the known ones
+                val added = runCatching { app.addNotes(missing) }.getOrElse { addNotesBroken = true; return@runCatching snap }
+                (missing - added).takeIf { it.isNotEmpty() }?.let { n -> notVocab.parentFile?.mkdirs(); notVocab.appendText(n.joinToString("\n", postfix = "\n")) }
+                if (added.isNotEmpty()) {
+                    words = app.deck()
+                    snap = DueSnapshot.take(reader, deckIds, words)
+                }
+            }
+            snap
+        }
+        val snap = result.getOrElse { return noReviews("Couldn't read Anki's queue (${it.message}). This passage has no review words.") }
+        snapshot = snap
+        pool = planner.pool(snap, mistakes.weakPoints(), maxWords = app.passageLength.maxWords)
+        ankiNote = if (snap.cards.isEmpty()) "Nothing is due in Anki right now: this is reading practice." else null
     }
 
     /** Keys of mistakes seen so far, so the checker reuses them. */
