@@ -113,10 +113,14 @@ class PendingTurn(
  * How long passages are, and so how many review words each one can carry: longer passages cover a big
  * review pile in fewer (cheaper) turns, shorter ones give more back-and-forth.
  */
-enum class PassageLength(val label: String, val text: String, val maxWords: Int, /** review words a passage usually carries */ val estimate: Double) {
-    SHORT("Short", "about 100–200 Japanese characters; a quiet beat can be a few lines", 8, 3.5),
-    NORMAL("Normal", "about 150–350 Japanese characters; a quiet beat can be much shorter", 15, 6.0),
-    LONG("Long", "about 300–550 Japanese characters, still ending at the player's decision", 25, 10.0),
+enum class PassageLength(
+    val label: String, val text: String, val maxWords: Int,
+    /** review words a passage usually carries (until measured) */ val estimate: Double,
+    /** how many review words the writer is asked to aim for */ val aim: Int,
+) {
+    SHORT("Short", "about 100–200 Japanese characters; a quiet beat can be a few lines", 8, 3.5, 4),
+    NORMAL("Normal", "about 150–350 Japanese characters; a quiet beat can be much shorter", 15, 6.0, 7),
+    LONG("Long", "about 300–550 Japanese characters, still ending at the player's decision", 25, 10.0, 12),
 }
 
 /** Measures a passage against what the reader knows (backed by the matcher in the app). */
@@ -145,6 +149,8 @@ class StoryEngine(
         val chapterTurns: Int = 30,
         /** Away longer than this, and the next turn starts a new session (off-screen moves, new beats). */
         val sessionGapMs: Long = 3 * 60 * 60 * 1000L,
+        /** Review words to aim for in a passage (fewer is fine when the scene doesn't take them). */
+        val aimWords: Int = 7,
     )
 
     val prompts = Prompts(dir)
@@ -532,6 +538,9 @@ class StoryEngine(
             "clocks" to state.clocks().joinToString("\n") { "- ${it.name}: ${it.filled}/${it.size} (when full: ${it.whenFull})" }.ifEmpty { "none" },
             "chronicle" to state.chronicle().filter { e -> e.tags.any { it in tags } }.takeLast(8).joinToString("\n") { "- ${it.text}" }.ifEmpty { "nothing yet" },
             "due_words" to t.pool.words.joinToString("、") { it.word }.ifEmpty { "none this turn" },
+            "due_aim" to if (t.pool.words.isEmpty()) "" else
+                "Aim to fit in about ${minOf(settings.aimWords, t.pool.words.size)} of them, earlier ones in the list first, wherever they " +
+                    "belong naturally. Fewer is fine when the scene doesn't take them; never bend the story to fit one.",
             "due_grammar" to (t.pool.grammar.map { "${it.id} (${it.meaning})" } +
                 t.pool.weakPoints.map { "correct form of: $it" }).joinToString("\n") { "- $it" }.ifEmpty { "none this turn" },
             "opening" to if (s.openingsThisSession > 0 && beat != null) "\n(This beat was planned so a practised point can come up naturally. Don't force it.)\n" else "",

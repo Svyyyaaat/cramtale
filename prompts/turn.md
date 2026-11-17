@@ -30,6 +30,7 @@ Turn {{turn}}, chapter {{chapter}}.
 
 ### Review words (use the ones that fit; never stress them)
 {{due_words}}
+{{due_aim}}
 
 ### Review grammar (use where it fits naturally)
 {{due_grammar}}

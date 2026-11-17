@@ -16,9 +16,17 @@ import java.net.URL
 class DictionarySetup(private val context: Context) {
     val dbFile: File get() = context.getDatabasePath("jmdict.sqlite")
 
-    fun isReady(): Boolean = dbFile.exists() && runCatching {
-        AndroidSql(dbFile.path).let { sql -> Jmdict(sql).entryCount().also { sql.close() } } > 100_000
-    }.getOrDefault(false)
+    // counting 200,000 entries takes a moment: done once, then remembered while the file is the same
+    @Volatile private var readyFor: Long = -1
+
+    fun isReady(): Boolean {
+        if (!dbFile.exists()) return false
+        val stamp = dbFile.lastModified() xor dbFile.length()
+        if (readyFor == stamp) return true
+        val ok = runCatching { AndroidSql(dbFile.path).let { sql -> Jmdict(sql).entryCount().also { sql.close() } } > 100_000 }.getOrDefault(false)
+        if (ok) readyFor = stamp
+        return ok
+    }
 
     fun open(): Jmdict = Jmdict(AndroidSql(dbFile.path))
 
