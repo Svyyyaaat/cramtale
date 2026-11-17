@@ -13,6 +13,8 @@ kotlin {
 
 dependencies {
     api("com.atilika.kuromoji:kuromoji-ipadic:0.9.0")
+    // Claude API (the official Java SDK; Kotlin-friendly, OkHttp underneath)
+    implementation("com.anthropic:anthropic-java:3.9.0")
     // Android ships XmlPullParser in the platform; plain JVM (tests, CLI) gets it from kxml2.
     compileOnly("net.sf.kxml:kxml2:2.3.0")
     // org.json is part of Android; the JVM gets the reference implementation.
