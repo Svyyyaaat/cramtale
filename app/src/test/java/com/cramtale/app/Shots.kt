@@ -170,7 +170,7 @@ class Shots {
     }
 
     @Test fun e1_settings() = shot {
-        SettingsContent(SettingsValues(1.15f, com.cramtale.core.story.PassageLength.LONG, false, false, "sk-ant-…x9Qa"), {}, {}, {}, {}, {}, {})
+        SettingsContent(SettingsValues(1.15f, com.cramtale.core.story.PassageLength.LONG, false, false, "sk-ant-…x9Qa", "Spare and close: short sentences, objects and what people do."), {}, {}, {}, {}, {}, {})
     }
 
     @Test fun d3_word_sheet() = shot {

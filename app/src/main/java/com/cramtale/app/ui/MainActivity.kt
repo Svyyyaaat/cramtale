@@ -80,7 +80,9 @@ fun App(state: AppState) {
                     Screen.FILES -> FilesScreen(state)
                     Screen.TARGET -> TargetScreen(state) { stack.add(Screen.PROBE) }
                     Screen.PROBE -> ProbeScreen(state)
-                    Screen.SETTINGS -> SettingsScreen(state, onScale = { scale = it }, onNewStory = {
+                    Screen.SETTINGS -> SettingsScreen(state, onScale = { scale = it }, onPickStyle = {
+                        state.story.clearStyle(); state.onboardingStep = 7; state.onboardingDone = false; onboarding = true
+                    }, onNewStory = {
                         if (state.story.archiveAndReset() != null) {
                             // straight to "Your story": the rest of setup is done
                             state.onboardingStep = 6; state.onboardingDone = false; onboarding = true

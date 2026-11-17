@@ -132,6 +132,11 @@ class StoryController(
         if (!dir.renameTo(archive)) return null
         dir.mkdirs()
         for (k in keep) File(archive, k).takeIf { it.exists() }?.let { f -> File(dir, k).also { it.parentFile?.mkdirs() }.writeBytes(f.readBytes()) }
+        // your taste, picked style and prompt edits are yours, not the story's; the complication table is
+        // filled in per story by setup, so it starts fresh
+        for (sub in listOf("prompts", "config")) File(archive, sub).listFiles { f -> f.isFile }.orEmpty()
+            .filter { it.name != "complications.md" }
+            .forEach { f -> File(dir, "$sub/${f.name}").also { it.parentFile?.mkdirs() }.writeBytes(f.readBytes()) }
         engine = null
         history.clear(); current = null; error = null; retry = null; proposals.clear(); replyDraft = ""; ankiNote = null
         tappedNotes.clear(); tappedWords.clear(); meaningCache.clear()
@@ -187,6 +192,27 @@ class StoryController(
 
     fun isSetUp() = File(dir, "state/world.md").exists()
     fun hasStyle() = File(dir, "config/style_sample.md").let { it.exists() && it.readText().isNotBlank() }
+
+    /** The picked style's one-line description, for Settings. */
+    fun styleLine(): String? = File(dir, "config/style_line.txt").takeIf { it.exists() }?.readText()?.trim()?.ifEmpty { null }
+
+    /** "Choose again": the current style is set aside (kept as .previous) so the picker shows. */
+    fun clearStyle() {
+        for (n in listOf("style_sample.md", "style_line.txt")) {
+            val f = File(dir, "config/$n")
+            if (f.exists()) { f.copyTo(File(dir, "config/$n.previous"), overwrite = true); f.writeText("") }
+        }
+        engine = null
+    }
+
+    /** Back out of "Choose again": the style set aside comes back. False if there was none. */
+    fun restoreStyle(): Boolean {
+        val prev = File(dir, "config/style_sample.md.previous")
+        if (!prev.exists() || prev.readText().isBlank()) return false
+        for (n in listOf("style_sample.md", "style_line.txt")) File(dir, "config/$n.previous").takeIf { it.exists() }?.copyTo(File(dir, "config/$n"), overwrite = true)
+        engine = null
+        return true
+    }
 
     suspend fun setup(seed: String): Unit? = work("Creating the story…", again = { setup(seed) }) { engine().setup(seed) }
 

@@ -315,11 +315,14 @@ fun OnboardingFlow(state: AppState, onFinished: () -> Unit) {
                 onCreate = { scope.launch { state.story.setup(seed); if (state.story.isSetUp()) go(7) } }, onBack = back)
         }
         else -> {
+            // a new story keeps the style you picked before
+            if (state.story.hasStyle()) { LaunchedEffect(Unit) { state.onboardingDone = true; onFinished() }; return }
             var options by remember { mutableStateOf<List<Pair<StoryEngine.StyleOption, Double>>?>(null) }
             LaunchedEffect(Unit) { options = state.story.styleOptions() }
             StyleStepContent(options, state.story.busy, state.story.error,
                 onPick = { o -> scope.launch { state.story.pickStyle(o); state.onboardingDone = true; onFinished() } },
-                onMore = { scope.launch { options = state.story.styleOptions(fresh = options != null) } }, onBack = back)
+                onMore = { scope.launch { options = state.story.styleOptions(fresh = options != null) } },
+                onBack = { if (state.story.restoreStyle()) { state.onboardingDone = true; onFinished() } else back() })
         }
     }
 }

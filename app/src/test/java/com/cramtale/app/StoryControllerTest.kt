@@ -138,4 +138,28 @@ class StoryControllerTest {
         assertEquals(2, again.current!!.passage.versions)
         assertEquals(0, again.current!!.passage.version)
     }
+
+    @Test
+    fun `a new story archives the old one and keeps your style, taste and mistakes`() = runBlocking {
+        val c = controller()
+        c.setup("")
+        c.pickStyle(c.styleOptions()!!.first().first)
+        c.start()
+        File(c.dir, "log/mistakes.json").writeText("[]")
+        File(c.dir, "config/plot.md").writeText("my taste")
+        val archive = c.archiveAndReset()!!
+        assertTrue(File(archive, "state/world.md").exists())
+        assertTrue("the story itself is gone", !c.isSetUp())
+        assertTrue("the picked style stays", c.hasStyle())
+        assertEquals("my taste", File(c.dir, "config/plot.md").readText())
+        assertTrue(File(c.dir, "log/mistakes.json").exists())
+        assertNull(c.current)
+        assertTrue(c.history.isEmpty())
+
+        // choose the style again, then back out: the old one returns
+        c.clearStyle()
+        assertTrue(!c.hasStyle())
+        assertTrue(c.restoreStyle())
+        assertTrue(c.hasStyle())
+    }
 }

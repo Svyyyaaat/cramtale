@@ -35,14 +35,16 @@ data class SettingsValues(
     val twoReads: Boolean,
     val firmStyle: Boolean,
     val keyHint: String?,
+    val styleLine: String? = null,
 )
 
 val TEXT_SCALES = listOf(0.85f to "Small", 1f to "Normal", 1.15f to "Large", 1.3f to "Larger")
 
 @Composable
-fun SettingsScreen(state: AppState, onNewStory: () -> Unit, onScale: (Float) -> Unit) {
+fun SettingsScreen(state: AppState, onNewStory: () -> Unit, onScale: (Float) -> Unit, onPickStyle: () -> Unit) {
     var v by remember {
-        mutableStateOf(SettingsValues(state.textScale, state.passageLength, state.twoReads, state.firmStyleRules, state.story.keyHint()))
+        mutableStateOf(SettingsValues(state.textScale, state.passageLength, state.twoReads, state.firmStyleRules, state.story.keyHint(),
+            state.story.styleLine()))
     }
     SettingsContent(v,
         onScale = { state.textScale = it; onScale(it); v = v.copy(textScale = it) },
@@ -51,13 +53,14 @@ fun SettingsScreen(state: AppState, onNewStory: () -> Unit, onScale: (Float) -> 
         onFirm = { state.firmStyleRules = it; state.story.settingsChanged(); v = v.copy(firmStyle = it) },
         onKey = { state.story.saveKey(it.trim()); v = v.copy(keyHint = state.story.keyHint()) },
         onNewStory = onNewStory,
+        onPickStyle = onPickStyle,
     )
 }
 
 @Composable
 fun SettingsContent(
     v: SettingsValues, onScale: (Float) -> Unit, onLength: (PassageLength) -> Unit, onTwoReads: (Boolean) -> Unit,
-    onFirm: (Boolean) -> Unit, onKey: (String) -> Unit, onNewStory: () -> Unit,
+    onFirm: (Boolean) -> Unit, onKey: (String) -> Unit, onNewStory: () -> Unit, onPickStyle: () -> Unit = {},
 ) {
     var keyInput by remember { mutableStateOf<String?>(null) }
     var confirmNew by remember { mutableStateOf(false) }
@@ -80,6 +83,14 @@ fun SettingsContent(
                 PassageLength.NORMAL -> "Up to ${v.length.maxWords} review words a passage."
                 PassageLength.LONG -> "Up to ${v.length.maxWords} review words a passage: clears a big pile in fewer, cheaper turns."
             })
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Writing style", style = MaterialTheme.typography.titleSmall)
+                    Hint(v.styleLine ?: "Not picked yet")
+                }
+                TextButton(onPickStyle) { Text("Choose again") }
+            }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Toggle("Style rules as firm prohibitions", "Off: the style is described positively (\"short sentences\"). On: as rules (\"never…\").", v.firmStyle, onFirm)
         }
