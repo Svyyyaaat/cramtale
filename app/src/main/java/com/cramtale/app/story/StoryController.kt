@@ -77,6 +77,10 @@ class StoryController(private val context: Context, private val app: AppState) {
     private var pool = DuePool()
     private val meaningCache = HashMap<String, String>()
 
+    /** The error and its causes, so a failure shows what actually went wrong, not just a class name. */
+    private fun describe(e: Throwable): String = generateSequence(e) { it.cause }.take(4)
+        .joinToString("\n← ") { "${it.javaClass.simpleName}: ${it.message ?: ""}" }
+
     fun hasKey() = keys.load() != null
     fun saveKey(k: String) { keys.save(k); engine = null }
 
@@ -103,7 +107,7 @@ class StoryController(private val context: Context, private val app: AppState) {
     private suspend fun <T> work(label: String, block: () -> T): T? = withContext(Dispatchers.IO) {
         busy = label
         error = null
-        try { block() } catch (e: Throwable) { error = e.message ?: e.toString(); null } finally { busy = null }
+        try { block() } catch (e: Throwable) { error = describe(e); null } finally { busy = null }
     }
 
     fun isSetUp() = File(dir, "state/world.md").exists()

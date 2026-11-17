@@ -12,7 +12,7 @@
 ことはない	there is no need to	<P こと は @ない|@無い ;; <P こと は ありません
 ざるを得ない	cannot help but; have no choice but	ざる を @得る|@える
 しかない	have no choice but to	<V しか @ない|@無い ;; <V しか ありません
-たがる	(someone else) wants to	@たい @がる ;; ~(?<=\p{IsHan}|[\u3041-\u3096])たが(る|ら|り|っ(て[いおる]|た))
+たがる	(someone else) wants to	@たい @がる ;; ~(?<=[\u4E00-\u9FFF\u3041-\u3096])たが(る|ら|り|っ(て[いおる]|た))
 ために	for; in order to; because of	ため|為 に >!なる|@なる
 だけでなく	not only … but also	だけ で なく
 つつある	is in the process of	<V つつ @ある

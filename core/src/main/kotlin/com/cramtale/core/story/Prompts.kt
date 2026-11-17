@@ -33,7 +33,8 @@ class Prompts(private val dir: File?) {
         val CONFIG = listOf("plot.md", "banned.txt", "complications.md", "style_rules_positive.md", "style_rules_firm.md",
             "style_sample.md", "style_line.txt").map { "config/$it" }
 
-        private val placeholder = Regex("\\{\\{(\\w+)}}")
+        // every brace escaped: Android's regex engine (ICU) rejects a bare "}" that desktop Java accepts
+        private val placeholder = Regex("\\{\\{(\\w+)\\}\\}")
 
         fun fill(template: String, values: Map<String, String?>): String =
             placeholder.replace(template) { m ->
