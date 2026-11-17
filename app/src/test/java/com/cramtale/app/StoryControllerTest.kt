@@ -196,4 +196,16 @@ class StoryControllerTest {
         assertTrue(42L !in c.knownNew)
         assertTrue("書類" !in app.lists.known)
     }
+
+    @Test
+    fun `undo keeps a word that was known before Already know it`() {
+        val app = AppState(context)
+        app.lists = app.lists.copy(known = app.lists.known + "許可")
+        val c = StoryController(context, app, llmFor = { llm }, fixedKey = "test")
+        val w = com.cramtale.core.match.DeckWord(43, "Core", "Japanese Core 5k", "許可", null, com.cramtale.core.match.CardState.NEW,
+            listOf(com.cramtale.core.match.RawCard(0, "Recognition", 0, 0)))
+        c.alreadyKnow(listOf(w))
+        c.undoAlreadyKnow(43)
+        assertTrue("許可" in app.lists.known)
+    }
 }

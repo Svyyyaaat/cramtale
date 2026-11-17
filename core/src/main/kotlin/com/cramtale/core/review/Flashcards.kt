@@ -17,6 +17,12 @@ class Flashcards(private val file: File?, private val dayStart: () -> Long = { G
 
     @Synchronized fun answeredToday(ref: CardRef): Boolean = (answered[ref.key] ?: 0) >= dayStart()
 
+    /** Any card of this note answered as a flashcard today (a tap on it in a passage then doesn't count either). */
+    @Synchronized fun noteAnsweredToday(noteId: Long): Boolean {
+        val start = dayStart()
+        return answered.any { (k, at) -> at >= start && k.substringBefore(':').toLongOrNull() == noteId }
+    }
+
     /** The queue minus what was answered today and what's already in the passage being written. */
     @Synchronized fun pick(snapshot: DueSnapshot, inPassage: Set<Long>, limit: Int = 30): List<DueCard> =
         snapshot.cards.filter { !answeredToday(it.ref) && it.ref.noteId !in inPassage }.take(limit)

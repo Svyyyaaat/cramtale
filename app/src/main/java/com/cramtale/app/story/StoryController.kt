@@ -110,6 +110,8 @@ class StoryController(
     var current by mutableStateOf<ShownTurn?>(null)
     var proposals = mutableStateListOf<MistakeLog.Key>()
     /** Deck notes tapped on any version of the current passage, minus "I know it". */
+    // touched from the main thread (taps) and the work thread (commit, restore): always under tapLock
+    private val tapLock = Any()
     private val tappedNotes = HashSet<Long>()
     private val tappedWords = LinkedHashMap<Long, DeckWord>()
     private var shownAt = 0L
@@ -141,7 +143,7 @@ class StoryController(
     fun keyHint(): String? = (fixedKey ?: keys.load())?.let { k -> if (k.length > 14) k.take(7) + "…" + k.takeLast(4) else "saved" }
 
     /** Settings changed: the next action builds the engine with them (the waiting turn is on disk). */
-    fun settingsChanged() { if (!isWorking) engine = null }
+    fun settingsChanged() { if (!isWorking) { engine?.shutdown(); engine = null } }
 
     /**
      * A new story: this one moves to story-archive/ (nothing is deleted). What's about you, not about
@@ -152,6 +154,7 @@ class StoryController(
         val keep = listOf("log/mistakes.json", "log/grades.jsonl", "log/skips.json", "log/two-reads.json", "log/costs.jsonl", "log/not-vocab.txt", "log/known-new.json", "log/flashcards.json")
         val archive = File(context.filesDir, "story-archive/" + java.text.SimpleDateFormat("yyyy-MM-dd_HHmm", java.util.Locale.US).format(java.util.Date()))
         archive.parentFile?.mkdirs()
+        engine?.shutdown()
         if (!dir.renameTo(archive)) return null
         dir.mkdirs()
         for (k in keep) File(archive, k).takeIf { it.exists() }?.let { f -> File(dir, k).also { it.parentFile?.mkdirs() }.writeBytes(f.readBytes()) }
@@ -162,7 +165,7 @@ class StoryController(
             .forEach { f -> File(dir, "$sub/${f.name}").also { it.parentFile?.mkdirs() }.writeBytes(f.readBytes()) }
         engine = null
         history.clear(); current = null; error = null; retry = null; proposals.clear(); replyDraft = ""; ankiNote = null
-        tappedNotes.clear(); tappedWords.clear(); meaningCache.clear()
+        synchronized(tapLock) { tappedNotes.clear(); tappedWords.clear() }; meaningCache.clear()
         return archive
     }
 
@@ -187,10 +190,10 @@ class StoryController(
             engine = e
             e.onCall = { purpose -> if (isWorking) STEP_LABELS[purpose]?.let { busy = it } }
             var last = 0L
-            e.onDraft = { phase, text ->
-                // a few updates a second are plenty for the eye
+            e.onDraft = { phase, text, final ->
+                // a few updates a second are plenty for the eye; the final one always shows
                 val now = System.currentTimeMillis()
-                if (now - last > 60 || draft == null) { last = now; draft = phase to text }
+                if (final || now - last > 60 || draft == null) { last = now; draft = phase to text }
             }
         }
     }
@@ -310,16 +313,28 @@ class StoryController(
             snap
         }
         val snap = result.getOrElse { return noReviews("Couldn't read Anki's queue (${it.message}). This passage has no review words.") }
-            // new cards you already know are neither offered nor graded
-            .let { s -> DueSnapshot(s.cards.filter { it.ref.noteId !in knownNew && !flashcards.answeredToday(it.ref) }, s.takenAt, s.unknownNotes) }
+            .let(::withoutExcluded)
         snapshot = snap
         pool = planner.pool(snap, mistakes.weakPoints(), maxWords = app.passageLength.maxWords)
-        // flashcards for the wait: what this passage won't use (reviews first, then new cards to triage)
+        // flashcards for the wait: what this passage won't use (reviews first, then new cards to triage);
+        // the list changes on the main thread, and a card answered meanwhile isn't put back
         val inPassage = (engine?.pending?.pool ?: pool).words.map { it.noteId }.toSet()
         val cards = flashcards.pick(snap, inPassage).sortedBy { if (it.isNew) 1 else 0 }
-        study.clear(); study.addAll(cards)
+        main.post { study.clear(); study.addAll(cards.filter { !excluded(it) }) }
         ankiNote = if (snap.cards.isEmpty()) "Nothing is due in Anki right now: this is reading practice." else null
     }
+
+    private val main = android.os.Handler(android.os.Looper.getMainLooper())
+
+    /**
+     * Left out of the story's reviews and grading: a card answered as a flashcard today, or a NEW card
+     * you said you already know (once it's a review card in Anki it's woven in again).
+     */
+    private fun excluded(c: com.cramtale.core.review.DueCard) =
+        flashcards.answeredToday(c.ref) || (c.isNew && c.ref.noteId in knownNew)
+
+    /** The snapshot as it stands now: answers given during the wait apply to the passage being graded. */
+    private fun withoutExcluded(s: DueSnapshot) = DueSnapshot(s.cards.filter { !excluded(it) }, s.takenAt, s.unknownNotes)
 
     /** Keys of mistakes seen so far, so the checker reuses them. */
     private fun knownKeys() = mistakes.all.map { it.key }
@@ -334,8 +349,9 @@ class StoryController(
      */
     suspend fun start(): Unit? = work("Opening the story…", again = { start() }) {
         loadHistory()
-        takeSnapshot()
+        // the engine first: a waiting turn's review words must not be offered as flashcards
         val e = engine()
+        takeSnapshot()
         if (e.pending == null && e.needsNewSession()) e.startSession(pool)
         val message = outbox.takeIf { it.exists() }?.readText()?.ifBlank { null }
         // a reply sent while this passage was still waiting (its commit failed) goes back into the box
@@ -402,7 +418,7 @@ class StoryController(
         val t = e.pending ?: return
         val shown = current ?: return
         val m = app.matcher()
-        val snap = snapshot
+        val snap = snapshot?.let(::withoutExcluded)
         // grades are decided first (Anki is asked now), but logged only once the turn is committed,
         // so a failed commit retried later doesn't log them twice
         var log: (() -> Unit)? = null
@@ -410,7 +426,12 @@ class StoryController(
             val reader = AnkiReader(context, app.target!!)
             val inText = planner.notesInText(Analysis(shown.passage.text, shown.passage.spans), t.draft, t.pool)
             // stable across restarts and stories, so a retried commit is the same read, not a second one
-            val read = PassageRead("${storyId()}-c${e.state.scene().chapter}-t${t.turn}", inText, tappedNotes.toSet(), tappedWords.values.toList(),
+            // a tap on a word answered as a flashcard today, or a known new card, doesn't count either
+            val (tapped, tappedList) = synchronized(tapLock) {
+                tappedNotes.filter { !flashcards.noteAnsweredToday(it) }.toSet() to
+                    tappedWords.values.filter { !flashcards.noteAnsweredToday(it.noteId) && it.noteId !in knownNew }
+            }
+            val read = PassageRead("${storyId()}-c${e.state.scene().chapter}-t${t.turn}", inText, tapped, tappedList,
                 System.currentTimeMillis() - shownAt)
             val grades = grading.decide(snap, read, reader::card)
             log = {
@@ -423,8 +444,7 @@ class StoryController(
         log?.invoke()
         history += shown
         current = null
-        tappedNotes.clear()
-        tappedWords.clear()
+        synchronized(tapLock) { tappedNotes.clear(); tappedWords.clear() }
     }
 
     /** This story's id (made once): passage ids stay unique after a new story starts turn numbers over. */
@@ -435,19 +455,23 @@ class StoryController(
     }
 
     /** Taps saved with the turn come back after a restart. */
-    private fun restoreTaps(t: PendingTurn) {
+    private fun restoreTaps(t: PendingTurn) = synchronized(tapLock) {
         tappedNotes.clear()
         tappedWords.clear()
-        if (t.tapped.isEmpty()) return
+        val ids = synchronized(t.tapped) { t.tapped.toList() }
+        if (ids.isEmpty()) return@synchronized
         val byNote = app.deck().associateBy { it.noteId }
-        for (id in t.tapped) { tappedNotes += id; byNote[id]?.let { tappedWords[id] = it } }
+        for (id in ids) { tappedNotes += id; byNote[id]?.let { tappedWords[id] = it } }
     }
+
 
     private fun saveTaps() {
         val t = engine?.pending ?: return
-        synchronized(t.tapped) { t.tapped.clear(); t.tapped += tappedNotes }
+        val ids = synchronized(tapLock) { tappedNotes.toList() }
+        synchronized(t.tapped) { t.tapped.clear(); t.tapped += ids }
         runCatching { engine?.savePending() }
     }
+
 
     private fun show(t: PendingTurn) {
         title = place()
@@ -461,7 +485,7 @@ class StoryController(
         val m = app.matcher()
         val analysis = m?.analyze(d.passage)
         val grammarFound = grammar?.find(com.cramtale.core.text.Tokenizer.tokenize(d.passage)).orEmpty()
-        val newNotes = snapshot?.cards?.filter { it.isNew }?.map { it.ref.noteId }?.toSet().orEmpty()
+        val newNotes = snapshot?.let(::withoutExcluded)?.cards?.filter { it.isNew }?.map { it.ref.noteId }?.toSet().orEmpty()
         val glosses = HashMap<Long, String>()
         val dict = app.jmdict()
         analysis?.spans?.forEach { s ->
@@ -512,7 +536,7 @@ class StoryController(
     fun tap(span: Span) {
         // while an action runs (the passage is being committed or rewritten) a tap can't count
         if (span.deck.isEmpty() || isName(span) || isWorking) return
-        span.deck.forEach { w -> tappedNotes += w.noteId; tappedWords[w.noteId] = w }
+        synchronized(tapLock) { span.deck.forEach { w -> tappedNotes += w.noteId; tappedWords[w.noteId] = w } }
         saveTaps()
     }
 
@@ -527,8 +551,11 @@ class StoryController(
      */
     fun alreadyKnow(words: List<DeckWord>) {
         if (words.isEmpty()) return
-        words.forEach { w -> knownNew.add(w.noteId, w.word); tappedNotes -= w.noteId; tappedWords.remove(w.noteId) }
-        app.lists = app.lists.copy(known = app.lists.known + words.map { it.word })
+        val known = app.lists.known
+        synchronized(tapLock) { words.forEach { w -> tappedNotes -= w.noteId; tappedWords.remove(w.noteId) } }
+        // remembered per card whether this put the word on the known list, so Undo only takes off its own
+        words.forEach { w -> knownNew.add(w.noteId, w.word, addedWord = w.word !in known) }
+        app.lists = app.lists.copy(known = known + words.map { it.word })
         saveTaps()
         // its inline meaning goes away at once
         val ids = words.map { it.noteId }.toSet()
@@ -538,16 +565,16 @@ class StoryController(
     /** Undo from the log: the card is a new card again. */
     fun undoAlreadyKnow(noteId: Long) {
         val e = knownNew.remove(noteId) ?: return
-        app.lists = app.lists.copy(known = app.lists.known - e.word)
+        if (e.addedWord) app.lists = app.lists.copy(known = app.lists.known - e.word)
     }
 
     /** "I know it": on a deck word it cancels the tap (a mis-tap); on other words it marks the word known. */
     fun iKnowIt(span: Span) {
-        if (span.deck.isNotEmpty()) { span.deck.forEach { tappedNotes -= it.noteId; tappedWords.remove(it.noteId) }; saveTaps() }
+        if (span.deck.isNotEmpty()) { synchronized(tapLock) { span.deck.forEach { tappedNotes -= it.noteId; tappedWords.remove(it.noteId) } }; saveTaps() }
         else app.lists = app.lists.copy(known = app.lists.known + span.lemma)
     }
 
-    fun isTapped(span: Span) = span.deck.any { it.noteId in tappedNotes }
+    fun isTapped(span: Span) = synchronized(tapLock) { span.deck.any { it.noteId in tappedNotes } }
 
     suspend fun meaning(span: Span, sentence: String): String? {
         val k = span.lemma + "|" + sentence

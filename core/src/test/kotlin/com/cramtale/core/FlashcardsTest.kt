@@ -36,4 +36,13 @@ class FlashcardsTest {
         day = System.currentTimeMillis() + 1
         assertEquals(3, Flashcards(File(dir, "fc.json")) { day }.pick(snap, emptySet()).size)
     }
+
+    @Test
+    fun `a flashcard answer covers its note for the day`() {
+        val dir = Files.createTempDirectory("fc2").toFile()
+        val fc = Flashcards(File(dir, "fc.json")) { 0L }
+        fc.answer(card(7), good = false, log = null)
+        assertEquals(true, fc.noteAnsweredToday(7))
+        assertEquals(false, fc.noteAnsweredToday(70))
+    }
 }

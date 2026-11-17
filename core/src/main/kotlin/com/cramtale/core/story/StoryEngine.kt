@@ -205,8 +205,14 @@ class StoryEngine(
 
     // ------------------------------------------------------------------ calls
 
-    /** The passage as it streams in: (phase, text so far). Phases: "writing", "rewriting". */
-    var onDraft: (String, String) -> Unit = { _, _ -> }
+    /**
+     * The passage as it streams in: (phase, text so far, final). Phases: "writing", "rewriting"; final is
+     * true once for the whole passage, so a display that skips updates still ends on the full text.
+     */
+    var onDraft: (String, String, Boolean) -> Unit = { _, _, _ -> }
+
+    /** Stops background work (the early scribe): a new engine or a new story takes over. */
+    fun shutdown() { scribeAhead = null; workers.shutdownNow() }
 
     // calls that don't depend on each other run side by side
     private val workers = java.util.concurrent.Executors.newCachedThreadPool { r -> Thread(r, "story-call").apply { isDaemon = true } }
@@ -443,8 +449,8 @@ class StoryEngine(
     fun resume(): PendingTurn {
         val t = pending ?: error("no pending turn")
         if (!t.ready) {
-            t.drafts += write(t)
-            t.current = 0
+            val d = write(t)
+            synchronized(this) { t.drafts += d; t.current = 0 }
             savePending()
         }
         return t
@@ -453,7 +459,7 @@ class StoryEngine(
     /** Shows an earlier version again (reroll keeps every version). */
     fun selectDraft(i: Int): Draft {
         val t = pending ?: error("no pending turn")
-        t.current = i.coerceIn(0, t.drafts.size - 1)
+        synchronized(this) { t.current = i.coerceIn(0, t.drafts.size - 1) }
         savePending()
         return t.draft
     }
@@ -462,8 +468,7 @@ class StoryEngine(
     fun reroll(): Draft {
         val t = pending ?: error("no pending turn")
         val d = write(t)
-        t.drafts += d
-        t.current = t.drafts.size - 1
+        synchronized(this) { t.drafts += d; t.current = t.drafts.size - 1 }
         savePending()
         return d
     }
@@ -472,8 +477,7 @@ class StoryEngine(
     fun edit(text: String): Draft {
         val t = pending ?: error("no pending turn")
         val d = Draft(text, t.draft.used.filter { it.second in text }, t.draft.grammar, cheapChecks(text), t.draft.rewritten)
-        t.drafts += d
-        t.current = t.drafts.size - 1
+        synchronized(this) { t.drafts += d; t.current = t.drafts.size - 1 }
         savePending()
         return d
     }
@@ -634,7 +638,8 @@ class StoryEngine(
         val system = writerSystem()
         val messages = writerMessages(t, packet)
         val first = retry(3) { parseDraft(call("writer", Models.WRITER, system.first().text, messages, schema = WRITER_SCHEMA,
-            maxTokens = 10000, cacheSystem = true, extraSystem = system.drop(1), onPassage = { onDraft("writing", it) }), t) }
+            maxTokens = 10000, cacheSystem = true, extraSystem = system.drop(1), onPassage = { onDraft("writing", it, false) }), t) }
+        onDraft("writing", first.passage, true)
         val problems = problems(first, t)
         if (problems.isEmpty()) return first.copy(checks = first.checks + CheckResult("all checks", true, ""))
         val raw = JSONObject().put("passage", first.passage).put("used", JSONArray(first.used.map { JSONObject().put("word", it.first).put("form", it.second) }))
@@ -643,7 +648,7 @@ class StoryEngine(
             messages + Msg(Role.ASSISTANT, raw) + Msg(Role.USER, Prompts.fill(prompts.prompt("rewrite"), mapOf(
                 "problems" to problems.joinToString("\n") { "- ${it.detail}" }))),
             schema = WRITER_SCHEMA, maxTokens = 10000, cacheSystem = true, extraSystem = system.drop(1),
-            onPassage = { onDraft("rewriting", it) }), t) }
+            onPassage = { onDraft("rewriting", it, false) }), t).also { onDraft("rewriting", it.passage, true) } }
             .getOrElse { return first.copy(checks = problems + CheckResult("rewrite", false, "rewrite failed: ${it.message}")) }
         // one retry, then accept: what's still wrong is logged, not retried again
         return fixed.copy(checks = problems.map { it.copy(detail = "fixed by rewrite: " + it.detail) } + cheapChecks(fixed.passage), rewritten = true)

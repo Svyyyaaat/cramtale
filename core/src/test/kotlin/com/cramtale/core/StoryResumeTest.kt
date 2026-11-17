@@ -181,7 +181,7 @@ class StoryResumeTest {
     fun `the draft is handed over while writing, and an early scribe isn't repeated at commit`() {
         val e = ready()
         val drafts = ArrayList<Pair<String, String>>()
-        e.onDraft = { phase, text -> synchronized(drafts) { drafts += phase to text } }
+        e.onDraft = { phase, text, _ -> synchronized(drafts) { drafts += phase to text } }
         e.playerTurn("嘘をつく。", pool)
         assertTrue(drafts.any { it.first == "writing" && it.second == "佐伯は帳簿を閉じた。" }, drafts.toString())
         val scribes = fake.sent("scribe").size
