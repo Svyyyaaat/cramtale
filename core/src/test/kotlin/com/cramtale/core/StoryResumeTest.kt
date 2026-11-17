@@ -143,4 +143,37 @@ class StoryResumeTest {
         assertEquals(2, e.state.scene().chapter)
         assertTrue(File(dir, "state/chapters/1.md").exists())
     }
+
+    @Test
+    fun `a decided new session survives a failed plan`() {
+        val e = ready()
+        e.playerTurn(null, pool); e.commit()
+        e.markSessionDue()
+        e.playerTurn(null, pool); e.commit()   // commits touch the clock; the decision stays
+        assertTrue(e.needsNewSession())
+        llm.failing += "director"
+        assertFailsWith<Exception> { e.startSession(pool) }
+        llm.failing.clear()
+        assertTrue(e.needsNewSession(), "still due after the failure")
+        e.startSession(pool)
+        assertFalse(e.needsNewSession())
+    }
+
+    @Test
+    fun `a commit interrupted after logging isn't applied twice`() {
+        val e = ready()
+        e.playerTurn(null, pool)
+        val turn = e.pending!!.turn
+        val pendingJson = File(dir, "state/pending.json").readText()
+        e.commit()
+        // the kill: the turn is logged, but the pending file came back (written before the clear)
+        File(dir, "state/pending.json").writeText(pendingJson)
+        val again = engine()
+        assertNotNull(again.pending)
+        val logged = File(dir, "log/turns.jsonl").readLines().count { it.isNotBlank() }
+        assertEquals(listOf("already recorded"), again.commit())
+        assertEquals(logged, File(dir, "log/turns.jsonl").readLines().count { it.isNotBlank() })
+        assertEquals(turn + 1, again.state.scene().turn)
+        assertNull(again.pending)
+    }
 }

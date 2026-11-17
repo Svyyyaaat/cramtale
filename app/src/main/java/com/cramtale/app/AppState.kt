@@ -85,14 +85,16 @@ class AppState(val context: Context) {
     private var matcher: Matcher? = null
     val frequency: FrequencyList? by lazy { FrequencyList.bundled() }
 
-    @Synchronized
-    fun jmdict(): Jmdict? {
+    private val dictLock = Any()
+
+    /** The dictionary on its own lock: building the matcher (seconds, under the main lock) doesn't block a popup. */
+    fun jmdict(): Jmdict? = synchronized(dictLock) {
         if (dict == null && dictionary.isReady()) dict = dictionary.open()
-        return dict
+        dict
     }
 
     @Synchronized
-    fun dictionaryRebuilt() { dict?.close(); dict = null; matcher = null }
+    fun dictionaryRebuilt() { synchronized(dictLock) { dict?.close(); dict = null }; matcher = null }
 
     @Synchronized
     fun deck(): List<DeckWord> {

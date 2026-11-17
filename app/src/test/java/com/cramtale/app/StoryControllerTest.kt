@@ -162,4 +162,23 @@ class StoryControllerTest {
         assertTrue(c.restoreStyle())
         assertTrue(c.hasStyle())
     }
+
+    @Test
+    fun `a reply whose send failed at the commit survives a restart`() = runBlocking {
+        val c = controller()
+        c.setup("")
+        c.start()
+        val shown = c.current!!.passage.text
+        failing += "scribe"
+        c.send("ありがとう。")
+        failing.clear()
+
+        val again = controller()
+        again.start()
+        assertEquals("the same passage is still waiting", shown, again.current!!.passage.text)
+        assertEquals("ありがとう。", again.replyDraft)
+        again.send(again.replyDraft)
+        assertEquals("ありがとう。", again.current!!.player)
+        assertTrue(!File(again.dir, "log/outbox.txt").exists())
+    }
 }

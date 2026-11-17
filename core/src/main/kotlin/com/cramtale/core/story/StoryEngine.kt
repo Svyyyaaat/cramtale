@@ -46,10 +46,12 @@ class PendingTurn(
     var current = 0
     /** The facts sent with this turn; rerolls reuse them, and history keeps them. */
     var packet: String? = null
-    /** Deck notes the reader tapped on any version (the app keeps this; saved with the turn). */
-    val tapped: MutableSet<Long> = LinkedHashSet()
+    /** Deck notes the reader tapped on any version (the app keeps this; saved with the turn). Lock it to iterate. */
+    val tapped: MutableSet<Long> = java.util.Collections.synchronizedSet(LinkedHashSet())
     /** The player's mistakes from this turn are in the mistake log (once, even if writing was retried). */
     var mistakesRecorded = false
+    /** Known mistake keys the player's message got right (for "fixed" tracking), kept with the turn. */
+    var correctKeys: List<String> = emptyList()
     val draft get() = drafts[current]
     /** Written yet? A turn whose writer call failed has no drafts and resumes from here. */
     val ready get() = drafts.isNotEmpty()
@@ -69,7 +71,8 @@ class PendingTurn(
             .put("used", JSONArray(d.used.map { JSONObject().put("word", it.first).put("form", it.second) }))
             .put("grammar", JSONArray(d.grammar)).put("rewritten", d.rewritten)
             .put("checks", JSONArray(d.checks.map { JSONObject().put("name", it.name).put("passed", it.passed).put("detail", it.detail) })) }))
-        .put("tapped", JSONArray(tapped.toList())).put("mistakesRecorded", mistakesRecorded)
+        .put("tapped", JSONArray(synchronized(tapped) { tapped.toList() })).put("mistakesRecorded", mistakesRecorded)
+        .put("correctKeys", JSONArray(correctKeys))
 
     companion object {
         private fun JSONArray?.objects() = if (this == null) emptyList() else (0 until length()).map { getJSONObject(it) }
@@ -103,6 +106,7 @@ class PendingTurn(
             t.current = o.optInt("current").coerceIn(0, (t.drafts.size - 1).coerceAtLeast(0))
             t.packet = o.str("packet")
             t.mistakesRecorded = o.optBoolean("mistakesRecorded")
+            t.correctKeys = o.optJSONArray("correctKeys")?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty()
             o.optJSONArray("tapped")?.let { a -> (0 until a.length()).forEach { t.tapped += a.getLong(it) } }
             return t
         }
@@ -171,6 +175,7 @@ class StoryEngine(
         pending = runCatching { if (pendingFile.exists()) PendingTurn.fromJson(JSONObject(pendingFile.readText())) else null }.getOrNull()
     }
 
+    @Synchronized
     fun savePending() {
         val t = pending
         if (t == null) pendingFile.delete() else pendingFile.writeAtomic(t.toJson().toString())
@@ -179,7 +184,16 @@ class StoryEngine(
     /** No session yet, or the player has been away long enough that the world should move. */
     fun needsNewSession(now: Long = System.currentTimeMillis()): Boolean {
         val s = state.scene()
-        return s.session == 0 || s.beats.isEmpty() || now - s.lastActive > settings.sessionGapMs
+        return s.session == 0 || s.beats.isEmpty() || s.sessionDue || now - s.lastActive > settings.sessionGapMs
+    }
+
+    /**
+     * Records that the next turn starts a new session, before anything touches the clock: if the plan
+     * then fails, Try again still makes it (instead of carrying on with the old beats).
+     */
+    fun markSessionDue() {
+        val s = state.scene()
+        if (!s.sessionDue) { s.sessionDue = true; state.save(s) }
     }
 
     private fun touch() {
@@ -334,6 +348,7 @@ class StoryEngine(
         }.toMutableList()
         s.session += 1
         s.movedForSession = s.session
+        s.sessionDue = false
         s.lastActive = System.currentTimeMillis()
         s.openingsThisSession = if (o.optString("opening").isNotBlank()) 1 else 0
         s.complication = null
@@ -357,6 +372,7 @@ class StoryEngine(
         maybeNewChapter()
         val scene = state.scene()
         val corrections = if (message.isNullOrBlank()) emptyList() else checkMistakes(message, knownMistakeKeys)
+        val correctKeys = lastCorrectKeys
         var roll: Dice.Roll? = null
         var rollNote: String? = null
         if (!message.isNullOrBlank()) {
@@ -384,6 +400,7 @@ class StoryEngine(
             state.save(s)
         }
         val turn = PendingTurn(s.turn, message, corrections, roll, rollNote, s.complication, pool)
+        turn.correctKeys = correctKeys
         // saved before the writer runs: if that call fails, the roll and its consequence are already
         // decided and a retry resumes this turn instead of rolling again
         pending = turn
@@ -435,6 +452,14 @@ class StoryEngine(
     fun commit(): List<String> {
         val t = pending ?: error("no pending turn")
         check(t.ready) { "the passage hasn't been written yet" }
+        // killed after this turn was logged but before it was cleared: finish clearing, don't apply it again
+        if (turnsInChapter(state.scene().chapter).any { it.optInt("turn") == t.turn }) {
+            val s = state.scene()
+            if (s.turn <= t.turn) { s.turn = t.turn + 1; state.save(s) }
+            pending = null
+            savePending()
+            return listOf("already recorded")
+        }
         val s = state.scene()
         val ops = StateOp.parse(call("scribe", Models.CHECKS, Prompts.fill(prompts.prompt("scribe"), records() + mapOf(
             "present" to s.present.joinToString(), "place" to s.place,

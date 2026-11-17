@@ -126,7 +126,7 @@ class StoryController(
      */
     fun archiveAndReset(): File? {
         if (isWorking) return null
-        val keep = listOf("log/mistakes.json", "log/grades.jsonl", "log/skips.json", "log/two-reads.json", "log/costs.jsonl")
+        val keep = listOf("log/mistakes.json", "log/grades.jsonl", "log/skips.json", "log/two-reads.json", "log/costs.jsonl", "log/not-vocab.txt")
         val archive = File(context.filesDir, "story-archive/" + java.text.SimpleDateFormat("yyyy-MM-dd_HHmm", java.util.Locale.US).format(java.util.Date()))
         archive.parentFile?.mkdirs()
         if (!dir.renameTo(archive)) return null
@@ -294,6 +294,8 @@ class StoryController(
         val e = engine()
         if (e.pending == null && e.needsNewSession()) e.startSession(pool)
         val message = outbox.takeIf { it.exists() }?.readText()?.ifBlank { null }
+        // a reply sent while this passage was still waiting (its commit failed) goes back into the box
+        if (message != null && e.pending?.ready == true && replyDraft.isBlank()) replyDraft = message
         // a waiting passage comes back as it was; a half-done turn is finished; otherwise the next one
         val t = if (e.pending != null) e.resume() else e.playerTurn(message, pool, knownKeys())
         afterTurn(t)
@@ -304,7 +306,8 @@ class StoryController(
     /** Your reply: the current passage is graded (read-only: logged), then the next one is written. */
     suspend fun send(message: String): Unit? = work("Sending…", again = { send(message) }) {
         val e = engine()
-        // decided before this turn touches the clock
+        // decided (and saved) before this turn touches the clock, so a failed plan is retried, not skipped
+        if (e.needsNewSession()) e.markSessionDue()
         val newSession = e.needsNewSession()
         outbox.parentFile?.mkdirs()
         outbox.writeText(message)
@@ -317,12 +320,14 @@ class StoryController(
     }
 
     private fun afterTurn(t: PendingTurn) {
-        outbox.delete()
-        // mistakes count once per turn, even if writing the passage needed a retry
+        // the outbox goes only once this turn answered it (a passage restored as it was hasn't)
+        val waiting = outbox.takeIf { it.exists() }?.readText()
+        if (waiting == null || waiting.isBlank() || waiting.trim() == t.player?.trim()) outbox.delete()
+        // mistakes count once per turn, even after retries or a kill: marked first (at most once)
         if (!t.player.isNullOrBlank() && !t.mistakesRecorded) {
-            proposals += mistakes.record(t.player!!, t.corrections, engine().lastCorrectKeys)
             t.mistakesRecorded = true
             engine().savePending()
+            proposals += mistakes.record(t.player!!, t.corrections, t.correctKeys)
         }
         restoreTaps(t)
         show(t)
@@ -360,7 +365,8 @@ class StoryController(
         if (m != null && snap != null && app.target != null) {
             val reader = AnkiReader(context, app.target!!)
             val inText = planner.notesInText(Analysis(shown.passage.text, shown.passage.spans), t.draft, t.pool)
-            val read = PassageRead("t${t.turn}-$session", inText, tappedNotes.toSet(), tappedWords.values.toList(),
+            // stable across restarts and stories, so a retried commit is the same read, not a second one
+            val read = PassageRead("${storyId()}-c${e.state.scene().chapter}-t${t.turn}", inText, tappedNotes.toSet(), tappedWords.values.toList(),
                 System.currentTimeMillis() - shownAt)
             val grades = grading.decide(snap, read, reader::card)
             log = {
@@ -377,6 +383,13 @@ class StoryController(
         tappedWords.clear()
     }
 
+    /** This story's id (made once): passage ids stay unique after a new story starts turn numbers over. */
+    private fun storyId(): String {
+        val f = File(dir, "state/story-id")
+        if (!f.exists() || f.readText().isBlank()) { f.parentFile?.mkdirs(); f.writeText(UUID.randomUUID().toString().take(8)) }
+        return f.readText().trim()
+    }
+
     /** Taps saved with the turn come back after a restart. */
     private fun restoreTaps(t: PendingTurn) {
         tappedNotes.clear()
@@ -388,8 +401,7 @@ class StoryController(
 
     private fun saveTaps() {
         val t = engine?.pending ?: return
-        t.tapped.clear()
-        t.tapped += tappedNotes
+        synchronized(t.tapped) { t.tapped.clear(); t.tapped += tappedNotes }
         runCatching { engine?.savePending() }
     }
 
@@ -452,7 +464,8 @@ class StoryController(
     fun isName(span: Span) = span.ignoredBecause == "name" || span.surface in castNames || span.lemma in castNames
 
     fun tap(span: Span) {
-        if (span.deck.isEmpty() || isName(span)) return
+        // while an action runs (the passage is being committed or rewritten) a tap can't count
+        if (span.deck.isEmpty() || isName(span) || isWorking) return
         span.deck.forEach { w -> tappedNotes += w.noteId; tappedWords[w.noteId] = w }
         saveTaps()
     }

@@ -44,6 +44,8 @@ class StoryState(val dir: File) {
         var lastActive: Long = 0,
         /** The session whose off-screen moves are done (so a retry after a failed plan doesn't move the world twice). */
         var movedForSession: Int = 0,
+        /** A new session was decided (the player came back after a break) but its plan isn't made yet. */
+        var sessionDue: Boolean = false,
     )
 
     // ---------- characters (free text) ----------
@@ -152,6 +154,7 @@ class StoryState(val dir: File) {
             usedComplications = o.optJSONArray("usedComplications").strings().toMutableList(),
             openingsThisSession = o.optInt("openingsThisSession"),
             lastActive = o.optLong("lastActive"), movedForSession = o.optInt("movedForSession"),
+            sessionDue = o.optBoolean("sessionDue"),
         )
     }
 
@@ -168,7 +171,7 @@ class StoryState(val dir: File) {
             .put("complicationFor", s.complicationFor ?: "")
             .put("usedComplications", JSONArray(s.usedComplications))
             .put("openingsThisSession", s.openingsThisSession)
-            .put("lastActive", s.lastActive).put("movedForSession", s.movedForSession)
+            .put("lastActive", s.lastActive).put("movedForSession", s.movedForSession).put("sessionDue", s.sessionDue)
         sceneFile.writeAtomic(o.toString(2))
     }
 

@@ -372,7 +372,8 @@ fun StoryScreen(state: AppState, onBack: () -> Unit) {
         isTapped = story::isTapped,
         statusOf = { if (story.isName(it)) Status.NAME else it.status(state.policy, state.lists) },
         onBack = onBack,
-        onTap = { s, p -> story.tap(s); tapVersion++; lookupOnly = false; picked = s to p },
+        // while the passage is being committed or rewritten, a tap is a lookup (it can't count any more)
+        onTap = { s, p -> val counts = !story.isWorking; story.tap(s); tapVersion++; lookupOnly = !counts; picked = s to p },
         onGrammar = { grammar = it },
         onReroll = { story.launch { reroll() } },
         onEdit = { editing = story.current?.passage?.text },
@@ -392,12 +393,16 @@ fun StoryScreen(state: AppState, onBack: () -> Unit) {
         val sentence = remember(span, p) { sentenceAround(p.text, span.start, span.end) }
         var meaning by remember(span) { mutableStateOf<String?>(null) }
         LaunchedEffect(span) { meaning = story.meaning(span, sentence) }
-        val dict = state.jmdict()
-        val info = remember(span, meaning) {
-            if (story.isName(span)) WordInfo(span.surface, nameReading(span.surface), meaning, emptyList(), false, isName = true)
-            else WordInfo(span.lemma, span.entries.firstOrNull()?.let { dict?.forms(it)?.kana?.firstOrNull() }, meaning,
-                span.entries.take(2).flatMap { e -> dict?.senses(e).orEmpty().take(3).map { it.gloss } }, span.deck.isNotEmpty(),
-                earlier = lookupOnly, card = span.deck.firstNotNullOfOrNull { it.meaning })
+        // dictionary lookups off the main thread (the dictionary may be busy right after launch)
+        var info by remember(span) { mutableStateOf(WordInfo(span.surface, null, null, emptyList(), span.deck.isNotEmpty(), story.isName(span), lookupOnly)) }
+        LaunchedEffect(span, meaning) {
+            info = withContext(Dispatchers.IO) {
+                val dict = state.jmdict()
+                if (story.isName(span)) WordInfo(span.surface, nameReading(span.surface), meaning, emptyList(), false, isName = true)
+                else WordInfo(span.lemma, span.entries.firstOrNull()?.let { dict?.forms(it)?.kana?.firstOrNull() }, meaning,
+                    span.entries.take(2).flatMap { e -> dict?.senses(e).orEmpty().take(3).map { it.gloss } }, span.deck.isNotEmpty(),
+                    earlier = lookupOnly, card = span.deck.firstNotNullOfOrNull { it.meaning })
+            }
         }
         WordSheet(info, onKnow = { story.iKnowIt(span); tapVersion++; picked = null }, onClose = { picked = null },
             onSay = { state.speaker.say(span.surface, rate = 0.8f) })
