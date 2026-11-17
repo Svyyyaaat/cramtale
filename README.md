@@ -24,9 +24,17 @@ writes to it: grades are decided and logged, nothing is sent.
 **Phone:** install the debug APK. The first start walks you through setup (progress is saved):
 welcome → connect AnkiDroid (read-only) → download the dictionary → read your decks → vocabulary check
 (about 80 words; Back undoes a wrong answer) → Claude API key → create the story → pick a style.
-After that, the home screen opens on your story; the vocabulary check, calibration on real text, your
-decks, the review log and costs, the prompt and story files and the AnkiDroid connection (with its probe)
-are all one tap away, and *Run setup again* repeats the walk-through.
+After that, the home screen opens on your story, with a *Today* card (what Anki has due, what the story
+read today, about how many passages that takes). The vocabulary check, calibration on real text, your
+decks, the review log and costs, the prompt and story files, the AnkiDroid connection (with its probe) and
+*Settings* (text size, passage length, writing style, API key, new story) are one tap away.
+
+In the story: tap any word (names too) for its reading, your card's meaning and the dictionary's; *Listen*
+reads the passage aloud with the phone's Japanese voice; *Reroll* keeps every version (‹ 1/3 ›); words in
+earlier passages can be looked up without counting. The passage on screen, its versions and your taps are
+saved, so closing the app (or Android closing it) doesn't lose or rewrite it; a failed call says what to do
+and offers *Try again*, which finishes the same turn (no second dice roll). A new session (the world moves
+off-screen, new beats) starts after three hours away. Prompt files you haven't edited follow app updates.
 
 **Dictionary:** builds from here ship JMdict prebuilt (`tools/build_dict_asset.sh` makes
 `app/src/main/assets/jmdict.sqlite.gz`, gitignored); the phone only unpacks it. Builds without it (CI)
