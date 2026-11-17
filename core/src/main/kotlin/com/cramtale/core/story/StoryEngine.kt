@@ -109,6 +109,16 @@ class PendingTurn(
     }
 }
 
+/**
+ * How long passages are, and so how many review words each one can carry: longer passages cover a big
+ * review pile in fewer (cheaper) turns, shorter ones give more back-and-forth.
+ */
+enum class PassageLength(val label: String, val text: String, val maxWords: Int, /** review words a passage usually carries */ val estimate: Double) {
+    SHORT("Short", "about 100–200 Japanese characters; a quiet beat can be a few lines", 8, 3.5),
+    NORMAL("Normal", "about 150–350 Japanese characters; a quiet beat can be much shorter", 15, 6.0),
+    LONG("Long", "about 300–550 Japanese characters, still ending at the player's decision", 25, 10.0),
+}
+
 /** Measures a passage against what the reader knows (backed by the matcher in the app). */
 fun interface UnknownWords {
     /** Counted words, and the lemma of every unknown occurrence. */
@@ -433,7 +443,7 @@ class StoryEngine(
         }
         logFile.parentFile.mkdirs()
         logFile.appendText(JSONObject()
-            .put("turn", t.turn).put("chapter", s.chapter).put("player", t.player ?: "")
+            .put("turn", t.turn).put("at", System.currentTimeMillis()).put("chapter", s.chapter).put("player", t.player ?: "")
             .put("passage", t.draft.passage).put("roll", t.roll?.toString() ?: "")
             .put("packet", t.packet ?: "").put("sentAs", sentAs(t, turnsInChapter(s.chapter).isEmpty()))
             .put("corrections", JSONArray(t.corrections.map { JSONObject().put("wrong", it.wrong).put("right", it.right).put("key", it.key) }))

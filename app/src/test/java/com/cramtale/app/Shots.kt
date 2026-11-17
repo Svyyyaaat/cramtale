@@ -11,6 +11,10 @@ import app.cash.paparazzi.Paparazzi
 import com.android.resources.NightMode
 import com.cramtale.app.story.ShownPassage
 import com.cramtale.app.story.ShownTurn
+import com.cramtale.app.ui.DueCounts
+import com.cramtale.app.ui.StoryInfoBody
+import com.cramtale.app.ui.SettingsContent
+import com.cramtale.app.ui.SettingsValues
 import com.cramtale.app.ui.nameReading
 import com.cramtale.app.ui.AnkiStepContent
 import com.cramtale.app.ui.CramtaleTheme
@@ -98,7 +102,8 @@ class Shots {
 
     @Test fun c1_home() = shot {
         HomeContent(HomeInfo("西田製作所の事務所", 12, 1, "村井はかばんの口を閉めて、立ち上がらずに待っていた。", 1.42,
-            "Real collection · com.ichi2.anki", true, true, 7127, 10000), {}, {})
+            "Real collection · com.ichi2.anki", true, true, 7127, 10000,
+            due = DueCounts(142, 6, 20), perPassage = 6.4, readToday = 23, goodToday = 19, againToday = 4), {}, {})
     }
 
     private val passage = "信用金庫の村井は、早朝にもかかわらず化粧も髪も崩れていなかった。机に布のかばんを置き、薄いファイルを一冊出す。\n「先月お約束いただいた返済の計画書、今日もらえますか」"
@@ -132,7 +137,8 @@ class Shots {
 
     @Test fun c2_home_dark() = shot(dark = true) {
         HomeContent(HomeInfo("西田製作所の事務所", 12, 1, "村井はかばんの口を閉めて、立ち上がらずに待っていた。", 1.42,
-            "Real collection · com.ichi2.anki", true, true, 7127, 10000), {}, {})
+            "Real collection · com.ichi2.anki", true, true, 7127, 10000,
+            due = DueCounts(142, 6, 20), perPassage = 6.4, readToday = 23, goodToday = 19, againToday = 4), {}, {})
     }
 
     @Test fun a6b_vocab_question_dark() = shot(dark = true) {
@@ -146,6 +152,26 @@ class Shots {
     @Test fun d1b_story_versions() = storyShot(false, versions = 3)
     @Test fun d1c_story_error() = storyShot(false, error = com.cramtale.core.llm.ErrorText.explain(
         com.cramtale.core.llm.LlmException("network: Request failed", cause = java.net.UnknownHostException("Unable to resolve host \"api.anthropic.com\""))))
+
+    @Test fun d5_story_start() = shot {
+        val text = "朝六時。店の戸を半分開けたところで、榊さんが入ってきた。"
+        StoryContent("狐火堂", 0.04, history = emptyList(),
+            current = ShownTurn(null, emptyList(), ShownPassage(0, text, spans(text), emptyList(), emptySet(), emptyMap(), emptyList(), emptyList())),
+            busy = null, error = null, proposals = emptyList(), tapVersion = 0, isTapped = { false }, statusOf = { Status.DECK },
+            onBack = {}, onTap = { _, _ -> }, onGrammar = {}, onReroll = {}, onEdit = {}, onSend = {}, onDecide = { _, _ -> },
+            intro = "狐火堂という小さな菓子屋の二代目。父の借金が残っていて、春祭りまでに返さなければならない。", onInfo = {})
+    }
+
+    @Test fun d6_story_info() = shot {
+        StoryInfoBody(com.cramtale.app.story.StoryController.StoryInfo(
+            "狐火堂という小さな菓子屋の二代目。父の借金が残っていて、春祭りまでに返さなければならない。",
+            listOf("榊", "コガネ", "ミナ"),
+            listOf(1 to "Sakaki from the guild brought the festival papers and a threat: sign, or lose the shop's permit. Kogane, the cat, watched.")))
+    }
+
+    @Test fun e1_settings() = shot {
+        SettingsContent(SettingsValues(1.15f, com.cramtale.core.story.PassageLength.LONG, false, false, "sk-ant-…x9Qa"), {}, {}, {}, {}, {}, {})
+    }
 
     @Test fun d3_word_sheet() = shot {
         WordSheetBody(WordInfo("返済", "へんさい", "repaying the loan", listOf("repayment; reimbursement; refund"), false), {}, {})

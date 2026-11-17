@@ -184,9 +184,15 @@ class GradeLog(private val file: File?) {
     val entries = ArrayList<JSONObject>()
 
     init {
-        file?.takeIf { it.exists() }?.forEachLine { if (it.isNotBlank()) entries += JSONObject(it) }
+        // a torn last line (an append cut short by a kill) is skipped, not fatal
+        file?.takeIf { it.exists() }?.forEachLine { l -> if (l.isNotBlank()) runCatching { JSONObject(l) }.onSuccess { entries += it } }
     }
 
+    /** A copy to read from another thread (a turn may be committing meanwhile). */
+    @Synchronized
+    fun snapshot(): List<JSONObject> = ArrayList(entries)
+
+    @Synchronized
     fun record(o: GradingEngine.Outcome, mode: Mode) {
         val g = o.grade
         val e = JSONObject()
@@ -199,7 +205,27 @@ class GradeLog(private val file: File?) {
     }
 
     fun sentToday(): Int {
-        val dayStart = java.time.LocalDate.now().atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
-        return entries.count { it.optBoolean("sent") && it.optLong("at") >= dayStart }
+        val dayStart = ankiDayStart()
+        return snapshot().count { it.optBoolean("sent") && it.optLong("at") >= dayStart }
+    }
+
+    /** Today's reads (Anki's day): each card once, its latest grade. */
+    data class Today(val cards: Int, val good: Int, val again: Int)
+
+    fun today(now: Long = System.currentTimeMillis(), rolloverHour: Int = 4): Today {
+        val start = ankiDayStart(now, rolloverHour)
+        val latest = snapshot().filter { it.optLong("at") >= start }.associateBy { "${it.optLong("noteId")}/${it.optInt("ord")}" }.values
+        return Today(latest.size, latest.count { it.optInt("ease") == 3 }, latest.count { it.optInt("ease") == 1 })
+    }
+
+    companion object {
+        /** Anki's day starts at the rollover hour (4 AM by default), not at midnight. */
+        fun ankiDayStart(now: Long = System.currentTimeMillis(), rolloverHour: Int = 4): Long {
+            val zone = java.time.ZoneId.systemDefault()
+            val t = java.time.Instant.ofEpochMilli(now).atZone(zone)
+            var day = t.toLocalDate()
+            if (t.hour < rolloverHour) day = day.minusDays(1)
+            return day.atTime(rolloverHour, 0).atZone(zone).toInstant().toEpochMilli()
+        }
     }
 }

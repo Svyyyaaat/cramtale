@@ -1,5 +1,10 @@
 package com.cramtale.app.ui
 
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import com.cramtale.app.story.StoryController
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -133,7 +138,7 @@ fun PassageText(p: ShownPassage, interactive: Boolean, isTapped: (Span) -> Boole
             if (pos < p.text.length) append(p.text.substring(pos))
         }
     }
-    Text(text, style = ReadingText, color = MaterialTheme.colorScheme.onBackground)
+    Text(text, style = readingStyle(), color = MaterialTheme.colorScheme.onBackground)
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -214,6 +219,9 @@ fun StoryContent(
     reply: String = "", onReply: (String) -> Unit = {}, onRetry: (() -> Unit)? = null, onVersion: (Int) -> Unit = {},
     /** A word in an earlier passage: looked up only, never graded. */
     onLookup: (Span, ShownPassage) -> Unit = { _, _ -> },
+    /** Who you are in the story, shown above the first passage. */
+    intro: String? = null,
+    onInfo: (() -> Unit)? = null,
 ) {
     val listState = rememberLazyListState()
     LaunchedEffect(history.size, current) {
@@ -222,11 +230,20 @@ fun StoryContent(
     }
     Column(Modifier.fillMaxSize().imePadding()) {
         AppBar(title, onBack = onBack) {
+            if (onInfo != null) IconButton(onInfo) { Icon(Icons.Outlined.Info, "The story so far") }
             Text("$%.2f".format(cost), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(end = 16.dp))
         }
         LazyColumn(Modifier.weight(1f), state = listState, contentPadding = PaddingValues(horizontal = 22.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            if (intro != null && history.isEmpty()) item {
+                PaperCard {
+                    Text("You are", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
+                    Text(intro, style = MaterialTheme.typography.bodyLarge)
+                    Text("Tap any word you don't know. Reply in Japanese, or press Continue to let the scene go on.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
             items(history) { t ->
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     t.player?.let { PlayerBubble(it, t.corrections) }
@@ -313,13 +330,18 @@ fun StoryScreen(state: AppState, onBack: () -> Unit) {
     val story = state.story
     var picked by remember { mutableStateOf<Pair<Span, ShownPassage>?>(null) }
     var lookupOnly by remember { mutableStateOf(false) }
+    var info by remember { mutableStateOf<StoryController.StoryInfo?>(null) }
+    var role by remember { mutableStateOf<String?>(null) }
+    var infoWanted by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { role = withContext(Dispatchers.IO) { story.role() } }
+    LaunchedEffect(infoWanted) { if (infoWanted) { info = withContext(Dispatchers.IO) { story.storyInfo() }; infoWanted = false } }
     var grammar by remember { mutableStateOf<GrammarPatterns.Found?>(null) }
     var editing by remember { mutableStateOf<String?>(null) }
     var tapVersion by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) { if (story.current == null && story.busy == null && story.error == null) story.launch { start() } }
 
     StoryContent(
-        title = story.place() ?: "Story", cost = story.sessionCost(), history = story.history, current = story.current,
+        title = story.title ?: "Story", cost = story.sessionCost(), history = story.history, current = story.current,
         busy = story.busy, error = story.error, proposals = story.proposals, tapVersion = tapVersion,
         isTapped = story::isTapped,
         statusOf = { if (story.isName(it)) Status.NAME else it.status(state.policy, state.lists) },
@@ -333,7 +355,9 @@ fun StoryScreen(state: AppState, onBack: () -> Unit) {
         reply = story.replyDraft, onReply = { story.replyDraft = it }, onRetry = story.retry,
         onVersion = { story.selectVersion(it); tapVersion++ },
         onLookup = { s, p -> lookupOnly = true; picked = s to p },
+        intro = role, onInfo = { infoWanted = true },
     )
+    info?.let { i -> StoryInfoSheet(i) { info = null } }
 
     picked?.let { (span, p) ->
         val sentence = remember(span, p) { sentenceAround(p.text, span.start, span.end) }
@@ -366,4 +390,35 @@ fun sentenceAround(text: String, start: Int, end: Int): String {
     val s = text.lastIndexOfAny(charArrayOf('。', '！', '？', '\n', '」'), start - 1).let { if (it < 0) 0 else it + 1 }
     val e = text.indexOfAny(charArrayOf('。', '！', '？', '\n'), end).let { if (it < 0) text.length else it + 1 }
     return text.substring(s, e).trim()
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun StoryInfoSheet(info: StoryController.StoryInfo, onClose: () -> Unit) {
+    ModalBottomSheet(onDismissRequest = onClose, containerColor = MaterialTheme.colorScheme.surfaceContainerLowest) {
+        StoryInfoBody(info)
+    }
+}
+
+@Composable
+fun StoryInfoBody(info: StoryController.StoryInfo) {
+    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp).padding(bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("The story so far", style = MaterialTheme.typography.titleLarge)
+        info.role?.let {
+            Text("You", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
+            Text(it, style = MaterialTheme.typography.bodyLarge)
+        }
+        if (info.met.isNotEmpty()) {
+            Text("People you've met", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
+            Text(info.met.joinToString("、"), style = readingStyle().copy(fontSize = 18.sp, lineHeight = 28.sp))
+        }
+        Text("Chapters", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
+        if (info.chapters.isEmpty()) Text("Chapter 1 is still being written. A summary appears here when it closes.",
+            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        info.chapters.forEach { (n, text) ->
+            Text("Chapter $n", style = MaterialTheme.typography.titleSmall)
+            Text(text, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
 }

@@ -48,7 +48,7 @@ fun LogsScreen(state: AppState) {
             val t = state.target ?: run { reportNote = "No AnkiDroid connected."; return@withContext }
             val reader = AnkiReader(context, t)
             if (!reader.hasPermission()) { reportNote = "No access to AnkiDroid."; return@withContext }
-            report = DryRunReport.build(story.gradeLog.entries, reader::card)
+            report = DryRunReport.build(story.gradeLog.snapshot(), reader::card)
         }
     }
     Page {
@@ -103,15 +103,6 @@ fun LogsScreen(state: AppState) {
             }
         }
 
-        SectionTitle("Settings")
-        PaperCard {
-            var two by remember { mutableStateOf(state.twoReads) }
-            SettingRow("Young cards (interval under 21 days) need two untapped reads", two) { two = it; state.twoReads = it }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            var firm by remember { mutableStateOf(state.firmStyleRules) }
-            SettingRow("Style rules as firm prohibitions instead of positive statements", firm) { firm = it; state.firmStyleRules = it }
-            Text("Applies from the next app start.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
     }
 }
 
@@ -121,15 +112,6 @@ private fun Stat(label: String, n: Int, warn: Boolean = false) {
         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
         Text("$n", style = MaterialTheme.typography.labelLarge,
             color = if (warn && n > 0) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface)
-    }
-}
-
-@Composable
-private fun SettingRow(label: String, value: Boolean, onChange: (Boolean) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-        Spacer(Modifier.width(12.dp))
-        Switch(value, onChange)
     }
 }
 

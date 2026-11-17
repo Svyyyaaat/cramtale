@@ -82,8 +82,11 @@ class CostLog(private val file: File?, private val prices: Map<String, Price> = 
         return e
     }
 
+    // read from the UI while calls append from a background thread
+    @Synchronized
     fun total(session: String) = entries.filter { it.session == session }.sumOf { it.dollars }
 
+    @Synchronized
     fun byPurpose(session: String) = entries.filter { it.session == session }
         .groupBy { it.purpose }.mapValues { (_, v) -> v.sumOf { it.dollars } }
 }

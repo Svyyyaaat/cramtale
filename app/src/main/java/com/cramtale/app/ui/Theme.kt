@@ -75,3 +75,13 @@ private val AppShapes = Shapes(
 fun CramtaleTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = if (dark) Dark else Light, typography = Type, shapes = AppShapes, content = content)
 }
+
+/** The reader's text size setting (Settings → Reading), as a multiple of [ReadingText]. */
+val LocalReadingScale = androidx.compose.runtime.staticCompositionLocalOf { 1f }
+
+/** [ReadingText] at the reader's chosen size. */
+@androidx.compose.runtime.Composable
+fun readingStyle(): TextStyle {
+    val k = LocalReadingScale.current
+    return ReadingText.copy(fontSize = ReadingText.fontSize * k, lineHeight = ReadingText.lineHeight * k)
+}

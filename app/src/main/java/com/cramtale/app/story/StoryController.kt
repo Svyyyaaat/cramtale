@@ -28,6 +28,7 @@ import com.cramtale.core.story.Draft
 import com.cramtale.core.story.DuePool
 import com.cramtale.core.story.StoryEngine
 import com.cramtale.core.story.UnknownWords
+import com.cramtale.core.jsonLines
 import com.cramtale.core.llm.ErrorText
 import com.cramtale.core.story.PendingTurn
 import kotlinx.coroutines.CoroutineScope
@@ -113,6 +114,30 @@ class StoryController(
     fun hasKey() = (fixedKey ?: keys.load()) != null
     fun saveKey(k: String) { keys.save(k); engine = null }
 
+    /** The saved key, shortened for display ("sk-ant-…a1b2"). */
+    fun keyHint(): String? = (fixedKey ?: keys.load())?.let { k -> if (k.length > 14) k.take(7) + "…" + k.takeLast(4) else "saved" }
+
+    /** Settings changed: the next action builds the engine with them (the waiting turn is on disk). */
+    fun settingsChanged() { if (!isWorking) engine = null }
+
+    /**
+     * A new story: this one moves to story-archive/ (nothing is deleted). What's about you, not about
+     * the story, stays: your mistakes, the review log and skips, the costs.
+     */
+    fun archiveAndReset(): File? {
+        if (isWorking) return null
+        val keep = listOf("log/mistakes.json", "log/grades.jsonl", "log/skips.json", "log/two-reads.json", "log/costs.jsonl")
+        val archive = File(context.filesDir, "story-archive/" + java.text.SimpleDateFormat("yyyy-MM-dd_HHmm", java.util.Locale.US).format(java.util.Date()))
+        archive.parentFile?.mkdirs()
+        if (!dir.renameTo(archive)) return null
+        dir.mkdirs()
+        for (k in keep) File(archive, k).takeIf { it.exists() }?.let { f -> File(dir, k).also { it.parentFile?.mkdirs() }.writeBytes(f.readBytes()) }
+        engine = null
+        history.clear(); current = null; error = null; retry = null; proposals.clear(); replyDraft = ""
+        tappedNotes.clear(); tappedWords.clear(); meaningCache.clear()
+        return archive
+    }
+
     private var engine: StoryEngine? = null
 
     private fun engine(): StoryEngine {
@@ -130,7 +155,7 @@ class StoryController(
             counted.size to unknown.map { it.lemma }
         }
         return StoryEngine(dir, llmFor(key), costs, session, unknown,
-            settings = StoryEngine.Settings(firmStyleRules = app.firmStyleRules)).also { e ->
+            settings = StoryEngine.Settings(firmStyleRules = app.firmStyleRules, length = app.passageLength.text)).also { e ->
             engine = e
             e.onCall = { purpose -> STEP_LABELS[purpose]?.let { busy = it } }
         }
@@ -195,7 +220,7 @@ class StoryController(
         val deckNames = words.map { it.deck }.toSet()
         val deckIds = reader.decks().filter { it.name in deckNames }.map { it.id }
         snapshot = DueSnapshot.take(reader, deckIds, words)
-        pool = planner.pool(snapshot!!, mistakes.weakPoints())
+        pool = planner.pool(snapshot!!, mistakes.weakPoints(), maxWords = app.passageLength.maxWords)
     }
 
     /** Keys of mistakes seen so far, so the checker reuses them. */
@@ -313,6 +338,7 @@ class StoryController(
     }
 
     private fun show(t: PendingTurn) {
+        title = place()
         val d = t.draft
         val player = t.player
         val corrections = t.corrections
@@ -358,6 +384,10 @@ class StoryController(
     var castNames by mutableStateOf<Set<String>>(emptySet())
         private set
 
+    /** The scene's place, for the title bar (kept here: reading the file on every redraw is wasteful). */
+    var title by mutableStateOf<String?>(null)
+        private set
+
     fun refreshCast() { castNames = runCatching { com.cramtale.core.story.StoryState(dir).castNameParts() }.getOrDefault(emptySet()) }
 
     /** A person's or place's name: from the tokenizer (固有名詞) or one of the story's characters. */
@@ -400,6 +430,35 @@ class StoryController(
     /** The end of the last passage, for the home screen. */
     fun lastLines(): String? = File(dir, "log/turns.jsonl").takeIf { it.exists() }?.readLines()?.lastOrNull { it.isNotBlank() }
         ?.let { runCatching { JSONObject(it).getString("passage") }.getOrNull() }?.lines()?.filter { it.isNotBlank() }?.takeLast(3)?.joinToString("\n")
+
+    /**
+     * Review words a passage actually carries, measured over the last 30 passages that had any (the
+     * grade log against the turn log); null until there are a few.
+     */
+    fun cardsPerPassage(): Double? {
+        val turns = File(dir, "log/turns.jsonl").jsonLines().mapNotNull { o -> o.optLong("at").takeIf { it > 0 } }.takeLast(30)
+        if (turns.size < 3) return null
+        val since = turns.first() - 60_000
+        val graded = gradeLog.snapshot().count { it.optLong("at") >= since }
+        return (graded.toDouble() / turns.size).takeIf { it > 0 }
+    }
+
+    /** What the player's character knows: their role, who they've met, the chapters so far. Never secrets. */
+    data class StoryInfo(val role: String?, val met: List<String>, val chapters: List<Pair<Int, String>>)
+
+    fun role(): String? = File(dir, "state/player.md").takeIf { it.exists() }?.readText()?.trim()?.ifEmpty { null }
+
+    fun storyInfo(): StoryInfo {
+        val role = role()
+        val text = File(dir, "log/turns.jsonl").jsonLines().joinToString("\n") { it.optString("passage") } + "\n" + (current?.passage?.text ?: "")
+        val cast = runCatching { com.cramtale.core.story.StoryState(dir).characterNames() }.getOrDefault(emptyList())
+        // met = named in a passage you've read (by full name or any part of it)
+        // (a whole name counts at any length, 榊 included; parts of a long name need two characters)
+        val met = cast.filter { n -> n in text || n.split(' ', '　', '・', '(', ')', '（', '）').any { it.length >= 2 && it in text } }
+        val chapters = File(dir, "state/chapters").listFiles { f -> f.extension == "md" }.orEmpty()
+            .mapNotNull { f -> f.nameWithoutExtension.toIntOrNull()?.let { it to f.readText().trim() } }.sortedBy { it.first }
+        return StoryInfo(role, met, chapters)
+    }
 
     /** Every session's costs, from the log file. */
     fun totalCost(): Double = File(dir, "log/costs.jsonl").takeIf { it.exists() }?.readLines()

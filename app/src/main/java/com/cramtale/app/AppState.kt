@@ -19,7 +19,7 @@ import com.cramtale.core.match.RawNote
 import java.io.File
 
 /** Settings, the dictionary, the deck snapshot and the user's lists. Heavy calls: off the main thread. */
-class AppState(private val context: Context) {
+class AppState(val context: Context) {
     private val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
     val dictionary = DictionarySetup(context)
     private val listsDir = File(context.filesDir, "lists")
@@ -61,6 +61,16 @@ class AppState(private val context: Context) {
     var firmStyleRules: Boolean
         get() = prefs.getBoolean("firmStyleRules", false)
         set(v) = prefs.edit().putBoolean("firmStyleRules", v).apply()
+
+    /** Reading text size, as a multiple of the default. */
+    var textScale: Float
+        get() = prefs.getFloat("textScale", 1f)
+        set(v) = prefs.edit().putFloat("textScale", v).apply()
+
+    var passageLength: com.cramtale.core.story.PassageLength
+        get() = runCatching { com.cramtale.core.story.PassageLength.valueOf(prefs.getString("passageLength", "NORMAL")!!) }
+            .getOrDefault(com.cramtale.core.story.PassageLength.NORMAL)
+        set(v) = prefs.edit().putString("passageLength", v.name).apply()
 
     val story by lazy { com.cramtale.app.story.StoryController(context, this) }
 
