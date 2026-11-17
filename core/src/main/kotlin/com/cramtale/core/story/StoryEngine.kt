@@ -434,6 +434,10 @@ class StoryEngine(
         }
     }
 
+    /** Known mistake keys the last checked message used correctly (for "fixed" tracking). */
+    var lastCorrectKeys: List<String> = emptyList()
+        private set
+
     /** Definite errors in the player's Japanese (prompts/mistakes.md). */
     fun checkMistakes(message: String, knownKeys: List<String>): List<Correction> {
         val s = state.scene()
@@ -442,6 +446,8 @@ class StoryEngine(
             "context" to context.ifBlank { "(start of the story)" }, "known_keys" to knownKeys.joinToString("\n").ifBlank { "(none yet)" },
             "message" to message,
         )), listOf(Msg(Role.USER, "Check the message.")), schema = MISTAKES_SCHEMA, maxTokens = 1200))
+        lastCorrectKeys = o.optJSONArray("correct_keys")?.let { k -> (0 until k.length()).map { k.getString(it) } }.orEmpty()
+            .filter { it in knownKeys }
         val a = o.optJSONArray("errors") ?: return emptyList()
         return (0 until a.length()).map { a.getJSONObject(it) }
             .map { Correction(it.getString("wrong"), it.getString("right"), it.optString("type"), it.optString("reason"), it.getString("key")) }
@@ -473,7 +479,8 @@ class StoryEngine(
             "passage":{"type":"string"},
             "used":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["word","form"],"properties":{"word":{"type":"string"},"form":{"type":"string"}}}},
             "grammar":{"type":"array","items":{"type":"string"}}}}"""
-        val MISTAKES_SCHEMA = """{"type":"object","additionalProperties":false,"required":["errors"],"properties":{"errors":{"type":"array","items":{
+        val MISTAKES_SCHEMA = """{"type":"object","additionalProperties":false,"required":["errors","correct_keys"],"properties":{
+            "correct_keys":{"type":"array","items":{"type":"string"}},"errors":{"type":"array","items":{
             "type":"object","additionalProperties":false,"required":["wrong","right","type","reason","key"],"properties":{
             "wrong":{"type":"string"},"right":{"type":"string"},
             "type":{"type":"string","enum":["conjugation","particle","word choice","grammar pattern","spelling","other"]},

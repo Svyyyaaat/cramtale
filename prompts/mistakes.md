@@ -24,7 +24,9 @@ For each error:
   - Anything else: the rule as a learner would look it up, with no specific word and covering every verb or adjective class it applies to: `い-adjective past: 〜いでした → 〜かったです`, `たい after the masu-stem: 行くたい → 行きたい`, `te-form spelling: small っ (待つて → 待って)`.
   - If one of the known keys below names the same mistake, reuse it exactly instead of making a new one, even if its example uses different words.
 
-Return only the JSON. No errors: `{"errors": []}`.
+Also list in `correct_keys` every known key below whose correct form the message uses correctly (the same rule, any words). Leave it empty when unsure.
+
+Return only the JSON. No errors: `{"errors": [], "correct_keys": []}`.
 
 ## Story so far (context only, never check it)
 {{context}}
