@@ -1,0 +1,3786 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Rev 1.09
+        Added the g_type attribute
+-->
+<!-- Rev 1.08
+        Delete <info> and <example> elements. (The <example> element was
+        later restored.)
+-->
+<!-- Rev 1.07
+        Revised POS tags for the adjectives
+-->
+<!-- Rev 1.06
+        Dropped the "*" from the end of the entry element.
+        Dropped the g_lang attribute in favour of xml:lang
+        Dropped the <lang> element and replaced it with <lsource> at the
+        sense level.
+        Moved <dial> from the entry level to the sense level.
+        Changed "info*" to "info?".
+-->
+<!-- Rev 1.05
+        Changed the <gram> element name to <pos>
+        Added the g_gend attribute
+        moved the s_inf element
+-->
+<!-- Rev 1.04
+        Changes:
+        Rename the project  "JMdict" and add the g_lang attribute to the
+        <gloss> entity - 08 May 1999
+        Moved the <gram>, <field> and <misc> elements down to be in the
+        <sense> region, as suggested by Chris Czeyka. I have also tidied up
+        some of the "*" as he suggested.  - 27 May 2000
+        Added the re_nokanji element - Sep 2003.
+     -->
+<!DOCTYPE JMdict [
+<!ELEMENT JMdict (entry*)>
+<!--                                                                   -->
+<!ELEMENT entry (ent_seq, k_ele*, r_ele+, sense+)>
+        <!-- Entries consist of kanji elements, reading elements,
+        general information and sense elements. Each entry must have at
+        least one reading element and one sense element. Others are optional.
+        -->
+<!ELEMENT ent_seq (#PCDATA)>
+        <!-- A unique numeric sequence number for each entry
+        -->
+<!ELEMENT k_ele (keb, ke_inf*, ke_pri*)>
+        <!-- The kanji element, or in its absence, the reading element, is
+        the defining component of each entry.
+        The overwhelming majority of entries will have a single kanji
+        element associated with a word in Japanese. Where there are
+        multiple kanji elements within an entry, they will be orthographical
+        variants of the same word, either using variations in okurigana, or
+        alternative and equivalent kanji. Common "mis-spellings" may be
+        included, provided they are associated with appropriate information
+        fields. Synonyms are not included; they may be indicated in the
+        cross-reference field associated with the sense element.
+        -->
+<!ELEMENT keb (#PCDATA)>
+        <!-- This element will contain a word or short phrase in Japanese
+        which is written using at least one non-kana character (usually kanji,
+        but can be other characters). The valid characters are
+        kanji, kana, related characters such as chouon and kurikaeshi, and
+        in exceptional cases, letters from other alphabets.
+        -->
+<!ELEMENT ke_inf (#PCDATA)>
+        <!-- This is a coded information field related specifically to the
+        orthography of the keb, and will typically indicate some unusual
+        aspect, such as okurigana irregularity.
+        -->
+<!ELEMENT ke_pri (#PCDATA)>
+        <!-- This and the equivalent re_pri field are provided to record
+        information about the relative priority of the entry,  and consist
+        of codes indicating the word appears in various references which
+        can be taken as an indication of the frequency with which the word
+        is used. This field is intended for use either by applications which
+        want to concentrate on entries of  a particular priority, or to
+        generate subset files.
+        The current values in this field are:
+        - news1/2: appears in the "wordfreq" file compiled by Alexandre Girardi
+        from the Mainichi Shimbun. (See the Monash ftp archive for a copy.)
+        Words in the first 12,000 in that file are marked "news1" and words
+        in the second 12,000 are marked "news2".
+        - ichi1/2: appears in the "Ichimango goi bunruishuu", Senmon Kyouiku
+        Publishing, Tokyo, 1998.  (The entries marked "ichi2" were
+        demoted from ichi1 because they were observed to have low
+        frequencies in the WWW and newspapers.)
+        - spec1 and spec2: a small number of words use this marker when they
+        are detected as being common, but are not included in other lists.
+        - gai1/2: common loanwords, based on the wordfreq file.
+        - nfxx: this is an indicator of frequency-of-use ranking in the
+        wordfreq file. "xx" is the number of the set of 500 words in which
+        the entry can be found, with "01" assigned to the first 500, "02"
+        to the second, and so on. (The entries with news1, ichi1, spec1, spec2
+        and gai1 values are marked with a "(P)" in the EDICT and EDICT2
+        files.)
+
+        The reason both the kanji and reading elements are tagged is because
+        on occasions a priority is only associated with a particular
+        kanji/reading pair.
+        -->
+<!--                                                                   -->
+<!ELEMENT r_ele (reb, re_nokanji?, re_restr*, re_inf*, re_pri*)>
+        <!-- The reading element typically contains the valid readings
+        of the word(s) in the kanji element using modern kanadzukai.
+        Where there are multiple reading elements, they will typically be
+        alternative readings of the kanji element. In the absence of a
+        kanji element, i.e. in the case of a word or phrase written
+        entirely in kana, these elements will define the entry.
+        -->
+<!ELEMENT reb (#PCDATA)>
+        <!-- this element content is restricted to kana and related
+        characters such as chouon and kurikaeshi. Kana usage will be
+        consistent between the keb and reb elements; e.g. if the keb
+        contains katakana, so too will the reb.
+        -->
+<!ELEMENT re_nokanji (#PCDATA)>
+        <!-- This element, which will usually have a null value, indicates
+        that the reb, while associated with the keb, cannot be regarded
+        as a true reading of the kanji. It is typically used for words
+        such as foreign place names, gairaigo which can be in kanji or
+        katakana, etc.
+        -->
+<!ELEMENT re_restr (#PCDATA)>
+        <!-- This element is used to indicate when the reading only applies
+        to a subset of the keb elements in the entry. In its absence, all
+        readings apply to all kanji elements. The contents of this element
+        must exactly match those of one of the keb elements.
+        -->
+<!ELEMENT re_inf (#PCDATA)>
+        <!-- General coded information pertaining to the specific reading.
+        Typically it will be used to indicate some unusual aspect of
+        the reading. -->
+<!ELEMENT re_pri (#PCDATA)>
+        <!-- See the comment on ke_pri above. -->
+<!--                                                                   -->
+<!ELEMENT sense (stagk*, stagr*, pos*, xref*, ant*, field*, misc*, s_inf*, lsource*, dial*, gloss*, example*)>
+        <!-- The sense element will record the translational equivalent
+        of the Japanese word, plus other related information. Where there
+        are several distinctly different meanings of the word, multiple
+        sense elements will be employed.
+        -->
+<!ELEMENT stagk (#PCDATA)>
+<!ELEMENT stagr (#PCDATA)>
+        <!-- These elements, if present, indicate that the sense is restricted
+        to the lexeme represented by the keb and/or reb. -->
+<!ELEMENT xref (#PCDATA)*>
+        <!-- This element is used to indicate a cross-reference to another
+        entry with a similar or related meaning or sense. The content of
+        this element is typically a keb or reb element in another entry. In some
+        cases a keb will be followed by a reb and/or a sense number to provide
+        a precise target for the cross-reference. Where this happens, a JIS
+        "centre-dot" (0x2126) is placed between the components of the
+        cross-reference. The target keb or reb must not contain a centre-dot.
+        -->
+<!ELEMENT ant (#PCDATA)*>
+        <!-- This element is used to indicate another entry which is an
+        antonym of the current entry/sense. The content of this element
+        must exactly match that of a keb or reb element in another entry.
+        -->
+<!ELEMENT pos (#PCDATA)>
+        <!-- Part-of-speech information about the entry/sense. Should use
+        appropriate entity codes. In general where there are multiple senses
+        in an entry, the part-of-speech of an earlier sense will apply to
+        later senses unless there is a new part-of-speech indicated.
+        -->
+<!ELEMENT field (#PCDATA)>
+        <!-- Information about the field of application of the entry/sense.
+        When absent, general application is implied. Entity coding for
+        specific fields of application. -->
+<!ELEMENT misc (#PCDATA)>
+        <!-- This element is used for other relevant information about
+        the entry/sense. As with part-of-speech, information will usually
+        apply to several senses.
+        -->
+<!ELEMENT lsource (#PCDATA)>
+        <!-- This element records the information about the source
+        language(s) of a loan-word/gairaigo. If the source language is other
+        than English, the language is indicated by the xml:lang attribute.
+        The element value (if any) is the source word or phrase.
+        -->
+<!ATTLIST lsource xml:lang CDATA "eng">
+        <!-- The xml:lang attribute defines the language(s) from which
+        a loanword is drawn.  It will be coded using the three-letter language
+        code from the ISO 639-2 standard. When absent, the value "eng" (i.e.
+        English) is the default value. The bibliographic (B) codes are used. -->
+<!ATTLIST lsource ls_type CDATA #IMPLIED>
+        <!-- The ls_type attribute indicates whether the lsource element
+        fully or partially describes the source word or phrase of the
+        loanword. If absent, it will have the implied value of "full".
+        Otherwise it will contain "part".  -->
+<!ATTLIST lsource ls_wasei CDATA #IMPLIED>
+        <!-- The ls_wasei attribute indicates that the Japanese word
+        has been constructed from words in the source language, and
+        not from an actual phrase in that language. Most commonly used to
+        indicate "waseieigo". -->
+<!ELEMENT dial (#PCDATA)>
+        <!-- For words specifically associated with regional dialects in
+        Japanese, the entity code for that dialect, e.g. ksb for Kansaiben.
+        -->
+<!ELEMENT gloss (#PCDATA | pri)*>
+        <!-- Within each sense will be one or more "glosses", i.e.
+        target-language words or phrases which are equivalents to the
+        Japanese word. This element would normally be present, however it
+        may be omitted in entries which are purely for a cross-reference.
+        -->
+<!ATTLIST gloss xml:lang CDATA "eng">
+        <!-- The xml:lang attribute defines the target language of the
+        gloss. It will be coded using the three-letter language code from
+        the ISO 639 standard. When absent, the value "eng" (i.e. English)
+        is the default value. -->
+<!ATTLIST gloss g_gend CDATA #IMPLIED>
+        <!-- The g_gend attribute defines the gender of the gloss (typically
+        a noun in the target language. When absent, the gender is either
+        not relevant or has yet to be provided.
+        -->
+<!ATTLIST gloss g_type CDATA #IMPLIED>
+        <!-- The g_type attribute specifies that the gloss is of a particular
+        type, e.g. "lit" (literal), "fig" (figurative), "expl" (explanation).
+        -->
+<!ELEMENT pri (#PCDATA)>
+        <!-- These elements highlight particular target-language words which
+        are strongly associated with the Japanese word. The purpose is to
+        establish a set of target-language words which can effectively be
+        used as head-words in a reverse target-language/Japanese relationship.
+        -->
+<!ELEMENT s_inf (#PCDATA)>
+        <!-- The sense-information elements provided for additional
+        information to be recorded about a sense. Typical usage would
+        be to indicate such things as level of currency of a sense, the
+        regional variations, etc.
+        -->
+<!ELEMENT example (ex_srce,ex_text,ex_sent+)>
+    <!-- The example elements contain a Japanese sentence using the term
+    associated with the entry, and one or more translations of that sentence.
+    Within the element, the ex_srce element will indicate the source of the
+    sentences (typically the sequence number in the Tatoeba Project), the
+    ex_text element will contain the form of the term in the Japanese
+    sentence, and the ex_sent elements contain the example sentences.
+    -->
+<!ELEMENT ex_srce (#PCDATA)>
+<!ELEMENT ex_text (#PCDATA)>
+<!ELEMENT ex_sent (#PCDATA)>
+<!ATTLIST ex_sent xml:lang CDATA "eng">
+<!ATTLIST ex_srce exsrc_type CDATA #IMPLIED>
+<!-- The following entity codes are used for common elements within the
+various information fields.
+-->
+<!-- <dial> (dialect) entities -->
+<!ENTITY bra "Brazilian">
+<!ENTITY hob "Hokkaido-ben">
+<!ENTITY ksb "Kansai-ben">
+<!ENTITY ktb "Kantou-ben">
+<!ENTITY kyb "Kyoto-ben">
+<!ENTITY kyu "Kyuushuu-ben">
+<!ENTITY nab "Nagano-ben">
+<!ENTITY osb "Osaka-ben">
+<!ENTITY rkb "Ryuukyuu-ben">
+<!ENTITY thb "Touhoku-ben">
+<!ENTITY tsb "Tosa-ben">
+<!ENTITY tsug "Tsugaru-ben">
+<!-- <field> entities -->
+<!ENTITY agric "agriculture">
+<!ENTITY anat "anatomy">
+<!ENTITY archeol "archeology">
+<!ENTITY archit "architecture">
+<!ENTITY art "art, aesthetics">
+<!ENTITY astron "astronomy">
+<!ENTITY audvid "audiovisual">
+<!ENTITY aviat "aviation">
+<!ENTITY baseb "baseball">
+<!ENTITY biochem "biochemistry">
+<!ENTITY biol "biology">
+<!ENTITY bot "botany">
+<!ENTITY boxing "boxing">
+<!ENTITY Buddh "Buddhism">
+<!ENTITY bus "business">
+<!ENTITY cards "card games">
+<!ENTITY chem "chemistry">
+<!ENTITY chmyth "Chinese mythology">
+<!ENTITY Christn "Christianity">
+<!ENTITY civeng "civil engineering">
+<!ENTITY cloth "clothing">
+<!ENTITY comp "computing">
+<!ENTITY cryst "crystallography">
+<!ENTITY dent "dentistry">
+<!ENTITY ecol "ecology">
+<!ENTITY econ "economics">
+<!ENTITY elec "electricity, elec. eng.">
+<!ENTITY electr "electronics">
+<!ENTITY embryo "embryology">
+<!ENTITY engr "engineering">
+<!ENTITY ent "entomology">
+<!ENTITY figskt "figure skating">
+<!ENTITY film "film">
+<!ENTITY finc "finance">
+<!ENTITY fish "fishing">
+<!ENTITY food "food, cooking">
+<!ENTITY gardn "gardening, horticulture">
+<!ENTITY genet "genetics">
+<!ENTITY geogr "geography">
+<!ENTITY geol "geology">
+<!ENTITY geom "geometry">
+<!ENTITY go "go (game)">
+<!ENTITY golf "golf">
+<!ENTITY gramm "grammar">
+<!ENTITY grmyth "Greek mythology">
+<!ENTITY hanaf "hanafuda">
+<!ENTITY horse "horse racing">
+<!ENTITY internet "Internet">
+<!ENTITY jpmyth "Japanese mythology">
+<!ENTITY kabuki "kabuki">
+<!ENTITY law "law">
+<!ENTITY ling "linguistics">
+<!ENTITY logic "logic">
+<!ENTITY MA "martial arts">
+<!ENTITY mahj "mahjong">
+<!ENTITY manga "manga">
+<!ENTITY math "mathematics">
+<!ENTITY mech "mechanical engineering">
+<!ENTITY med "medicine">
+<!ENTITY met "meteorology">
+<!ENTITY mil "military">
+<!ENTITY min "mineralogy">
+<!ENTITY mining "mining">
+<!ENTITY motor "motorsport">
+<!ENTITY music "music">
+<!ENTITY noh "noh">
+<!ENTITY ornith "ornithology">
+<!ENTITY paleo "paleontology">
+<!ENTITY pathol "pathology">
+<!ENTITY pharm "pharmacology">
+<!ENTITY phil "philosophy">
+<!ENTITY photo "photography">
+<!ENTITY physics "physics">
+<!ENTITY physiol "physiology">
+<!ENTITY politics "politics">
+<!ENTITY print "printing">
+<!ENTITY prowres "professional wrestling">
+<!ENTITY psy "psychiatry">
+<!ENTITY psyanal "psychoanalysis">
+<!ENTITY psych "psychology">
+<!ENTITY rail "railway">
+<!ENTITY rommyth "Roman mythology">
+<!ENTITY Shinto "Shinto">
+<!ENTITY shogi "shogi">
+<!ENTITY ski "skiing">
+<!ENTITY sports "sports">
+<!ENTITY stat "statistics">
+<!ENTITY stockm "stock market">
+<!ENTITY sumo "sumo">
+<!ENTITY surg "surgery">
+<!ENTITY telec "telecommunications">
+<!ENTITY tradem "trademark">
+<!ENTITY tv "television">
+<!ENTITY vet "veterinary terms">
+<!ENTITY vidg "video games">
+<!ENTITY zool "zoology">
+<!-- <ke_inf> (kanji info) entities -->
+<!ENTITY ateji "ateji (phonetic) reading">
+<!ENTITY ik "word containing irregular kana usage">
+<!ENTITY iK "word containing irregular kanji usage">
+<!ENTITY io "irregular okurigana usage">
+<!ENTITY oK "word containing out-dated kanji or kanji usage">
+<!ENTITY rK "rarely used kanji form">
+<!ENTITY sK "search-only kanji form">
+<!-- <misc> (miscellaneous) entities -->
+<!ENTITY abbr "abbreviation">
+<!ENTITY arch "archaic">
+<!ENTITY char "character">
+<!ENTITY chn "children's language">
+<!ENTITY col "colloquial">
+<!ENTITY company "company name">
+<!ENTITY creat "creature">
+<!ENTITY dated "dated term">
+<!ENTITY dei "deity">
+<!ENTITY derog "derogatory">
+<!ENTITY doc "document">
+<!ENTITY euph "euphemistic">
+<!ENTITY ev "event">
+<!ENTITY fam "familiar language">
+<!ENTITY fem "female term or language">
+<!ENTITY fict "fiction">
+<!ENTITY form "formal or literary term">
+<!ENTITY given "given name or forename, gender not specified">
+<!ENTITY group "group">
+<!ENTITY hist "historical term">
+<!ENTITY hon "honorific or respectful (sonkeigo) language">
+<!ENTITY hum "humble (kenjougo) language">
+<!ENTITY id "idiomatic expression">
+<!ENTITY joc "jocular, humorous term">
+<!ENTITY leg "legend">
+<!ENTITY m-sl "manga slang">
+<!ENTITY male "male term or language">
+<!ENTITY myth "mythology">
+<!ENTITY net-sl "Internet slang">
+<!ENTITY obj "object">
+<!ENTITY obs "obsolete term">
+<!ENTITY on-mim "onomatopoeic or mimetic word">
+<!ENTITY organization "organization name">
+<!ENTITY oth "other">
+<!ENTITY person "full name of a particular person">
+<!ENTITY place "place name">
+<!ENTITY poet "poetical term">
+<!ENTITY pol "polite (teineigo) language">
+<!ENTITY product "product name">
+<!ENTITY proverb "proverb">
+<!ENTITY quote "quotation">
+<!ENTITY rare "rare term">
+<!ENTITY relig "religion">
+<!ENTITY sens "sensitive">
+<!ENTITY serv "service">
+<!ENTITY ship "ship name">
+<!ENTITY sl "slang">
+<!ENTITY station "railway station">
+<!ENTITY surname "family or surname">
+<!ENTITY uk "word usually written using kana alone">
+<!ENTITY unclass "unclassified name">
+<!ENTITY vulg "vulgar expression or word">
+<!ENTITY work "work of art, literature, music, etc. name">
+<!ENTITY X "rude or X-rated term (not displayed in educational software)">
+<!ENTITY yoji "yojijukugo">
+<!-- <pos> (part-of-speech) entities -->
+<!ENTITY adj-f "noun or verb acting prenominally">
+<!ENTITY adj-i "adjective (keiyoushi)">
+<!ENTITY adj-ix "adjective (keiyoushi) - yoi/ii class">
+<!ENTITY adj-kari "'kari' adjective (archaic)">
+<!ENTITY adj-ku "'ku' adjective (archaic)">
+<!ENTITY adj-na "adjectival nouns or quasi-adjectives (keiyodoshi)">
+<!ENTITY adj-nari "archaic/formal form of na-adjective">
+<!ENTITY adj-no "nouns which may take the genitive case particle 'no'">
+<!ENTITY adj-pn "pre-noun adjectival (rentaishi)">
+<!ENTITY adj-shiku "'shiku' adjective (archaic)">
+<!ENTITY adj-t "'taru' adjective">
+<!ENTITY adv "adverb (fukushi)">
+<!ENTITY adv-to "adverb taking the 'to' particle">
+<!ENTITY aux "auxiliary">
+<!ENTITY aux-adj "auxiliary adjective">
+<!ENTITY aux-v "auxiliary verb">
+<!ENTITY conj "conjunction">
+<!ENTITY cop "copula">
+<!ENTITY ctr "counter">
+<!ENTITY exp "expressions (phrases, clauses, etc.)">
+<!ENTITY int "interjection (kandoushi)">
+<!ENTITY n "noun (common) (futsuumeishi)">
+<!ENTITY n-adv "adverbial noun (fukushitekimeishi)">
+<!ENTITY n-pr "proper noun">
+<!ENTITY n-pref "noun, used as a prefix">
+<!ENTITY n-suf "noun, used as a suffix">
+<!ENTITY n-t "noun (temporal) (jisoumeishi)">
+<!ENTITY num "numeric">
+<!ENTITY pn "pronoun">
+<!ENTITY pref "prefix">
+<!ENTITY prt "particle">
+<!ENTITY suf "suffix">
+<!ENTITY unc "unclassified">
+<!ENTITY v-unspec "verb unspecified">
+<!ENTITY v1 "Ichidan verb">
+<!ENTITY v1-s "Ichidan verb - kureru special class">
+<!ENTITY v2a-s "Nidan verb with 'u' ending (archaic)">
+<!ENTITY v2b-k "Nidan verb (upper class) with 'bu' ending (archaic)">
+<!ENTITY v2b-s "Nidan verb (lower class) with 'bu' ending (archaic)">
+<!ENTITY v2d-k "Nidan verb (upper class) with 'dzu' ending (archaic)">
+<!ENTITY v2d-s "Nidan verb (lower class) with 'dzu' ending (archaic)">
+<!ENTITY v2g-k "Nidan verb (upper class) with 'gu' ending (archaic)">
+<!ENTITY v2g-s "Nidan verb (lower class) with 'gu' ending (archaic)">
+<!ENTITY v2h-k "Nidan verb (upper class) with 'hu/fu' ending (archaic)">
+<!ENTITY v2h-s "Nidan verb (lower class) with 'hu/fu' ending (archaic)">
+<!ENTITY v2k-k "Nidan verb (upper class) with 'ku' ending (archaic)">
+<!ENTITY v2k-s "Nidan verb (lower class) with 'ku' ending (archaic)">
+<!ENTITY v2m-k "Nidan verb (upper class) with 'mu' ending (archaic)">
+<!ENTITY v2m-s "Nidan verb (lower class) with 'mu' ending (archaic)">
+<!ENTITY v2n-s "Nidan verb (lower class) with 'nu' ending (archaic)">
+<!ENTITY v2r-k "Nidan verb (upper class) with 'ru' ending (archaic)">
+<!ENTITY v2r-s "Nidan verb (lower class) with 'ru' ending (archaic)">
+<!ENTITY v2s-s "Nidan verb (lower class) with 'su' ending (archaic)">
+<!ENTITY v2t-k "Nidan verb (upper class) with 'tsu' ending (archaic)">
+<!ENTITY v2t-s "Nidan verb (lower class) with 'tsu' ending (archaic)">
+<!ENTITY v2w-s "Nidan verb (lower class) with 'u' ending and 'we' conjugation (archaic)">
+<!ENTITY v2y-k "Nidan verb (upper class) with 'yu' ending (archaic)">
+<!ENTITY v2y-s "Nidan verb (lower class) with 'yu' ending (archaic)">
+<!ENTITY v2z-s "Nidan verb (lower class) with 'zu' ending (archaic)">
+<!ENTITY v4b "Yodan verb with 'bu' ending (archaic)">
+<!ENTITY v4g "Yodan verb with 'gu' ending (archaic)">
+<!ENTITY v4h "Yodan verb with 'hu/fu' ending (archaic)">
+<!ENTITY v4k "Yodan verb with 'ku' ending (archaic)">
+<!ENTITY v4m "Yodan verb with 'mu' ending (archaic)">
+<!ENTITY v4n "Yodan verb with 'nu' ending (archaic)">
+<!ENTITY v4r "Yodan verb with 'ru' ending (archaic)">
+<!ENTITY v4s "Yodan verb with 'su' ending (archaic)">
+<!ENTITY v4t "Yodan verb with 'tsu' ending (archaic)">
+<!ENTITY v5aru "Godan verb - -aru special class">
+<!ENTITY v5b "Godan verb with 'bu' ending">
+<!ENTITY v5g "Godan verb with 'gu' ending">
+<!ENTITY v5k "Godan verb with 'ku' ending">
+<!ENTITY v5k-s "Godan verb - Iku/Yuku special class">
+<!ENTITY v5m "Godan verb with 'mu' ending">
+<!ENTITY v5n "Godan verb with 'nu' ending">
+<!ENTITY v5r "Godan verb with 'ru' ending">
+<!ENTITY v5r-i "Godan verb with 'ru' ending (irregular verb)">
+<!ENTITY v5s "Godan verb with 'su' ending">
+<!ENTITY v5t "Godan verb with 'tsu' ending">
+<!ENTITY v5u "Godan verb with 'u' ending">
+<!ENTITY v5u-s "Godan verb with 'u' ending (special class)">
+<!ENTITY v5uru "Godan verb - Uru old class verb (old form of Eru)">
+<!ENTITY vi "intransitive verb">
+<!ENTITY vk "Kuru verb - special class">
+<!ENTITY vn "irregular nu verb">
+<!ENTITY vr "irregular ru verb, plain form ends with -ri">
+<!ENTITY vs "noun or participle which takes the aux. verb suru">
+<!ENTITY vs-c "su verb - precursor to the modern suru">
+<!ENTITY vs-i "suru verb - included">
+<!ENTITY vs-s "suru verb - special class">
+<!ENTITY vt "transitive verb">
+<!ENTITY vz "Ichidan verb - zuru verb (alternative form of -jiru verbs)">
+<!-- <re_inf> (reading info) entities -->
+<!ENTITY gikun "gikun (meaning as reading) or jukujikun (special kanji reading)">
+<!ENTITY ik "word containing irregular kana usage">
+<!ENTITY ok "out-dated or obsolete kana usage">
+<!ENTITY rk "rarely used kana form">
+<!ENTITY sk "search-only kana form">
+]>
+<!-- JMdict created: 2026-11-17 -->
+<JMdict>
+<entry>
+<ent_seq>1037740</ent_seq>
+<k_ele>
+<keb>カツ丼</keb>
+</k_ele>
+<k_ele>
+<keb>かつ丼</keb>
+</k_ele>
+<r_ele>
+<reb>カツどん</reb>
+<re_restr>カツ丼</re_restr>
+</r_ele>
+<r_ele>
+<reb>かつどん</reb>
+<re_restr>かつ丼</re_restr>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<xref>カツ</xref>
+<field>&food;</field>
+<gloss>katsudon</gloss>
+<gloss g_type="expl">pork cutlet served on top of a bowl of rice</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1157170</ent_seq>
+<k_ele>
+<keb>為る</keb>
+<ke_inf>&rK;</ke_inf>
+</k_ele>
+<r_ele>
+<reb>する</reb>
+<re_pri>ichi1</re_pri>
+</r_ele>
+<sense>
+<pos>&vs-i;</pos>
+<misc>&uk;</misc>
+<gloss>to do</gloss>
+<gloss>to carry out</gloss>
+<gloss>to perform</gloss>
+</sense>
+<sense>
+<pos>&vs-i;</pos>
+<misc>&uk;</misc>
+<gloss>to cause to become</gloss>
+<gloss>to make (into)</gloss>
+<gloss>to turn (into)</gloss>
+</sense>
+<sense>
+<pos>&vs-i;</pos>
+<misc>&uk;</misc>
+<gloss>to serve as</gloss>
+<gloss>to act as</gloss>
+<gloss>to work as</gloss>
+</sense>
+<sense>
+<pos>&vs-i;</pos>
+<misc>&uk;</misc>
+<gloss>to wear (clothes, a facial expression, etc.)</gloss>
+</sense>
+<sense>
+<pos>&vs-i;</pos>
+<misc>&uk;</misc>
+<s_inf>as 〜にする,〜とする</s_inf>
+<gloss>to judge as being</gloss>
+<gloss>to view as being</gloss>
+<gloss>to think of as</gloss>
+<gloss>to treat as</gloss>
+<gloss>to use as</gloss>
+</sense>
+<sense>
+<pos>&vs-i;</pos>
+<misc>&uk;</misc>
+<s_inf>as 〜にする</s_inf>
+<gloss>to decide on</gloss>
+<gloss>to choose</gloss>
+</sense>
+<sense>
+<pos>&vs-i;</pos>
+<pos>&vi;</pos>
+<misc>&uk;</misc>
+<s_inf>as 〜がする</s_inf>
+<gloss>to be sensed (of a smell, noise, etc.)</gloss>
+</sense>
+<sense>
+<pos>&vs-i;</pos>
+<pos>&vi;</pos>
+<misc>&uk;</misc>
+<gloss>to be (in a state, condition, etc.)</gloss>
+</sense>
+<sense>
+<pos>&vs-i;</pos>
+<pos>&vi;</pos>
+<misc>&uk;</misc>
+<gloss>to be worth</gloss>
+<gloss>to cost</gloss>
+</sense>
+<sense>
+<pos>&vs-i;</pos>
+<pos>&vi;</pos>
+<misc>&uk;</misc>
+<gloss>to pass (of time)</gloss>
+<gloss>to elapse</gloss>
+</sense>
+<sense>
+<pos>&vs-i;</pos>
+<pos>&vt;</pos>
+<misc>&uk;</misc>
+<s_inf>as AをBにする</s_inf>
+<gloss>to place, or raise, person A to a post or status B</gloss>
+</sense>
+<sense>
+<pos>&vs-i;</pos>
+<pos>&vt;</pos>
+<misc>&uk;</misc>
+<s_inf>as AをBにする</s_inf>
+<gloss>to transform A to B</gloss>
+<gloss>to make A into B</gloss>
+<gloss>to exchange A for B</gloss>
+</sense>
+<sense>
+<pos>&vs-i;</pos>
+<pos>&vt;</pos>
+<misc>&uk;</misc>
+<s_inf>as AをBにする</s_inf>
+<gloss>to make use of A for B</gloss>
+<gloss>to view A as B</gloss>
+<gloss>to handle A as if it were B</gloss>
+</sense>
+<sense>
+<pos>&vs-i;</pos>
+<pos>&vt;</pos>
+<misc>&uk;</misc>
+<s_inf>as AをBにする</s_inf>
+<gloss>to feel A about B</gloss>
+</sense>
+<sense>
+<pos>&suf;</pos>
+<pos>&vs-i;</pos>
+<misc>&uk;</misc>
+<gloss>verbalizing suffix (applies to nouns noted in this dictionary with the part of speech "vs")</gloss>
+</sense>
+<sense>
+<pos>&aux-v;</pos>
+<pos>&vs-i;</pos>
+<xref>お願いします</xref>
+<xref>御・1</xref>
+<misc>&uk;</misc>
+<gloss>creates a humble verb (after a noun prefixed with "o" or "go")</gloss>
+</sense>
+<sense>
+<pos>&aux-v;</pos>
+<pos>&vs-i;</pos>
+<xref>とする・1</xref>
+<misc>&uk;</misc>
+<s_inf>as 〜うとする,〜ようとする</s_inf>
+<gloss>to be just about to</gloss>
+<gloss>to be just starting to</gloss>
+<gloss>to try to</gloss>
+<gloss>to attempt to</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1171900</ent_seq>
+<k_ele>
+<keb>雨</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf02</ke_pri>
+</k_ele>
+<r_ele>
+<reb>あめ</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf02</re_pri>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<gloss>rain</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<gloss>rainy day</gloss>
+<gloss>rainy weather</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<xref>花札</xref>
+<gloss>the November suit (in hanafuda)</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1172040</ent_seq>
+<k_ele>
+<keb>雨宿り</keb>
+<ke_pri>ichi1</ke_pri>
+</k_ele>
+<k_ele>
+<keb>雨やどり</keb>
+</k_ele>
+<r_ele>
+<reb>あまやどり</reb>
+<re_pri>ichi1</re_pri>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<pos>&vs;</pos>
+<pos>&vi;</pos>
+<gloss>taking shelter from rain</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1206900</ent_seq>
+<k_ele>
+<keb>学生</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf01</ke_pri>
+</k_ele>
+<k_ele>
+<keb>學生</keb>
+<ke_inf>&sK;</ke_inf>
+</k_ele>
+<r_ele>
+<reb>がくせい</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf01</re_pri>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<gloss>student (esp. a university student)</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1207610</ent_seq>
+<k_ele>
+<keb>掛ける</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf20</ke_pri>
+</k_ele>
+<k_ele>
+<keb>懸ける</keb>
+</k_ele>
+<r_ele>
+<reb>かける</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf20</re_pri>
+</r_ele>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<xref>壁にかける</xref>
+<misc>&uk;</misc>
+<gloss>to hang up (e.g. a coat, a picture on the wall)</gloss>
+<gloss>to let hang</gloss>
+<gloss>to suspend (from)</gloss>
+<gloss>to hoist (e.g. sail)</gloss>
+<gloss>to raise (e.g. flag)</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<misc>&uk;</misc>
+<gloss>to put on (e.g. a blanket)</gloss>
+<gloss>to put on top of</gloss>
+<gloss>to cover</gloss>
+<gloss>to lay</gloss>
+<gloss>to spread</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<xref>眼鏡を掛ける</xref>
+<misc>&uk;</misc>
+<gloss>to put on (glasses, etc.)</gloss>
+<gloss>to wear (a necklace, etc.)</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<xref>電話を掛ける</xref>
+<misc>&uk;</misc>
+<gloss>to make (a call)</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<xref>時間を掛ける</xref>
+<misc>&uk;</misc>
+<gloss>to spend (time, money)</gloss>
+<gloss>to expend</gloss>
+<gloss>to use</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<xref>塩をかける</xref>
+<misc>&uk;</misc>
+<gloss>to pour (liquid) onto</gloss>
+<gloss>to sprinkle (powder or spices) onto</gloss>
+<gloss>to splash</gloss>
+<gloss>to throw (e.g. water) onto</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<misc>&uk;</misc>
+<gloss>to turn on (an engine, radio, etc.)</gloss>
+<gloss>to set (a dial, alarm clock, etc.)</gloss>
+<gloss>to put on (a DVD, song, etc.)</gloss>
+<gloss>to use (a device, implement, etc.)</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<xref>迷惑を掛ける</xref>
+<misc>&uk;</misc>
+<gloss>to cause (someone inconvenience, trouble, etc.)</gloss>
+<gloss>to burden (someone)</gloss>
+<gloss>to impose</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<field>&math;</field>
+<misc>&uk;</misc>
+<gloss>to multiply (arithmetic operation)</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<xref>鍵を掛ける</xref>
+<misc>&uk;</misc>
+<gloss>to secure (e.g. lock)</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<xref>腰を掛ける</xref>
+<misc>&uk;</misc>
+<gloss>to take a seat</gloss>
+<gloss>to sit</gloss>
+<gloss>to rest (something on something else)</gloss>
+<gloss>to support (something on something else)</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<misc>&uk;</misc>
+<s_inf>also as 繋ける</s_inf>
+<gloss>to bind</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<xref>賭ける・かける</xref>
+<misc>&uk;</misc>
+<gloss>to wager</gloss>
+<gloss>to bet</gloss>
+<gloss>to risk</gloss>
+<gloss>to stake</gloss>
+<gloss>to gamble</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<misc>&uk;</misc>
+<gloss>to put an effect (spell, anaesthetic, etc.) on</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<misc>&uk;</misc>
+<gloss>to hold (a play, festival, etc.)</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<misc>&uk;</misc>
+<gloss>to hold an emotion for (pity, hope, etc.)</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<xref>裁判に掛ける</xref>
+<misc>&uk;</misc>
+<gloss>to argue (in court)</gloss>
+<gloss>to deliberate (in a meeting)</gloss>
+<gloss>to present (e.g. idea to a conference, etc.)</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<misc>&uk;</misc>
+<gloss>to increase further</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<misc>&uk;</misc>
+<gloss>to catch (in a trap, etc.)</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<misc>&uk;</misc>
+<gloss>to set atop</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<misc>&uk;</misc>
+<gloss>to erect (a makeshift building)</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<xref>保険を掛ける・1</xref>
+<misc>&uk;</misc>
+<gloss>to apply (insurance)</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<xref>掛詞</xref>
+<misc>&uk;</misc>
+<gloss>to pun (on a word)</gloss>
+<gloss>to use (a word) as a pivot word</gloss>
+<gloss>to play on words</gloss>
+</sense>
+<sense>
+<pos>&suf;</pos>
+<pos>&v1;</pos>
+<xref>話し掛ける・2</xref>
+<xref>治りかける</xref>
+<misc>&uk;</misc>
+<s_inf>after -masu stem of verb</s_inf>
+<gloss>to be partway doing ...</gloss>
+<gloss>to begin (but not complete) ...</gloss>
+<gloss>to be about to ...</gloss>
+</sense>
+<sense>
+<pos>&suf;</pos>
+<pos>&v1;</pos>
+<xref>話し掛ける・1</xref>
+<misc>&uk;</misc>
+<s_inf>after -masu stem of verb; indicates an action is being directed to someone</s_inf>
+<gloss>to address (someone)</gloss>
+<gloss>to direct (something, to someone)</gloss>
+<gloss>to do (something, to someone)</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1220210</ent_seq>
+<k_ele>
+<keb>机</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf07</ke_pri>
+</k_ele>
+<k_ele>
+<keb>案</keb>
+<ke_inf>&oK;</ke_inf>
+</k_ele>
+<r_ele>
+<reb>つくえ</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf07</re_pri>
+</r_ele>
+<r_ele>
+<reb>つき</reb>
+<re_restr>机</re_restr>
+<re_inf>&ok;</re_inf>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<gloss>desk</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1220560</ent_seq>
+<k_ele>
+<keb>期限</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf03</ke_pri>
+</k_ele>
+<r_ele>
+<reb>きげん</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf03</re_pri>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<gloss>term</gloss>
+<gloss>period</gloss>
+<gloss>time frame</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<xref>期限切れ</xref>
+<gloss>time limit</gloss>
+<gloss>deadline</gloss>
+<gloss>cutoff (date)</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1221740</ent_seq>
+<k_ele>
+<keb>気に入る</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news2</ke_pri>
+<ke_pri>nf42</ke_pri>
+</k_ele>
+<k_ele>
+<keb>気にいる</keb>
+</k_ele>
+<r_ele>
+<reb>きにいる</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news2</re_pri>
+<re_pri>nf42</re_pri>
+</r_ele>
+<sense>
+<pos>&exp;</pos>
+<pos>&v5r;</pos>
+<gloss>to like</gloss>
+<gloss>to be pleased with</gloss>
+<gloss>to be delighted with</gloss>
+<gloss>to take a liking to</gloss>
+<gloss>to suit one's fancy</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1244720</ent_seq>
+<k_ele>
+<keb>駆ける</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf23</ke_pri>
+</k_ele>
+<k_ele>
+<keb>駈ける</keb>
+</k_ele>
+<r_ele>
+<reb>かける</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf23</re_pri>
+</r_ele>
+<sense>
+<pos>&v1;</pos>
+<pos>&vi;</pos>
+<gloss>to run</gloss>
+<gloss>to dash</gloss>
+<gloss>to race</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vi;</pos>
+<gloss>to gallop (on horseback)</gloss>
+<gloss>to canter</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vi;</pos>
+<misc>&arch;</misc>
+<gloss>to advance (against one's enemy)</gloss>
+<gloss>to charge (on horseback)</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1253920</ent_seq>
+<k_ele>
+<keb>欠ける</keb>
+<ke_pri>ichi1</ke_pri>
+</k_ele>
+<k_ele>
+<keb>缺ける</keb>
+</k_ele>
+<k_ele>
+<keb>闕ける</keb>
+</k_ele>
+<r_ele>
+<reb>かける</reb>
+<re_pri>ichi1</re_pri>
+</r_ele>
+<sense>
+<pos>&v1;</pos>
+<pos>&vi;</pos>
+<gloss>to chip</gloss>
+<gloss>to be chipped</gloss>
+<gloss>to break (off)</gloss>
+<gloss>to be damaged</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vi;</pos>
+<gloss>to be missing (from a set, team, etc.)</gloss>
+<gloss>to be absent</gloss>
+<gloss>to become lost</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vi;</pos>
+<gloss>to be lacking (in)</gloss>
+<gloss>to be short (of)</gloss>
+<gloss>to be deficient</gloss>
+<gloss>to be wanting (in)</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vi;</pos>
+<ant>満ちる・みちる・2</ant>
+<s_inf>also 虧ける</s_inf>
+<gloss>to wane (of the moon)</gloss>
+<gloss>to go into eclipse</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1255840</ent_seq>
+<k_ele>
+<keb>月末</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf15</ke_pri>
+</k_ele>
+<r_ele>
+<reb>げつまつ</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf15</re_pri>
+</r_ele>
+<r_ele>
+<reb>つきずえ</reb>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<pos>&adv;</pos>
+<gloss>end of the month</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1259290</ent_seq>
+<k_ele>
+<keb>見る</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf14</ke_pri>
+</k_ele>
+<k_ele>
+<keb>観る</keb>
+<ke_pri>spec1</ke_pri>
+</k_ele>
+<k_ele>
+<keb>視る</keb>
+</k_ele>
+<k_ele>
+<keb>覧る</keb>
+<ke_inf>&sK;</ke_inf>
+</k_ele>
+<r_ele>
+<reb>みる</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf14</re_pri>
+<re_pri>spec1</re_pri>
+</r_ele>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<gloss>to see</gloss>
+<gloss>to look</gloss>
+<gloss>to watch</gloss>
+<gloss>to view</gloss>
+<gloss>to observe</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<gloss>to examine</gloss>
+<gloss>to look over</gloss>
+<gloss>to assess</gloss>
+<gloss>to check</gloss>
+<gloss>to judge</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<xref>看る</xref>
+<gloss>to look after</gloss>
+<gloss>to attend to</gloss>
+<gloss>to take care of</gloss>
+<gloss>to keep an eye on</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<gloss>to experience</gloss>
+<gloss>to meet with (misfortune, success, etc.)</gloss>
+</sense>
+<sense>
+<pos>&aux-v;</pos>
+<pos>&v1;</pos>
+<misc>&uk;</misc>
+<s_inf>after the -te form of a verb</s_inf>
+<gloss>to try ...</gloss>
+<gloss>to have a go at ...</gloss>
+<gloss>to give ... a try</gloss>
+</sense>
+<sense>
+<pos>&aux-v;</pos>
+<pos>&v1;</pos>
+<misc>&uk;</misc>
+<s_inf>as 〜てみると, 〜てみたら, 〜てみれば, etc.</s_inf>
+<gloss>to see (that) ...</gloss>
+<gloss>to find (that) ...</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1260490</ent_seq>
+<k_ele>
+<keb>鍵</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf18</ke_pri>
+</k_ele>
+<k_ele>
+<keb>鑰</keb>
+<ke_inf>&rK;</ke_inf>
+</k_ele>
+<r_ele>
+<reb>かぎ</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf18</re_pri>
+</r_ele>
+<r_ele>
+<reb>カギ</reb>
+<re_nokanji/>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<gloss>key</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<xref>錠・1</xref>
+<gloss>lock</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<gloss>key (to a problem, success, etc.)</gloss>
+<gloss>clue</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1260670</ent_seq>
+<k_ele>
+<keb>元</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf05</ke_pri>
+</k_ele>
+<k_ele>
+<keb>本</keb>
+<ke_pri>ichi1</ke_pri>
+</k_ele>
+<k_ele>
+<keb>素</keb>
+</k_ele>
+<k_ele>
+<keb>基</keb>
+</k_ele>
+<k_ele>
+<keb>因</keb>
+<ke_inf>&sK;</ke_inf>
+</k_ele>
+<r_ele>
+<reb>もと</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf05</re_pri>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<s_inf>esp. 元</s_inf>
+<gloss>origin</gloss>
+<gloss>source</gloss>
+<gloss>beginning</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<s_inf>oft. 基</s_inf>
+<gloss>basis</gloss>
+<gloss>base</gloss>
+<gloss>foundation</gloss>
+<gloss>root</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<s_inf>also written as 因, 原</s_inf>
+<gloss>cause</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<s_inf>esp. 素</s_inf>
+<gloss>(raw) material</gloss>
+<gloss>ingredient</gloss>
+<gloss>base</gloss>
+<gloss>mix (e.g. for a cake)</gloss>
+<gloss>(soup) stock</gloss>
+</sense>
+<sense>
+<stagk>元</stagk>
+<pos>&n;</pos>
+<gloss>(one's) side</gloss>
+</sense>
+<sense>
+<stagk>元</stagk>
+<pos>&n;</pos>
+<gloss>capital</gloss>
+<gloss>principal</gloss>
+<gloss>cost price</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<gloss>root (of a plant)</gloss>
+<gloss>(tree) trunk</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<gloss>part (of a brush, chopsticks, etc.) one holds (with the hand)</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<xref>和歌</xref>
+<gloss>first three lines of a waka</gloss>
+</sense>
+<sense>
+<stagk>本</stagk>
+<pos>&ctr;</pos>
+<gloss>counter for plants or trees</gloss>
+</sense>
+<sense>
+<stagk>本</stagk>
+<pos>&ctr;</pos>
+<gloss>counter for falcons (in falconry)</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1277450</ent_seq>
+<k_ele>
+<keb>好き</keb>
+<ke_pri>ichi1</ke_pri>
+</k_ele>
+<r_ele>
+<reb>すき</reb>
+<re_pri>ichi1</re_pri>
+</r_ele>
+<sense>
+<pos>&adj-na;</pos>
+<pos>&n;</pos>
+<ant>嫌い・1</ant>
+<gloss>liking</gloss>
+<gloss>being fond of</gloss>
+<gloss>to one's liking</gloss>
+<gloss>to one's taste</gloss>
+<gloss>preferred</gloss>
+<gloss>favourite</gloss>
+</sense>
+<sense>
+<pos>&adj-na;</pos>
+<pos>&n;</pos>
+<gloss>liking (romantically)</gloss>
+<gloss>being in love with</gloss>
+<gloss>beloved</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<pos>&adj-na;</pos>
+<gloss>faddism</gloss>
+<gloss>eccentricity</gloss>
+</sense>
+<sense>
+<pos>&adj-na;</pos>
+<pos>&n;</pos>
+<gloss>as one likes</gloss>
+<gloss>as it suits one</gloss>
+</sense>
+<sense>
+<pos>&adj-na;</pos>
+<pos>&n;</pos>
+<gloss>lecherous</gloss>
+<gloss>lustful</gloss>
+<gloss>salacious</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1298670</ent_seq>
+<k_ele>
+<keb>刷る</keb>
+<ke_pri>ichi1</ke_pri>
+</k_ele>
+<k_ele>
+<keb>摺る</keb>
+</k_ele>
+<r_ele>
+<reb>する</reb>
+<re_pri>ichi1</re_pri>
+</r_ele>
+<sense>
+<pos>&v5r;</pos>
+<pos>&vt;</pos>
+<gloss>to print</gloss>
+</sense>
+<sense>
+<pos>&v5r;</pos>
+<pos>&vt;</pos>
+<gloss>to color or pattern fabric using a wooden mold</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1305380</ent_seq>
+<k_ele>
+<keb>仕舞う</keb>
+<ke_inf>&rK;</ke_inf>
+</k_ele>
+<k_ele>
+<keb>終う</keb>
+<ke_inf>&rK;</ke_inf>
+</k_ele>
+<k_ele>
+<keb>了う</keb>
+<ke_inf>&rK;</ke_inf>
+</k_ele>
+<k_ele>
+<keb>蔵う</keb>
+<ke_inf>&rK;</ke_inf>
+</k_ele>
+<r_ele>
+<reb>しまう</reb>
+<re_pri>ichi1</re_pri>
+</r_ele>
+<sense>
+<pos>&v5u;</pos>
+<pos>&vt;</pos>
+<misc>&uk;</misc>
+<gloss>to finish</gloss>
+<gloss>to stop</gloss>
+<gloss>to end</gloss>
+<gloss>to put an end to</gloss>
+<gloss>to bring to a close</gloss>
+</sense>
+<sense>
+<pos>&v5u;</pos>
+<pos>&vt;</pos>
+<misc>&uk;</misc>
+<gloss>to close (a business, etc.)</gloss>
+<gloss>to close down</gloss>
+<gloss>to shut down</gloss>
+<gloss>to shut up</gloss>
+</sense>
+<sense>
+<pos>&v5u;</pos>
+<pos>&vt;</pos>
+<misc>&uk;</misc>
+<gloss>to put away</gloss>
+<gloss>to put back</gloss>
+<gloss>to keep</gloss>
+<gloss>to store</gloss>
+</sense>
+<sense>
+<pos>&aux-v;</pos>
+<pos>&v5u;</pos>
+<misc>&uk;</misc>
+<s_inf>after the -te form of a verb</s_inf>
+<gloss>to do completely</gloss>
+<gloss>to finish</gloss>
+</sense>
+<sense>
+<pos>&aux-v;</pos>
+<pos>&v5u;</pos>
+<misc>&uk;</misc>
+<s_inf>after the -te form of a verb</s_inf>
+<gloss>to do accidentally</gloss>
+<gloss>to do without meaning to</gloss>
+<gloss>to happen to do</gloss>
+<gloss>to end up ...</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1322180</ent_seq>
+<k_ele>
+<keb>射る</keb>
+<ke_pri>news2</ke_pri>
+<ke_pri>nf26</ke_pri>
+<ke_pri>spec2</ke_pri>
+</k_ele>
+<r_ele>
+<reb>いる</reb>
+<re_pri>news2</re_pri>
+<re_pri>nf26</re_pri>
+<re_pri>spec2</re_pri>
+</r_ele>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<gloss>to shoot (arrow, bolt, dart)</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1323940</ent_seq>
+<k_ele>
+<keb>借金</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf05</ke_pri>
+</k_ele>
+<r_ele>
+<reb>しゃっきん</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf05</re_pri>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<pos>&vs;</pos>
+<pos>&vt;</pos>
+<gloss>debt</gloss>
+<gloss>loan</gloss>
+<gloss>liabilities</gloss>
+<gloss>borrowing money</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<field>&baseb;</field>
+<misc>&col;</misc>
+<gloss>number of games under the .500 mark</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1343460</ent_seq>
+<k_ele>
+<keb>暑い</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news2</ke_pri>
+<ke_pri>nf34</ke_pri>
+</k_ele>
+<r_ele>
+<reb>あつい</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news2</re_pri>
+<re_pri>nf34</re_pri>
+</r_ele>
+<r_ele>
+<reb>あづい</reb>
+<re_inf>&sk;</re_inf>
+</r_ele>
+<r_ele>
+<reb>あぢぃ</reb>
+<re_inf>&sk;</re_inf>
+</r_ele>
+<r_ele>
+<reb>あぢー</reb>
+<re_inf>&sk;</re_inf>
+</r_ele>
+<r_ele>
+<reb>あぢい</reb>
+<re_inf>&sk;</re_inf>
+</r_ele>
+<r_ele>
+<reb>あっつい</reb>
+<re_inf>&sk;</re_inf>
+</r_ele>
+<r_ele>
+<reb>アツイ</reb>
+<re_inf>&sk;</re_inf>
+</r_ele>
+<r_ele>
+<reb>アツい</reb>
+<re_inf>&sk;</re_inf>
+</r_ele>
+<sense>
+<pos>&adj-i;</pos>
+<ant>寒い・1</ant>
+<gloss>hot</gloss>
+<gloss>warm</gloss>
+<gloss>sultry</gloss>
+<gloss>heated</gloss>
+</sense>
+<sense>
+<pos>&adj-i;</pos>
+<gloss>passionate</gloss>
+<gloss>impassioned</gloss>
+<gloss>burning (desire, etc.)</gloss>
+</sense>
+<sense>
+<pos>&adj-i;</pos>
+<gloss>on everybody's mind</gloss>
+<gloss>on the radar</gloss>
+<gloss>du jour</gloss>
+<gloss>interested (gaze, etc.)</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1352130</ent_seq>
+<k_ele>
+<keb>上</keb>
+<ke_pri>ichi1</ke_pri>
+</k_ele>
+<r_ele>
+<reb>うえ</reb>
+<re_pri>ichi1</re_pri>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<pos>&adj-no;</pos>
+<gloss>above</gloss>
+<gloss>over</gloss>
+<gloss>up</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<gloss>top</gloss>
+<gloss>summit</gloss>
+<gloss>upper part</gloss>
+<gloss>head (e.g. of a staircase)</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<gloss>surface</gloss>
+<gloss>on (top of)</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<pos>&adj-no;</pos>
+<gloss>the above (in a piece of writing)</gloss>
+<gloss>earlier part</gloss>
+</sense>
+<sense>
+<pos>&adj-no;</pos>
+<pos>&n;</pos>
+<gloss>superior</gloss>
+<gloss>better</gloss>
+<gloss>higher (position, rank, etc.)</gloss>
+<gloss>upper (class)</gloss>
+</sense>
+<sense>
+<pos>&adj-no;</pos>
+<pos>&n;</pos>
+<gloss>elder</gloss>
+<gloss>older</gloss>
+<gloss>senior</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<s_inf>as ...上で(は) or ...上の</s_inf>
+<gloss>with respect to ...</gloss>
+<gloss>in terms of</gloss>
+<gloss>as far as ... is concerned</gloss>
+<gloss>when (e.g. drunk)</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<s_inf>as ...上(に)</s_inf>
+<gloss>besides ...</gloss>
+<gloss>in addition to ...</gloss>
+<gloss>on top of ...</gloss>
+<gloss>as well as ...</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<s_inf>as ...上(で)</s_inf>
+<gloss>after ...</gloss>
+<gloss>upon ...</gloss>
+<gloss>on ...</gloss>
+<gloss>with (e.g. full awareness)</gloss>
+<gloss>as a result of ...</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<s_inf>as ...上は</s_inf>
+<gloss>since ...</gloss>
+<gloss>now that ...</gloss>
+<gloss>because ...</gloss>
+</sense>
+<sense>
+<pos>&suf;</pos>
+<xref>父上</xref>
+<misc>&hon;</misc>
+<s_inf>after a person of higher status</s_inf>
+<gloss>honorable</gloss>
+<gloss>venerable</gloss>
+<gloss>dear</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<misc>&arch;</misc>
+<gloss>emperor</gloss>
+<gloss>sovereign</gloss>
+<gloss>shogun</gloss>
+<gloss>daimyo</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1352140</ent_seq>
+<k_ele>
+<keb>上</keb>
+</k_ele>
+<r_ele>
+<reb>うわ</reb>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<pos>&pref;</pos>
+<gloss>upper</gloss>
+<gloss>upward</gloss>
+<gloss>outer</gloss>
+<gloss>surface</gloss>
+<gloss>top</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1352150</ent_seq>
+<k_ele>
+<keb>上</keb>
+<ke_pri>ichi1</ke_pri>
+</k_ele>
+<r_ele>
+<reb>かみ</reb>
+<re_pri>ichi1</re_pri>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<ant>下・しも・1</ant>
+<gloss>upper reaches (of a river)</gloss>
+<gloss>upper stream</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<gloss>top</gloss>
+<gloss>upper part</gloss>
+<gloss>upper half (of the body)</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<gloss>long ago</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<gloss>beginning</gloss>
+<gloss>first</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<xref>御上・1</xref>
+<misc>&hon;</misc>
+<gloss>person of high rank (e.g. the emperor)</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<gloss>government</gloss>
+<gloss>imperial court</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<xref>上方・かみがた</xref>
+<gloss>imperial capital (i.e. Kyoto)</gloss>
+<gloss>capital region (i.e. Kansai)</gloss>
+<gloss>region (or direction of) the imperial palace</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<gloss>head (of a table)</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<misc>&hon;</misc>
+<gloss>wife</gloss>
+<gloss>mistress (of a restaurant)</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1352170</ent_seq>
+<k_ele>
+<keb>上</keb>
+<ke_pri>ichi1</ke_pri>
+</k_ele>
+<r_ele>
+<reb>じょう</reb>
+<re_pri>ichi1</re_pri>
+</r_ele>
+<sense>
+<pos>&suf;</pos>
+<gloss>from the standpoint of</gloss>
+<gloss>from the viewpoint of</gloss>
+<gloss>with respect to</gloss>
+<gloss>in terms of</gloss>
+<gloss>as a matter of</gloss>
+<gloss>in view of</gloss>
+<gloss>so far as ... is concerned</gloss>
+</sense>
+<sense>
+<pos>&suf;</pos>
+<gloss>on</gloss>
+<gloss>above</gloss>
+<gloss>on top of</gloss>
+<gloss>aboard (a ship or vehicle)</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<pos>&adj-no;</pos>
+<gloss>the best</gloss>
+<gloss>top</gloss>
+<gloss>first class</gloss>
+<gloss>first grade</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<xref>下・2</xref>
+<xref>中・6</xref>
+<gloss>first volume (of a two or three-volume set)</gloss>
+<gloss>first book</gloss>
+</sense>
+<sense>
+<pos>&exp;</pos>
+<s_inf>written on a gift's wrapping paper</s_inf>
+<gloss>with my compliments</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1358280</ent_seq>
+<k_ele>
+<keb>食べる</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news2</ke_pri>
+<ke_pri>nf25</ke_pri>
+</k_ele>
+<k_ele>
+<keb>喰べる</keb>
+<ke_inf>&sK;</ke_inf>
+</k_ele>
+<r_ele>
+<reb>たべる</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news2</re_pri>
+<re_pri>nf25</re_pri>
+</r_ele>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<gloss>to eat</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<gloss>to live on (e.g. a salary)</gloss>
+<gloss>to live off</gloss>
+<gloss>to subsist on</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1358300</ent_seq>
+<k_ele>
+<keb>食べ過ぎる</keb>
+<ke_pri>news2</ke_pri>
+<ke_pri>nf25</ke_pri>
+<ke_pri>spec2</ke_pri>
+</k_ele>
+<k_ele>
+<keb>食べすぎる</keb>
+</k_ele>
+<r_ele>
+<reb>たべすぎる</reb>
+<re_pri>news2</re_pri>
+<re_pri>nf25</re_pri>
+<re_pri>spec2</re_pri>
+</r_ele>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<gloss>to overeat</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1387870</ent_seq>
+<k_ele>
+<keb>先週</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf05</ke_pri>
+</k_ele>
+<r_ele>
+<reb>せんしゅう</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf05</re_pri>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<pos>&adv;</pos>
+<gloss>last week</gloss>
+<gloss>the week before</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1391500</ent_seq>
+<k_ele>
+<keb>炒る</keb>
+<ke_pri>spec2</ke_pri>
+</k_ele>
+<k_ele>
+<keb>煎る</keb>
+<ke_pri>news2</ke_pri>
+<ke_pri>nf46</ke_pri>
+</k_ele>
+<k_ele>
+<keb>熬る</keb>
+<ke_inf>&rK;</ke_inf>
+</k_ele>
+<r_ele>
+<reb>いる</reb>
+<re_pri>news2</re_pri>
+<re_pri>nf46</re_pri>
+<re_pri>spec2</re_pri>
+</r_ele>
+<sense>
+<pos>&v5r;</pos>
+<pos>&vt;</pos>
+<gloss>to roast</gloss>
+<gloss>to parch</gloss>
+<gloss>to toast</gloss>
+<gloss>to boil down</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1399120</ent_seq>
+<k_ele>
+<keb>倉庫</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf07</ke_pri>
+</k_ele>
+<r_ele>
+<reb>そうこ</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf07</re_pri>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<gloss>storehouse</gloss>
+<gloss>warehouse</gloss>
+<gloss>godown</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1404740</ent_seq>
+<k_ele>
+<keb>足りる</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news2</ke_pri>
+<ke_pri>nf41</ke_pri>
+</k_ele>
+<r_ele>
+<reb>たりる</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news2</re_pri>
+<re_pri>nf41</re_pri>
+</r_ele>
+<sense>
+<pos>&v1;</pos>
+<pos>&vi;</pos>
+<gloss>to be sufficient</gloss>
+<gloss>to be enough</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vi;</pos>
+<xref>取るに足りない</xref>
+<s_inf>in the form に足りる after a verb</s_inf>
+<gloss>to be worth doing</gloss>
+<gloss>to be worthy of</gloss>
+<gloss>to deserve</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vi;</pos>
+<gloss>to do (the job)</gloss>
+<gloss>to serve</gloss>
+<gloss>to answer</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1413240</ent_seq>
+<k_ele>
+<keb>大学</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf01</ke_pri>
+</k_ele>
+<k_ele>
+<keb>大學</keb>
+<ke_inf>&oK;</ke_inf>
+</k_ele>
+<r_ele>
+<reb>だいがく</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf01</re_pri>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<gloss>university</gloss>
+<gloss>college</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<xref>大学寮</xref>
+<misc>&hist;</misc>
+<misc>&abbr;</misc>
+<gloss>former imperial university of Japan (established under the ritsuryō system for the training of government administrators)</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<xref>四書</xref>
+<gloss>the Great Learning (one of the Four Books)</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1420470</ent_seq>
+<k_ele>
+<keb>知る</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf02</ke_pri>
+</k_ele>
+<k_ele>
+<keb>識る</keb>
+</k_ele>
+<r_ele>
+<reb>しる</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf02</re_pri>
+</r_ele>
+<sense>
+<pos>&v5r;</pos>
+<pos>&vt;</pos>
+<gloss>to know</gloss>
+<gloss>to be aware (of)</gloss>
+<gloss>to be conscious (of)</gloss>
+<gloss>to learn (of)</gloss>
+<gloss>to find out</gloss>
+<gloss>to discover</gloss>
+</sense>
+<sense>
+<pos>&v5r;</pos>
+<pos>&vt;</pos>
+<gloss>to sense</gloss>
+<gloss>to feel</gloss>
+<gloss>to notice</gloss>
+<gloss>to realize</gloss>
+</sense>
+<sense>
+<pos>&v5r;</pos>
+<pos>&vt;</pos>
+<gloss>to understand</gloss>
+<gloss>to comprehend</gloss>
+<gloss>to grasp</gloss>
+<gloss>to appreciate</gloss>
+</sense>
+<sense>
+<pos>&v5r;</pos>
+<pos>&vt;</pos>
+<gloss>to remember</gloss>
+<gloss>to be familiar with</gloss>
+<gloss>to be acquainted with</gloss>
+</sense>
+<sense>
+<pos>&v5r;</pos>
+<pos>&vt;</pos>
+<gloss>to experience</gloss>
+<gloss>to go through</gloss>
+<gloss>to know (e.g. hardship)</gloss>
+</sense>
+<sense>
+<pos>&v5r;</pos>
+<pos>&vt;</pos>
+<gloss>to get acquainted with (a person)</gloss>
+<gloss>to get to know</gloss>
+</sense>
+<sense>
+<pos>&v5r;</pos>
+<pos>&vt;</pos>
+<s_inf>usu. with neg. sentence</s_inf>
+<gloss>to have to do with</gloss>
+<gloss>to be concerned with</gloss>
+<gloss>to be one's concern</gloss>
+<gloss>to be one's responsibility</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1421850</ent_seq>
+<k_ele>
+<keb>置く</keb>
+<ke_pri>ichi1</ke_pri>
+</k_ele>
+<r_ele>
+<reb>おく</reb>
+<re_pri>ichi1</re_pri>
+</r_ele>
+<sense>
+<pos>&v5k;</pos>
+<pos>&vt;</pos>
+<gloss>to put</gloss>
+<gloss>to place</gloss>
+</sense>
+<sense>
+<pos>&v5k;</pos>
+<pos>&vt;</pos>
+<gloss>to leave (behind)</gloss>
+</sense>
+<sense>
+<pos>&v5k;</pos>
+<pos>&vt;</pos>
+<gloss>to establish (an organization, a facility, a position, etc.)</gloss>
+<gloss>to set up</gloss>
+</sense>
+<sense>
+<pos>&v5k;</pos>
+<pos>&vt;</pos>
+<gloss>to appoint (someone to a certain position)</gloss>
+<gloss>to hire</gloss>
+<gloss>to employ</gloss>
+</sense>
+<sense>
+<pos>&v5k;</pos>
+<pos>&vt;</pos>
+<gloss>to place (one's trust, one's faith, etc.)</gloss>
+<gloss>to bear (in mind, etc.)</gloss>
+</sense>
+<sense>
+<pos>&v5k;</pos>
+<pos>&vt;</pos>
+<gloss>to put down a tool (e.g. a pen) hence stopping what one is doing with that tool</gloss>
+</sense>
+<sense>
+<pos>&v5k;</pos>
+<pos>&vt;</pos>
+<gloss>to take in (boarders, etc.)</gloss>
+<gloss>to provide lodging in one's house</gloss>
+</sense>
+<sense>
+<pos>&v5k;</pos>
+<pos>&vt;</pos>
+<gloss>to separate spatially or temporally</gloss>
+</sense>
+<sense>
+<pos>&v5k;</pos>
+<pos>&aux-v;</pos>
+<misc>&uk;</misc>
+<s_inf>after the -te form of a verb</s_inf>
+<gloss>to do something in advance</gloss>
+</sense>
+<sense>
+<pos>&v5k;</pos>
+<pos>&aux-v;</pos>
+<misc>&uk;</misc>
+<s_inf>after the -te form of a verb</s_inf>
+<gloss>to leave something in a certain state</gloss>
+<gloss>to keep something in a certain state</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1427560</ent_seq>
+<k_ele>
+<keb>帳簿</keb>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf13</ke_pri>
+</k_ele>
+<r_ele>
+<reb>ちょうぼ</reb>
+<re_pri>news1</re_pri>
+<re_pri>nf13</re_pri>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<gloss>account book</gloss>
+<gloss>register</gloss>
+<gloss>ledger</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1447690</ent_seq>
+<k_ele>
+<keb>東京</keb>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf01</ke_pri>
+</k_ele>
+<k_ele>
+<keb>東亰</keb>
+<ke_inf>&rK;</ke_inf>
+</k_ele>
+<r_ele>
+<reb>とうきょう</reb>
+<re_pri>news1</re_pri>
+<re_pri>nf01</re_pri>
+</r_ele>
+<r_ele>
+<reb>とうけい</reb>
+<re_inf>&ok;</re_inf>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<gloss>Tokyo</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1456360</ent_seq>
+<k_ele>
+<keb>読む</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf12</ke_pri>
+</k_ele>
+<k_ele>
+<keb>讀む</keb>
+<ke_inf>&sK;</ke_inf>
+</k_ele>
+<k_ele>
+<keb>訓む</keb>
+<ke_inf>&sK;</ke_inf>
+</k_ele>
+<r_ele>
+<reb>よむ</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf12</re_pri>
+</r_ele>
+<sense>
+<pos>&v5m;</pos>
+<pos>&vt;</pos>
+<gloss>to read</gloss>
+</sense>
+<sense>
+<pos>&v5m;</pos>
+<pos>&vt;</pos>
+<gloss>to recite (e.g. a sutra)</gloss>
+<gloss>to chant</gloss>
+</sense>
+<sense>
+<pos>&v5m;</pos>
+<pos>&vt;</pos>
+<gloss>to predict</gloss>
+<gloss>to guess</gloss>
+<gloss>to forecast</gloss>
+<gloss>to read (someone's thoughts)</gloss>
+<gloss>to see (e.g. into someone's heart)</gloss>
+<gloss>to divine</gloss>
+</sense>
+<sense>
+<pos>&v5m;</pos>
+<pos>&vt;</pos>
+<gloss>to pronounce</gloss>
+<gloss>to read (e.g. a kanji)</gloss>
+</sense>
+<sense>
+<pos>&v5m;</pos>
+<pos>&vt;</pos>
+<gloss>to decipher</gloss>
+<gloss>to read (a meter, graph, music, etc.)</gloss>
+<gloss>to tell (the time)</gloss>
+</sense>
+<sense>
+<pos>&v5m;</pos>
+<pos>&vt;</pos>
+<xref>サバを読む</xref>
+<s_inf>now mostly used in idioms</s_inf>
+<gloss>to count</gloss>
+<gloss>to estimate</gloss>
+</sense>
+<sense>
+<pos>&v5m;</pos>
+<pos>&vt;</pos>
+<s_inf>also written as 訓む</s_inf>
+<gloss>to read (a kanji) with its native Japanese reading</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1465580</ent_seq>
+<k_ele>
+<keb>入る</keb>
+<ke_pri>ichi1</ke_pri>
+</k_ele>
+<r_ele>
+<reb>いる</reb>
+<re_pri>ichi1</re_pri>
+</r_ele>
+<sense>
+<pos>&v5r;</pos>
+<pos>&vi;</pos>
+<xref>入る・はいる・1</xref>
+<s_inf>mainly used in fixed expressions and literary language</s_inf>
+<gloss>to enter</gloss>
+<gloss>to go in</gloss>
+<gloss>to get in</gloss>
+<gloss>to come in</gloss>
+</sense>
+<sense>
+<pos>&v5r;</pos>
+<pos>&vi;</pos>
+<gloss>to set (of the sun or moon)</gloss>
+<gloss>to sink</gloss>
+<gloss>to go down</gloss>
+</sense>
+<sense>
+<pos>&v5r;</pos>
+<pos>&vi;</pos>
+<gloss>to attain (nirvana, enlightenment, etc.)</gloss>
+<gloss>to achieve</gloss>
+<gloss>to reach (e.g. a climax)</gloss>
+</sense>
+<sense>
+<pos>&suf;</pos>
+<pos>&v5r;</pos>
+<xref>感じ入る</xref>
+<xref>聞き入る</xref>
+<s_inf>after -masu stem of verb</s_inf>
+<gloss>to do fully</gloss>
+<gloss>to do intently</gloss>
+<gloss>to do sincerely</gloss>
+<gloss>to do deeply</gloss>
+<gloss>to feel keenly</gloss>
+</sense>
+<sense>
+<pos>&suf;</pos>
+<pos>&v5r;</pos>
+<xref>寝入る・1</xref>
+<xref>絶え入る</xref>
+<s_inf>after -masu stem of verb</s_inf>
+<gloss>to (reach a state) completely</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1467640</ent_seq>
+<k_ele>
+<keb>猫</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf07</ke_pri>
+</k_ele>
+<r_ele>
+<reb>ねこ</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf07</re_pri>
+</r_ele>
+<r_ele>
+<reb>ネコ</reb>
+<re_nokanji/>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<gloss>cat (esp. the domestic cat, Felis catus)</gloss>
+<gloss>feline</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<gloss>shamisen</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<gloss>geisha</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<xref>猫車</xref>
+<misc>&abbr;</misc>
+<gloss>wheelbarrow</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<xref>猫火鉢</xref>
+<misc>&abbr;</misc>
+<gloss>clay bed-warmer</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<ant>タチ</ant>
+<misc>&uk;</misc>
+<misc>&sl;</misc>
+<gloss>bottom (submissive partner of a homosexual relationship)</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1467720</ent_seq>
+<k_ele>
+<keb>熱い</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf14</ke_pri>
+</k_ele>
+<r_ele>
+<reb>あつい</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf14</re_pri>
+</r_ele>
+<r_ele>
+<reb>あっつい</reb>
+<re_inf>&sk;</re_inf>
+</r_ele>
+<sense>
+<pos>&adj-i;</pos>
+<ant>冷たい・1</ant>
+<gloss>hot (to the touch)</gloss>
+</sense>
+<sense>
+<pos>&adj-i;</pos>
+<ant>冷たい・2</ant>
+<gloss>passionate (feelings, etc.)</gloss>
+<gloss>ardent</gloss>
+<gloss>hot (e.g. gaze)</gloss>
+</sense>
+<sense>
+<pos>&adj-i;</pos>
+<gloss>hot (e.g. temper)</gloss>
+</sense>
+<sense>
+<pos>&adj-i;</pos>
+<gloss>zealous</gloss>
+<gloss>enthusiastic</gloss>
+<gloss>fired up</gloss>
+</sense>
+<sense>
+<pos>&adj-i;</pos>
+<gloss>intense</gloss>
+<gloss>severe</gloss>
+<gloss>extreme</gloss>
+</sense>
+<sense>
+<pos>&adj-i;</pos>
+<gloss>hot (topic)</gloss>
+<gloss>of interest</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1486650</ent_seq>
+<k_ele>
+<keb>美味しい</keb>
+<ke_pri>ichi1</ke_pri>
+</k_ele>
+<k_ele>
+<keb>旨味しい</keb>
+<ke_inf>&sK;</ke_inf>
+</k_ele>
+<r_ele>
+<reb>おいしい</reb>
+<re_inf>&gikun;</re_inf>
+<re_pri>ichi1</re_pri>
+</r_ele>
+<r_ele>
+<reb>オイシイ</reb>
+<re_inf>&sk;</re_inf>
+</r_ele>
+<sense>
+<pos>&adj-i;</pos>
+<misc>&uk;</misc>
+<gloss>good(-tasting)</gloss>
+<gloss>nice</gloss>
+<gloss>delicious</gloss>
+<gloss>tasty</gloss>
+</sense>
+<sense>
+<pos>&adj-i;</pos>
+<misc>&uk;</misc>
+<gloss>attractive (offer, opportunity, etc.)</gloss>
+<gloss>appealing</gloss>
+<gloss>convenient</gloss>
+<gloss>favorable</gloss>
+<gloss>desirable</gloss>
+<gloss>profitable</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1512130</ent_seq>
+<k_ele>
+<keb>返す</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf20</ke_pri>
+</k_ele>
+<k_ele>
+<keb>反す</keb>
+<ke_inf>&rK;</ke_inf>
+</k_ele>
+<r_ele>
+<reb>かえす</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf18</re_pri>
+<re_pri>nf20</re_pri>
+</r_ele>
+<sense>
+<pos>&v5s;</pos>
+<pos>&vt;</pos>
+<xref>帰す・かえす</xref>
+<gloss>to return (something)</gloss>
+<gloss>to restore</gloss>
+<gloss>to put back</gloss>
+</sense>
+<sense>
+<pos>&v5s;</pos>
+<pos>&vt;</pos>
+<gloss>to turn over</gloss>
+<gloss>to turn upside down</gloss>
+<gloss>to overturn</gloss>
+</sense>
+<sense>
+<pos>&v5s;</pos>
+<pos>&vt;</pos>
+<gloss>to pay back</gloss>
+<gloss>to retaliate</gloss>
+<gloss>to reciprocate</gloss>
+</sense>
+<sense>
+<pos>&v5s;</pos>
+<pos>&vt;</pos>
+<gloss>to respond (with)</gloss>
+<gloss>to retort</gloss>
+<gloss>to reply</gloss>
+<gloss>to say back</gloss>
+</sense>
+<sense>
+<pos>&suf;</pos>
+<pos>&v5s;</pos>
+<s_inf>after the -masu stem of a verb</s_inf>
+<gloss>to do ... back (e.g. speak back, throw back)</gloss>
+</sense>
+<sense>
+<pos>&suf;</pos>
+<pos>&v5s;</pos>
+<s_inf>after the -masu stem of a verb</s_inf>
+<gloss>to do ... again</gloss>
+<gloss>to do ... repeatedly</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1512210</ent_seq>
+<k_ele>
+<keb>返済</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf04</ke_pri>
+</k_ele>
+<r_ele>
+<reb>へんさい</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf04</re_pri>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<pos>&vs;</pos>
+<pos>&vt;</pos>
+<gloss>repayment</gloss>
+<gloss>reimbursement</gloss>
+<gloss>refund</gloss>
+<gloss>redemption</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1512670</ent_seq>
+<k_ele>
+<keb>勉強</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf03</ke_pri>
+</k_ele>
+<r_ele>
+<reb>べんきょう</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf03</re_pri>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<pos>&vs;</pos>
+<pos>&vt;</pos>
+<gloss>study</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<pos>&vs;</pos>
+<pos>&vi;</pos>
+<gloss>diligence</gloss>
+<gloss>working hard</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<gloss>experience</gloss>
+<gloss>knowledge</gloss>
+<gloss>lesson (for the future)</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<pos>&vs;</pos>
+<pos>&vt;</pos>
+<pos>&vi;</pos>
+<gloss>discount</gloss>
+<gloss>price reduction</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1516925</ent_seq>
+<k_ele>
+<keb>方</keb>
+<ke_pri>ichi1</ke_pri>
+</k_ele>
+<r_ele>
+<reb>かた</reb>
+<re_pri>ichi1</re_pri>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<s_inf>also ほう</s_inf>
+<gloss>direction</gloss>
+<gloss>way</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<misc>&hon;</misc>
+<gloss>person</gloss>
+<gloss>lady</gloss>
+<gloss>gentleman</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<pos>&n-suf;</pos>
+<gloss>method of</gloss>
+<gloss>manner of</gloss>
+<gloss>way of</gloss>
+</sense>
+<sense>
+<pos>&n-suf;</pos>
+<gloss>care of ...</gloss>
+</sense>
+<sense>
+<pos>&n-suf;</pos>
+<s_inf>also がた</s_inf>
+<gloss>person in charge of ...</gloss>
+</sense>
+<sense>
+<pos>&n-suf;</pos>
+<s_inf>also がた</s_inf>
+<gloss>side (e.g. "on my mother's side")</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1516930</ent_seq>
+<k_ele>
+<keb>方</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf12</ke_pri>
+</k_ele>
+<r_ele>
+<reb>ほう</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf12</re_pri>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<gloss>direction</gloss>
+<gloss>way</gloss>
+<gloss>side</gloss>
+<gloss>area (in a particular direction)</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<s_inf>often 私の方, あなたの方, etc.</s_inf>
+<gloss>side (of an argument, etc.)</gloss>
+<gloss>one's part</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<gloss>type</gloss>
+<gloss>category</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<gloss>field (of study, etc.)</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<gloss>indicates one side of a comparison</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<gloss>way</gloss>
+<gloss>method</gloss>
+<gloss>manner</gloss>
+<gloss>means</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<gloss>length (of each side of a square)</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1522150</ent_seq>
+<k_ele>
+<keb>本</keb>
+<ke_pri>ichi1</ke_pri>
+</k_ele>
+<r_ele>
+<reb>ほん</reb>
+<re_pri>ichi1</re_pri>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<gloss>book</gloss>
+<gloss>volume</gloss>
+<gloss>script</gloss>
+</sense>
+<sense>
+<pos>&pref;</pos>
+<gloss>this</gloss>
+<gloss>present</gloss>
+<gloss>current</gloss>
+<gloss>... in question</gloss>
+<gloss>... at issue</gloss>
+</sense>
+<sense>
+<pos>&pref;</pos>
+<gloss>main</gloss>
+<gloss>head</gloss>
+<gloss>principal</gloss>
+</sense>
+<sense>
+<pos>&pref;</pos>
+<gloss>real</gloss>
+<gloss>genuine</gloss>
+<gloss>regular</gloss>
+<gloss>proper</gloss>
+</sense>
+<sense>
+<pos>&ctr;</pos>
+<gloss>counter for long, thin objects (sticks, tubes, strings, bottles, pillars, rivers, rail lines, etc.)</gloss>
+</sense>
+<sense>
+<pos>&ctr;</pos>
+<gloss>counter for films, TV shows, etc.</gloss>
+</sense>
+<sense>
+<pos>&ctr;</pos>
+<gloss>counter for telephone calls, letters, and emails</gloss>
+</sense>
+<sense>
+<pos>&ctr;</pos>
+<field>&sports;</field>
+<gloss>counter for goals, home runs, etc.</gloss>
+</sense>
+<sense>
+<pos>&ctr;</pos>
+<field>&MA;</field>
+<gloss>counter for rounds or points (in judo, kendo, etc.)</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1544990</ent_seq>
+<k_ele>
+<keb>預ける</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf21</ke_pri>
+</k_ele>
+<r_ele>
+<reb>あずける</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf21</re_pri>
+</r_ele>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<gloss>to leave (in someone's keeping)</gloss>
+<gloss>to put (in someone's care)</gloss>
+<gloss>to place (in someone's custody)</gloss>
+<gloss>to entrust (someone) with</gloss>
+<gloss>to deposit</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<gloss>to put (someone) in charge of</gloss>
+<gloss>to leave (a matter) in someone's hands</gloss>
+<gloss>to let (someone) decide</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<gloss>to lean on</gloss>
+<gloss>to put one's weight on</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1545790</ent_seq>
+<k_ele>
+<keb>様</keb>
+<ke_pri>ichi1</ke_pri>
+</k_ele>
+<k_ele>
+<keb>方</keb>
+<ke_inf>&rK;</ke_inf>
+</k_ele>
+<k_ele>
+<keb>状</keb>
+<ke_inf>&rK;</ke_inf>
+</k_ele>
+<r_ele>
+<reb>さま</reb>
+<re_pri>ichi1</re_pri>
+</r_ele>
+<sense>
+<pos>&suf;</pos>
+<misc>&hon;</misc>
+<s_inf>after a person's name, position, etc.</s_inf>
+<gloss>Mr</gloss>
+<gloss>Mrs</gloss>
+<gloss>Miss</gloss>
+<gloss>Ms</gloss>
+</sense>
+<sense>
+<pos>&suf;</pos>
+<xref>お粗末さまでした</xref>
+<misc>&pol;</misc>
+<s_inf>usu. after a noun or na-adjective prefixed with お or ご</s_inf>
+<gloss>makes a word more polite (usu. in fixed expressions)</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<gloss>state</gloss>
+<gloss>situation</gloss>
+<gloss>appearance</gloss>
+<gloss>manner</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1546640</ent_seq>
+<k_ele>
+<keb>要る</keb>
+<ke_pri>news2</ke_pri>
+<ke_pri>nf27</ke_pri>
+<ke_pri>spec1</ke_pri>
+</k_ele>
+<r_ele>
+<reb>いる</reb>
+<re_pri>news2</re_pri>
+<re_pri>nf27</re_pri>
+<re_pri>spec1</re_pri>
+</r_ele>
+<sense>
+<pos>&v5r;</pos>
+<pos>&vi;</pos>
+<misc>&uk;</misc>
+<gloss>to be needed</gloss>
+<gloss>to be necessary</gloss>
+<gloss>to be required</gloss>
+<gloss>to be wanted</gloss>
+<gloss>to need</gloss>
+<gloss>to want</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1547720</ent_seq>
+<k_ele>
+<keb>来る</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf16</ke_pri>
+</k_ele>
+<k_ele>
+<keb>來る</keb>
+<ke_inf>&sK;</ke_inf>
+</k_ele>
+<r_ele>
+<reb>くる</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf16</re_pri>
+</r_ele>
+<r_ele>
+<reb>クる</reb>
+<re_inf>&sk;</re_inf>
+</r_ele>
+<sense>
+<pos>&vk;</pos>
+<pos>&vi;</pos>
+<gloss>to come (spatially or temporally)</gloss>
+<gloss>to approach</gloss>
+<gloss>to arrive</gloss>
+</sense>
+<sense>
+<pos>&aux-v;</pos>
+<pos>&vk;</pos>
+<xref>行ってくる・2</xref>
+<misc>&uk;</misc>
+<s_inf>after the -te form of a verb</s_inf>
+<gloss>to come back</gloss>
+<gloss>to do ... and come back</gloss>
+</sense>
+<sense>
+<pos>&aux-v;</pos>
+<pos>&vk;</pos>
+<misc>&uk;</misc>
+<s_inf>after the -te form of a verb</s_inf>
+<gloss>to come to be</gloss>
+<gloss>to become</gloss>
+<gloss>to get</gloss>
+<gloss>to grow</gloss>
+<gloss>to continue</gloss>
+</sense>
+<sense>
+<pos>&vk;</pos>
+<pos>&vi;</pos>
+<gloss>to come from</gloss>
+<gloss>to be caused by</gloss>
+<gloss>to derive from</gloss>
+</sense>
+<sense>
+<pos>&vk;</pos>
+<pos>&vi;</pos>
+<xref>と来たら</xref>
+<gloss>to come to (e.g. "when it comes to spinach ...")</gloss>
+</sense>
+<sense>
+<pos>&vk;</pos>
+<pos>&vi;</pos>
+<gloss>to affect (the body or mind)</gloss>
+<gloss>to hit</gloss>
+<gloss>to get to one</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1567440</ent_seq>
+<k_ele>
+<keb>掏る</keb>
+</k_ele>
+<r_ele>
+<reb>する</reb>
+</r_ele>
+<r_ele>
+<reb>スる</reb>
+<re_nokanji/>
+</r_ele>
+<sense>
+<pos>&v5r;</pos>
+<pos>&vt;</pos>
+<misc>&uk;</misc>
+<gloss>to pickpocket</gloss>
+<gloss>to steal</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1570710</ent_seq>
+<k_ele>
+<keb>翔る</keb>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf14</ke_pri>
+</k_ele>
+<k_ele>
+<keb>駆ける</keb>
+</k_ele>
+<r_ele>
+<reb>かける</reb>
+<re_pri>news1</re_pri>
+<re_pri>nf14</re_pri>
+</r_ele>
+<sense>
+<pos>&v5r;</pos>
+<pos>&vi;</pos>
+<s_inf>usu. 翔る</s_inf>
+<gloss>to soar</gloss>
+<gloss>to fly</gloss>
+</sense>
+<sense>
+<pos>&v5r;</pos>
+<pos>&vi;</pos>
+<xref>駆ける・1</xref>
+<misc>&rare;</misc>
+<s_inf>usu. 駆ける</s_inf>
+<gloss>to run</gloss>
+<gloss>to dash</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1577120</ent_seq>
+<k_ele>
+<keb>何故</keb>
+<ke_pri>ichi1</ke_pri>
+</k_ele>
+<r_ele>
+<reb>なぜ</reb>
+<re_inf>&gikun;</re_inf>
+<re_pri>ichi1</re_pri>
+</r_ele>
+<sense>
+<pos>&adv;</pos>
+<misc>&uk;</misc>
+<gloss>why</gloss>
+<gloss>how</gloss>
+<gloss>for what reason</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1577980</ent_seq>
+<k_ele>
+<keb>居る</keb>
+<ke_inf>&rK;</ke_inf>
+</k_ele>
+<r_ele>
+<reb>いる</reb>
+<re_pri>ichi1</re_pri>
+</r_ele>
+<sense>
+<pos>&v1;</pos>
+<pos>&vi;</pos>
+<xref>ある・1</xref>
+<misc>&uk;</misc>
+<gloss>to be (of animate objects)</gloss>
+<gloss>to exist</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vi;</pos>
+<misc>&uk;</misc>
+<gloss>to stay</gloss>
+</sense>
+<sense>
+<pos>&aux-v;</pos>
+<pos>&v1;</pos>
+<misc>&uk;</misc>
+<s_inf>after the -te form of a verb; indicates continuing action</s_inf>
+<gloss>to be ...-ing</gloss>
+</sense>
+<sense>
+<pos>&aux-v;</pos>
+<pos>&v1;</pos>
+<misc>&uk;</misc>
+<s_inf>after the -te form of a verb; indicates continuing state</s_inf>
+<gloss>to have ...-ed</gloss>
+<gloss>to be ...-ed</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1578850</ent_seq>
+<k_ele>
+<keb>行く</keb>
+<ke_pri>ichi1</ke_pri>
+</k_ele>
+<k_ele>
+<keb>往く</keb>
+<ke_inf>&rK;</ke_inf>
+</k_ele>
+<r_ele>
+<reb>いく</reb>
+<re_pri>ichi1</re_pri>
+</r_ele>
+<r_ele>
+<reb>ゆく</reb>
+<re_pri>ichi1</re_pri>
+</r_ele>
+<r_ele>
+<reb>イク</reb>
+<re_inf>&sk;</re_inf>
+</r_ele>
+<sense>
+<pos>&v5k-s;</pos>
+<pos>&vi;</pos>
+<xref>来る・1</xref>
+<gloss>to go</gloss>
+<gloss>to move (towards)</gloss>
+<gloss>to head (towards)</gloss>
+<gloss>to leave (for)</gloss>
+</sense>
+<sense>
+<pos>&v5k-s;</pos>
+<pos>&vi;</pos>
+<gloss>to move through</gloss>
+<gloss>to travel across</gloss>
+<gloss>to walk along (e.g. a road)</gloss>
+</sense>
+<sense>
+<pos>&v5k-s;</pos>
+<pos>&vi;</pos>
+<gloss>to go (well, badly, etc.)</gloss>
+<gloss>to proceed</gloss>
+<gloss>to turn out</gloss>
+<gloss>to get along</gloss>
+</sense>
+<sense>
+<pos>&v5k-s;</pos>
+<pos>&vi;</pos>
+<s_inf>oft. as で〜</s_inf>
+<gloss>to do (in a particular way)</gloss>
+<gloss>to go (with; a choice)</gloss>
+<gloss>to try</gloss>
+</sense>
+<sense>
+<pos>&v5k-s;</pos>
+<pos>&vi;</pos>
+<gloss>to pass (of time, seasons, etc.)</gloss>
+<gloss>to go by</gloss>
+</sense>
+<sense>
+<pos>&v5k-s;</pos>
+<pos>&vi;</pos>
+<gloss>to stream</gloss>
+<gloss>to flow</gloss>
+</sense>
+<sense>
+<pos>&v5k-s;</pos>
+<pos>&vi;</pos>
+<s_inf>usu. written as 逝く</s_inf>
+<gloss>to die</gloss>
+<gloss>to pass away</gloss>
+</sense>
+<sense>
+<pos>&v5k-s;</pos>
+<pos>&vi;</pos>
+<gloss>to reach (a stage, extent, age, etc.)</gloss>
+<gloss>to get to</gloss>
+<gloss>to go (so far as ...)</gloss>
+</sense>
+<sense>
+<pos>&v5k-s;</pos>
+<pos>&vi;</pos>
+<gloss>to reach (of information, instructions, wind, etc.)</gloss>
+<gloss>to arrive</gloss>
+</sense>
+<sense>
+<pos>&aux-v;</pos>
+<pos>&v5k-s;</pos>
+<misc>&uk;</misc>
+<s_inf>after the -te form of a verb; い sometimes omitted in casual speech</s_inf>
+<gloss>to continue ...</gloss>
+<gloss>to go on ...</gloss>
+<gloss>to (progress) steadily</gloss>
+<gloss>to gradually ...</gloss>
+<gloss>to progressively ...</gloss>
+</sense>
+<sense>
+<pos>&v5k-s;</pos>
+<pos>&vi;</pos>
+<misc>&uk;</misc>
+<misc>&col;</misc>
+<s_inf>oft. written as イク</s_inf>
+<gloss>to have an orgasm</gloss>
+<gloss>to come</gloss>
+<gloss>to cum</gloss>
+</sense>
+<sense>
+<pos>&v5k-s;</pos>
+<pos>&vi;</pos>
+<misc>&uk;</misc>
+<misc>&sl;</misc>
+<gloss>to trip</gloss>
+<gloss>to get high</gloss>
+<gloss>to have a drug-induced hallucination</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1579110</ent_seq>
+<k_ele>
+<keb>今日</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf02</ke_pri>
+</k_ele>
+<r_ele>
+<reb>きょう</reb>
+<re_inf>&gikun;</re_inf>
+<re_pri>ichi1</re_pri>
+</r_ele>
+<r_ele>
+<reb>こんにち</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf02</re_pri>
+</r_ele>
+<r_ele>
+<reb>こんち</reb>
+</r_ele>
+<r_ele>
+<reb>こんじつ</reb>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<pos>&adv;</pos>
+<gloss>today</gloss>
+<gloss>this day</gloss>
+</sense>
+<sense>
+<stagr>こんにち</stagr>
+<pos>&n;</pos>
+<pos>&adv;</pos>
+<gloss>these days</gloss>
+<gloss>recently</gloss>
+<gloss>nowadays</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1581900</ent_seq>
+<k_ele>
+<keb>剃る</keb>
+<ke_pri>ichi1</ke_pri>
+</k_ele>
+<r_ele>
+<reb>そる</reb>
+<re_pri>ichi1</re_pri>
+</r_ele>
+<r_ele>
+<reb>する</reb>
+</r_ele>
+<sense>
+<pos>&v5r;</pos>
+<pos>&vt;</pos>
+<gloss>to shave</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1587040</ent_seq>
+<k_ele>
+<keb>言う</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf01</ke_pri>
+</k_ele>
+<k_ele>
+<keb>云う</keb>
+<ke_inf>&rK;</ke_inf>
+</k_ele>
+<k_ele>
+<keb>謂う</keb>
+<ke_inf>&rK;</ke_inf>
+</k_ele>
+<r_ele>
+<reb>いう</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf01</re_pri>
+</r_ele>
+<r_ele>
+<reb>ゆう</reb>
+<re_pri>ichi1</re_pri>
+</r_ele>
+<sense>
+<pos>&v5u;</pos>
+<pos>&vt;</pos>
+<gloss>to say</gloss>
+<gloss>to utter</gloss>
+<gloss>to declare</gloss>
+</sense>
+<sense>
+<pos>&v5u;</pos>
+<pos>&vt;</pos>
+<gloss>to name</gloss>
+<gloss>to call</gloss>
+</sense>
+<sense>
+<stagk>言う</stagk>
+<pos>&v5u;</pos>
+<pos>&vi;</pos>
+<gloss>to go (e.g. "the alarm went ping")</gloss>
+<gloss>to make a noise</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1587780</ent_seq>
+<k_ele>
+<keb>鋳る</keb>
+<ke_pri>news2</ke_pri>
+<ke_pri>nf30</ke_pri>
+<ke_pri>spec2</ke_pri>
+</k_ele>
+<k_ele>
+<keb>鑄る</keb>
+<ke_inf>&oK;</ke_inf>
+</k_ele>
+<r_ele>
+<reb>いる</reb>
+<re_pri>news2</re_pri>
+<re_pri>nf30</re_pri>
+<re_pri>spec2</re_pri>
+</r_ele>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<gloss>to cast</gloss>
+<gloss>to mint</gloss>
+<gloss>to coin</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1589060</ent_seq>
+<k_ele>
+<keb>行う</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf01</ke_pri>
+</k_ele>
+<k_ele>
+<keb>行なう</keb>
+</k_ele>
+<r_ele>
+<reb>おこなう</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf01</re_pri>
+</r_ele>
+<sense>
+<pos>&v5u;</pos>
+<pos>&vt;</pos>
+<gloss>to perform</gloss>
+<gloss>to do</gloss>
+<gloss>to conduct oneself</gloss>
+<gloss>to carry out</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1591270</ent_seq>
+<k_ele>
+<keb>来る</keb>
+</k_ele>
+<k_ele>
+<keb>来たる</keb>
+</k_ele>
+<r_ele>
+<reb>きたる</reb>
+</r_ele>
+<sense>
+<pos>&adj-pn;</pos>
+<ant>去る・6</ant>
+<gloss>next (e.g. "next April")</gloss>
+<gloss>forthcoming</gloss>
+<gloss>coming</gloss>
+</sense>
+<sense>
+<pos>&v5r;</pos>
+<pos>&vi;</pos>
+<s_inf>orig. meaning</s_inf>
+<gloss>to come</gloss>
+<gloss>to arrive</gloss>
+<gloss>to be due to</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1595910</ent_seq>
+<k_ele>
+<keb>擦る</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news2</ke_pri>
+<ke_pri>nf36</ke_pri>
+</k_ele>
+<k_ele>
+<keb>擂る</keb>
+</k_ele>
+<k_ele>
+<keb>摩る</keb>
+<ke_inf>&rK;</ke_inf>
+</k_ele>
+<k_ele>
+<keb>磨る</keb>
+<ke_inf>&rK;</ke_inf>
+</k_ele>
+<r_ele>
+<reb>する</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news2</re_pri>
+<re_pri>nf36</re_pri>
+</r_ele>
+<sense>
+<pos>&v5r;</pos>
+<pos>&vt;</pos>
+<gloss>to rub</gloss>
+<gloss>to chafe</gloss>
+<gloss>to strike (match)</gloss>
+<gloss>to file</gloss>
+<gloss>to frost (glass)</gloss>
+</sense>
+<sense>
+<pos>&v5r;</pos>
+<pos>&vt;</pos>
+<gloss>to squander (one's money)</gloss>
+<gloss>to run through (one's fortune)</gloss>
+<gloss>to lose money (e.g. by gambling)</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1602700</ent_seq>
+<k_ele>
+<keb>付属</keb>
+<ke_pri>ichi1</ke_pri>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf05</ke_pri>
+</k_ele>
+<k_ele>
+<keb>附属</keb>
+<ke_pri>ichi1</ke_pri>
+</k_ele>
+<r_ele>
+<reb>ふぞく</reb>
+<re_pri>ichi1</re_pri>
+<re_pri>news1</re_pri>
+<re_pri>nf05</re_pri>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<pos>&vs;</pos>
+<pos>&vi;</pos>
+<pos>&adj-no;</pos>
+<gloss>being attached (to)</gloss>
+<gloss>being affiliated (to)</gloss>
+<gloss>belonging (to)</gloss>
+<gloss>going with</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<xref>付属学校</xref>
+<misc>&abbr;</misc>
+<gloss>attached school</gloss>
+<gloss>affiliated school</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1613340</ent_seq>
+<k_ele>
+<keb>一人暮らし</keb>
+<ke_pri>news1</ke_pri>
+<ke_pri>nf13</ke_pri>
+</k_ele>
+<k_ele>
+<keb>１人暮らし</keb>
+</k_ele>
+<k_ele>
+<keb>独り暮らし</keb>
+<ke_inf>&rK;</ke_inf>
+</k_ele>
+<k_ele>
+<keb>ひとり暮らし</keb>
+<ke_inf>&sK;</ke_inf>
+</k_ele>
+<k_ele>
+<keb>一人暮し</keb>
+<ke_inf>&sK;</ke_inf>
+</k_ele>
+<k_ele>
+<keb>ひとり暮し</keb>
+<ke_inf>&sK;</ke_inf>
+</k_ele>
+<k_ele>
+<keb>独り暮し</keb>
+<ke_inf>&sK;</ke_inf>
+</k_ele>
+<r_ele>
+<reb>ひとりぐらし</reb>
+<re_pri>news1</re_pri>
+<re_pri>nf13</re_pri>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<pos>&vs;</pos>
+<gloss>living by oneself</gloss>
+<gloss>living alone</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>1626220</ent_seq>
+<k_ele>
+<keb>腹が立つ</keb>
+</k_ele>
+<k_ele>
+<keb>腹がたつ</keb>
+</k_ele>
+<r_ele>
+<reb>はらがたつ</reb>
+</r_ele>
+<sense>
+<pos>&exp;</pos>
+<pos>&v5t;</pos>
+<gloss>to get angry</gloss>
+<gloss>to take offense</gloss>
+<gloss>to take offence</gloss>
+<gloss>to be furious</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>2143050</ent_seq>
+<k_ele>
+<keb>足りない</keb>
+</k_ele>
+<r_ele>
+<reb>たりない</reb>
+</r_ele>
+<sense>
+<pos>&adj-i;</pos>
+<xref>足りる・1</xref>
+<gloss>insufficient</gloss>
+<gloss>not enough</gloss>
+<gloss>lacking</gloss>
+</sense>
+<sense>
+<pos>&adj-i;</pos>
+<gloss>dim-witted</gloss>
+<gloss>slow</gloss>
+<gloss>stupid</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>2146440</ent_seq>
+<k_ele>
+<keb>好き</keb>
+</k_ele>
+<r_ele>
+<reb>ずき</reb>
+</r_ele>
+<sense>
+<pos>&suf;</pos>
+<gloss>love of</gloss>
+<gloss>affection for</gloss>
+<gloss>enthusiast for</gloss>
+<gloss>lover of</gloss>
+<gloss>fan</gloss>
+<gloss>-phile</gloss>
+</sense>
+<sense>
+<pos>&suf;</pos>
+<gloss>being attractive to</gloss>
+<gloss>being liked by</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>2209310</ent_seq>
+<k_ele>
+<keb>没る</keb>
+</k_ele>
+<r_ele>
+<reb>いる</reb>
+</r_ele>
+<sense>
+<pos>&v5r;</pos>
+<pos>&vi;</pos>
+<xref>入る・2</xref>
+<misc>&poet;</misc>
+<gloss>to set (of the sun)</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>2247650</ent_seq>
+<k_ele>
+<keb>鍵</keb>
+</k_ele>
+<r_ele>
+<reb>けん</reb>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<gloss>key (on a piano, organ, etc.)</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>2253290</ent_seq>
+<k_ele>
+<keb>方</keb>
+</k_ele>
+<r_ele>
+<reb>がた</reb>
+</r_ele>
+<sense>
+<pos>&suf;</pos>
+<misc>&hon;</misc>
+<s_inf>pluralizing suffix</s_inf>
+<gloss>Sirs</gloss>
+<gloss>Mesdames</gloss>
+</sense>
+<sense>
+<pos>&suf;</pos>
+<s_inf>also かた</s_inf>
+<gloss>around (the time that, etc.)</gloss>
+<gloss>about</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>2254960</ent_seq>
+<k_ele>
+<keb>辺</keb>
+</k_ele>
+<k_ele>
+<keb>方</keb>
+</k_ele>
+<r_ele>
+<reb>へ</reb>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<misc>&arch;</misc>
+<misc>&poet;</misc>
+<gloss>surrounding area</gloss>
+<gloss>vicinity</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<misc>&arch;</misc>
+<misc>&poet;</misc>
+<gloss>seashore</gloss>
+<gloss>seaside</gloss>
+<gloss>coast</gloss>
+</sense>
+<sense>
+<pos>&suf;</pos>
+<misc>&arch;</misc>
+<s_inf>usu. べ or pronounced as え</s_inf>
+<gloss>suffix used as a rough indicator of location, direction, time, etc.</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>2586260</ent_seq>
+<k_ele>
+<keb>学生</keb>
+</k_ele>
+<r_ele>
+<reb>がくしょう</reb>
+</r_ele>
+<r_ele>
+<reb>がくそう</reb>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<misc>&arch;</misc>
+<gloss>Heian-period student of government administration</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<misc>&arch;</misc>
+<gloss>Buddhist scholar</gloss>
+<gloss>researcher at a Buddhist temple</gloss>
+<gloss>person studying Buddhism</gloss>
+</sense>
+<sense>
+<pos>&n;</pos>
+<misc>&arch;</misc>
+<gloss>learning</gloss>
+<gloss>scholarship</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>2698030</ent_seq>
+<k_ele>
+<keb>猫</keb>
+</k_ele>
+<r_ele>
+<reb>ねこま</reb>
+</r_ele>
+<sense>
+<pos>&n;</pos>
+<xref>猫・1</xref>
+<misc>&arch;</misc>
+<gloss>cat</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>2729170</ent_seq>
+<k_ele>
+<keb>癒る</keb>
+</k_ele>
+<r_ele>
+<reb>いる</reb>
+</r_ele>
+<sense>
+<pos>&v1;</pos>
+<pos>&vi;</pos>
+<xref>腹が居る</xref>
+<misc>&uk;</misc>
+<misc>&arch;</misc>
+<s_inf>usu. as 腹がいる</s_inf>
+<gloss>to calm down</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>2851105</ent_seq>
+<k_ele>
+<keb>沃る</keb>
+</k_ele>
+<r_ele>
+<reb>いる</reb>
+</r_ele>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<misc>&poet;</misc>
+<gloss>to pour</gloss>
+<gloss>to dash (water) over</gloss>
+<gloss>to douse with</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>2851106</ent_seq>
+<k_ele>
+<keb>率る</keb>
+</k_ele>
+<k_ele>
+<keb>将る</keb>
+</k_ele>
+<r_ele>
+<reb>いる</reb>
+</r_ele>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<xref>率いる・ひきいる</xref>
+<misc>&arch;</misc>
+<gloss>to lead</gloss>
+<gloss>to spearhead</gloss>
+<gloss>to command</gloss>
+</sense>
+<sense>
+<pos>&v1;</pos>
+<pos>&vt;</pos>
+<misc>&arch;</misc>
+<gloss>to carry</gloss>
+<gloss>to take</gloss>
+</sense>
+</entry>
+<entry>
+<ent_seq>2859936</ent_seq>
+<k_ele>
+<keb>何故</keb>
+<ke_pri>news2</ke_pri>
+<ke_pri>nf30</ke_pri>
+</k_ele>
+<k_ele>
+<keb>何ゆえ</keb>
+</k_ele>
+<r_ele>
+<reb>なにゆえ</reb>
+<re_pri>news2</re_pri>
+<re_pri>nf30</re_pri>
+</r_ele>
+<sense>
+<pos>&adv;</pos>
+<misc>&form;</misc>
+<gloss>why</gloss>
+</sense>
+</entry>
+</JMdict>
