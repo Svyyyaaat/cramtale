@@ -72,8 +72,12 @@ fun CalibrateScreen(state: AppState) {
     var picked by remember { mutableStateOf<Span?>(null) }
 
     Page {
-        Text("Words in red count as unknown, orange ones are in your deck but not studied yet. Tap a word to mark it.",
-            style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // a legend instead of a sentence: the colours speak for themselves
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Pill("unknown", MaterialTheme.colorScheme.accentContainer, MaterialTheme.colorScheme.onAccentContainer)
+            Pill("in deck, new", MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer)
+            Text("tap a word to mark it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for ((name, path) in SAMPLES) AssistChip({ input = context.assets.open(path).bufferedReader().readText() }, { Text(name) })
         }

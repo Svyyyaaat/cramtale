@@ -233,6 +233,18 @@ class Shots {
             listOf(com.cramtale.core.review.KnownNewCards.Entry(1, "見逃す", 0)), emptyList()), {})
     }
 
+    @Test fun d3c_word_sheet_dark() = shot(dark = true) {
+        WordSheetBody(WordInfo("書類", "しょるい", "the festival papers Sakaki brought", listOf("documents; official papers"), true,
+            card = "documents, papers", newCard = true), {}, {}, onSay = {})
+    }
+
+    @Test fun d8b_flashcard_dark() = shot(dark = true) {
+        StoryContent("狐火堂", 0.21, history = emptyList(), current = null, busy = "Planning this session…", error = null, proposals = emptyList(),
+            tapVersion = 0, isTapped = { false }, statusOf = { Status.DECK }, onBack = {}, onTap = { _, _ -> }, onGrammar = {},
+            onReroll = {}, onEdit = {}, onSend = {}, onDecide = { _, _ -> },
+            study = listOf(due(3, "許可", "permission", isNew = true)))
+    }
+
     @Test fun e1_settings() = shot {
         SettingsContent(SettingsValues(1.15f, com.cramtale.core.story.PassageLength.LONG, false, false, "sk-ant-…x9Qa", "Spare and close: short sentences, objects and what people do."), {}, {}, {}, {}, {}, {})
     }

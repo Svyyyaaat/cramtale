@@ -46,7 +46,7 @@ fun TargetScreen(state: AppState, onProbe: () -> Unit) {
     }
     val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh++ }
     Page {
-        Text("Cramtale reads your decks and Anki's due queue from the AnkiDroid you pick here. In this version it never writes.",
+        Text("Where your decks and due cards come from. Read-only.",
             style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         for (i in installs) PaperCard(onClick = { selected = i.packageName; state.targetPackage = i.packageName }) {
             Row { Text(i.title, style = MaterialTheme.typography.titleSmall) }
@@ -70,7 +70,7 @@ fun ProbeScreen(state: AppState) {
         }
     }
     Page {
-        Text("What this AnkiDroid's interface offers. Copy it and send it back if something doesn't work.",
+        Text("What this AnkiDroid offers. Copy it to report a problem.",
             style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         val r = report
         if (r == null) Busy("Asking AnkiDroid…") else {
