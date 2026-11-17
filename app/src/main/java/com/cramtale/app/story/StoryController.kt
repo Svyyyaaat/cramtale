@@ -576,11 +576,12 @@ class StoryController(
 
     fun isTapped(span: Span) = synchronized(tapLock) { span.deck.any { it.noteId in tappedNotes } }
 
-    suspend fun meaning(span: Span, sentence: String): String? {
+    /** The one-line meaning in this sentence, streamed into [onPartial] as it's written (cached after). */
+    suspend fun meaning(span: Span, sentence: String, onPartial: (String) -> Unit = {}): String? {
         val k = span.lemma + "|" + sentence
         meaningCache[k]?.let { return it }
         return withContext(Dispatchers.IO) {
-            runCatching { engine().meaning(span.surface, sentence) }.getOrNull()?.also { meaningCache[k] = it }
+            runCatching { engine().meaning(span.surface, sentence) { onPartial(it.trim()) } }.getOrNull()?.also { meaningCache[k] = it }
         }
     }
 

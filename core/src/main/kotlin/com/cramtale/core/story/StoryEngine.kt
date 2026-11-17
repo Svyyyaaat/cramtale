@@ -231,7 +231,9 @@ class StoryEngine(
                      /** streams the reply, handing over its "passage" field as it grows */
                      onPassage: ((String) -> Unit)? = null,
                      /** a background call: no progress line */
-                     quiet: Boolean = false): String {
+                     quiet: Boolean = false,
+                     /** streams the reply, handing over all of its text so far */
+                     onText: ((String) -> Unit)? = null): String {
         // one-shot jobs (everything but the writer): the instructions and material go in the user
         // message, ending with the request, which is where Claude reads a request best
         val oneShot = purpose != "writer" && purpose != "rewrite"
@@ -243,9 +245,13 @@ class StoryEngine(
             thinking = model != Models.CHECKS,
         )
         if (!quiet) onCall(purpose)
-        fun send(r: LlmRequest) = if (onPassage == null) llm.call(r) else {
+        fun send(r: LlmRequest) = if (onPassage == null && onText == null) llm.call(r) else {
             val sb = StringBuilder()
-            llm.stream(r) { piece -> sb.append(piece); PartialJson.stringField(sb.toString(), "passage")?.let(onPassage) }
+            llm.stream(r) { piece ->
+                sb.append(piece)
+                onText?.invoke(sb.toString())
+                onPassage?.let { f -> PartialJson.stringField(sb.toString(), "passage")?.let(f) }
+            }
         }
         var resp = send(req)
         costs.record(session, req, resp)
@@ -769,9 +775,9 @@ class StoryEngine(
     }
 
     /** The popup's one-line meaning of a word in its sentence. */
-    fun meaning(word: String, sentence: String): String =
+    fun meaning(word: String, sentence: String, onText: ((String) -> Unit)? = null): String =
         call("meaning", Models.CHECKS, Prompts.fill(prompts.prompt("meaning"), mapOf("word" to word, "sentence" to sentence)),
-            listOf(Msg(Role.USER, "Meaning?")), maxTokens = 120).trim()
+            listOf(Msg(Role.USER, "Meaning?")), maxTokens = 120, quiet = true, onText = onText).trim()
 
     // ------------------------------------------------------------------ helpers
 

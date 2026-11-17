@@ -319,8 +319,11 @@ fun StoryContent(
             if (error != null) item { ErrorNote(error, onRetry) }
             items(proposals) { p -> ProposalCard(p) { onDecide(p.key, it) } }
         }
-        if (notice != null && busy == null) Text(notice, Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer)
-            .padding(horizontal = 20.dp, vertical = 8.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (notice != null && busy == null) Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer)
+            .padding(horizontal = 20.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(Icons.Outlined.Info, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(notice, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         ReplyBar(busy, current != null, reply, onReply, onSend)
     }
 }
@@ -458,7 +461,7 @@ fun StoryScreen(state: AppState, onBack: () -> Unit) {
     picked?.let { (span, p) ->
         val sentence = remember(span, p) { sentenceAround(p.text, span.start, span.end) }
         var meaning by remember(span) { mutableStateOf<String?>(null) }
-        LaunchedEffect(span) { meaning = story.meaning(span, sentence) }
+        LaunchedEffect(span) { meaning = story.meaning(span, sentence) { partial -> meaning = partial } ?: meaning }
         // dictionary lookups off the main thread (the dictionary may be busy right after launch)
         var info by remember(span) { mutableStateOf(WordInfo(span.surface, null, null, emptyList(), span.deck.isNotEmpty(), story.isName(span), lookupOnly)) }
         LaunchedEffect(span, meaning) {
@@ -475,11 +478,7 @@ fun StoryScreen(state: AppState, onBack: () -> Unit) {
             onSay = { state.speaker.say(span.surface, rate = 0.8f) },
             onKnownNew = { story.alreadyKnow(story.newCardsIn(span)); tapVersion++; picked = null })
     }
-    grammar?.let { g ->
-        AlertDialog(onDismissRequest = { grammar = null }, title = { Text(g.pattern.id, style = WordText.copy(fontSize = 28.sp)) },
-            text = { Text(g.pattern.meaning, style = MaterialTheme.typography.bodyLarge) },
-            confirmButton = { TextButton({ grammar = null }) { Text("Close") } })
-    }
+    grammar?.let { g -> GrammarSheet(g, story.current?.passage?.text.orEmpty()) { grammar = null } }
     editing?.let { text ->
         var t by remember { mutableStateOf(text) }
         AlertDialog(onDismissRequest = { editing = null }, title = { Text("Edit the passage") },

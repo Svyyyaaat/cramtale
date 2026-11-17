@@ -245,6 +245,12 @@ class Shots {
             study = listOf(due(3, "許可", "permission", isNew = true)))
     }
 
+    @Test fun d9_grammar_sheet() = shot {
+        val text = "榊さんは書類を置いた。「もし断るなら、こちらをかたにいただくことにします」"
+        val i = text.indexOf("ことにします")
+        com.cramtale.app.ui.GrammarSheetBody("ことにする", "decide to (do)", text, i, i + "ことにします".length) {}
+    }
+
     @Test fun e1_settings() = shot {
         SettingsContent(SettingsValues(1.15f, com.cramtale.core.story.PassageLength.LONG, false, false, "sk-ant-…x9Qa", "Spare and close: short sentences, objects and what people do."), {}, {}, {}, {}, {}, {})
     }
