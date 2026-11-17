@@ -193,6 +193,7 @@ class StoryController(private val context: Context, private val app: AppState) {
 
     private fun show(player: String?, corrections: List<Correction>, d: Draft, turn: Int, roll: String?, complication: String?, keepTaps: Boolean = false) {
         if (!keepTaps) { tappedNotes.clear(); tappedWords.clear() }
+        refreshCast()
         val m = app.matcher()
         val analysis = m?.analyze(d.passage)
         val grammarFound = grammar?.find(com.cramtale.core.text.Tokenizer.tokenize(d.passage)).orEmpty()
@@ -226,8 +227,17 @@ class StoryController(private val context: Context, private val app: AppState) {
     // ------------------------------------------------------------------ taps
 
     /** A tap on a word in the current passage. Deck words count as tapped (Again) unless "I know it" follows. */
+    /** The story's cast, so their names show as names (tappable for the reading, never graded or carded). */
+    var castNames by mutableStateOf<Set<String>>(emptySet())
+        private set
+
+    fun refreshCast() { castNames = runCatching { com.cramtale.core.story.StoryState(dir).castNameParts() }.getOrDefault(emptySet()) }
+
+    /** A person's or place's name: from the tokenizer (固有名詞) or one of the story's characters. */
+    fun isName(span: Span) = span.ignoredBecause == "name" || span.surface in castNames || span.lemma in castNames
+
     fun tap(span: Span) {
-        if (span.deck.isEmpty()) return
+        if (span.deck.isEmpty() || isName(span)) return
         span.deck.forEach { w -> tappedNotes += w.noteId; tappedWords[w.noteId] = w }
     }
 

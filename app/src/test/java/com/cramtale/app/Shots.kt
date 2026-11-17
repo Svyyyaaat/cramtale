@@ -11,6 +11,7 @@ import app.cash.paparazzi.Paparazzi
 import com.android.resources.NightMode
 import com.cramtale.app.story.ShownPassage
 import com.cramtale.app.story.ShownTurn
+import com.cramtale.app.ui.nameReading
 import com.cramtale.app.ui.AnkiStepContent
 import com.cramtale.app.ui.CramtaleTheme
 import com.cramtale.app.ui.DeckRowUi
@@ -142,5 +143,9 @@ class Shots {
 
     @Test fun d3_word_sheet() = shot {
         WordSheetBody(WordInfo("返済", "へんさい", "repaying the loan", listOf("repayment; reimbursement; refund"), false), {}, {})
+    }
+
+    @Test fun d4_name_sheet() = shot {
+        WordSheetBody(WordInfo("榊", nameReading("榊"), "Sakaki, the visitor who brought the papers", emptyList(), false, isName = true), {}, {})
     }
 }

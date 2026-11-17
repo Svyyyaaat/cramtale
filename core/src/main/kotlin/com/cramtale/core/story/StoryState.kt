@@ -49,6 +49,11 @@ class StoryState(val dir: File) {
 
     fun characterNames(): List<String> = characterFiles().keys.sorted()
 
+    /** The cast's names as they appear in text: タム and グエン in "グエン・ヴァン・タム", 村井 in "村井 早苗 (clerk)". */
+    fun castNameParts(): Set<String> = characterNames()
+        .flatMap { n -> listOf(n) + n.split(' ', '　', '・', '(', ')', '（', '）') }
+        .map { it.trim() }.filter { it.length >= 2 }.toSet()
+
     /** The character's file without its name line. */
     fun character(name: String): String? = characterFiles()[name]?.readLines()?.drop(1)?.joinToString("\n")?.trim()
 

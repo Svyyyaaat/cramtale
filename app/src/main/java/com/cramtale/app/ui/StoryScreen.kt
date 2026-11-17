@@ -106,6 +106,7 @@ fun Ornament() {
 /** The passage as reading text: every word tappable; tapped words marked; new cards with their meaning inline. */
 @Composable
 fun PassageText(p: ShownPassage, interactive: Boolean, isTapped: (Span) -> Boolean, statusOf: (Span) -> Status, tapVersion: Int, onTap: (Span) -> Unit) {
+    // names are tappable too (for the reading); other ignored tokens (particles, numbers…) aren't
     val tappedBg = MaterialTheme.colorScheme.secondaryContainer
     val glossColor = MaterialTheme.colorScheme.tertiary
     val unknownLine = MaterialTheme.colorScheme.secondary
@@ -119,7 +120,7 @@ fun PassageText(p: ShownPassage, interactive: Boolean, isTapped: (Span) -> Boole
                     statusOf(s) == Status.UNKNOWN -> SpanStyle(textDecoration = TextDecoration.Underline, color = unknownLine)
                     else -> SpanStyle()
                 }
-                if (interactive && s.isWord) withLink(LinkAnnotation.Clickable("w${s.start}") { onTap(s) }) { withStyle(style) { append(s.surface) } }
+                if (interactive && (s.isWord || statusOf(s) == Status.NAME)) withLink(LinkAnnotation.Clickable("w${s.start}") { onTap(s) }) { withStyle(style) { append(s.surface) } }
                 else withStyle(style) { append(s.surface) }
                 s.deck.firstOrNull { it.noteId in p.newNotes }?.let { w ->
                     withStyle(SpanStyle(fontSize = 12.sp, color = glossColor)) { append("〔${p.glosses[w.noteId].orEmpty()}〕") }
@@ -232,7 +233,15 @@ fun StoryContent(
     }
 }
 
-data class WordInfo(val word: String, val reading: String?, val inSentence: String?, val senses: List<String>, val inDeck: Boolean)
+data class WordInfo(val word: String, val reading: String?, val inSentence: String?, val senses: List<String>, val inDeck: Boolean,
+                    val isName: Boolean = false)
+
+/** How a name is read, from the tokenizer, in hiragana; null when it's already all kana. */
+fun nameReading(surface: String): String? {
+    if (surface.none { it in '\u4E00'..'\u9FFF' || it == '々' }) return null
+    val r = com.cramtale.core.text.Tokenizer.tokenize(surface).joinToString("") { it.reading.ifBlank { it.surface } }
+    return r.map { if (it in '\u30A1'..'\u30F6') it - 0x60 else it }.joinToString("").takeIf { it != surface && it.isNotBlank() }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -263,13 +272,18 @@ fun WordSheetBody(info: WordInfo, onKnow: () -> Unit, onClose: () -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.Info, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.width(8.dp))
-            Text(if (info.inDeck) "In your deck: this tap counts as Again. If it was a mis-tap, say you know it."
-                else "Not in your deck. From the next version, unknown words go to your RP deck.",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(when {
+                info.isName -> "A name: not graded, and no card is made."
+                info.inDeck -> "In your deck: this tap counts as Again. If it was a mis-tap, say you know it."
+                else -> "Not in your deck. From the next version, unknown words go to your RP deck."
+            }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            SecondaryButton("Close", onClose, Modifier.weight(1f))
-            PrimaryButton("I know it", onKnow, Modifier.weight(1f))
+            if (info.isName) PrimaryButton("Close", onClose, Modifier.weight(1f))
+            else {
+                SecondaryButton("Close", onClose, Modifier.weight(1f))
+                PrimaryButton("I know it", onKnow, Modifier.weight(1f))
+            }
         }
     }
 }
@@ -289,7 +303,8 @@ fun StoryScreen(state: AppState, onBack: () -> Unit) {
     StoryContent(
         title = story.place() ?: "Story", cost = story.sessionCost(), history = story.history, current = story.current,
         busy = story.busy, error = story.error, proposals = story.proposals, tapVersion = tapVersion,
-        isTapped = story::isTapped, statusOf = { it.status(state.policy, state.lists) },
+        isTapped = story::isTapped,
+        statusOf = { if (story.isName(it)) Status.NAME else it.status(state.policy, state.lists) },
         onBack = onBack,
         onTap = { s, p -> story.tap(s); tapVersion++; picked = s to p },
         onGrammar = { grammar = it },
@@ -305,7 +320,8 @@ fun StoryScreen(state: AppState, onBack: () -> Unit) {
         LaunchedEffect(span) { meaning = story.meaning(span, sentence) }
         val dict = state.jmdict()
         val info = remember(span, meaning) {
-            WordInfo(span.lemma, span.entries.firstOrNull()?.let { dict?.forms(it)?.kana?.firstOrNull() }, meaning,
+            if (story.isName(span)) WordInfo(span.surface, nameReading(span.surface), meaning, emptyList(), false, isName = true)
+            else WordInfo(span.lemma, span.entries.firstOrNull()?.let { dict?.forms(it)?.kana?.firstOrNull() }, meaning,
                 span.entries.take(2).flatMap { e -> dict?.senses(e).orEmpty().take(3).map { it.gloss } }, span.deck.isNotEmpty())
         }
         WordSheet(info, onKnow = { story.iKnowIt(span); tapVersion++; picked = null }, onClose = { picked = null })

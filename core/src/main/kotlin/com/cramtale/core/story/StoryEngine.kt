@@ -455,7 +455,7 @@ class StoryEngine(
         val (total, occurrences) = unknownWords?.check(passage) ?: return null
         val seen = seenWords()
         // the cast's names aren't vocabulary (タム in グエン・ヴァン・タム, 村井 in 村井 早苗)
-        val names = state.characterNames().flatMap { n -> n.split(' ', '　', '・', '(', ')', '（', '）') }.filter { it.length >= 2 }
+        val names = state.castNameParts()
         val fresh = occurrences.filter { w -> w !in seen && names.none { it.contains(w) || w.contains(it) } }
         return (if (total == 0) 0.0 else fresh.size.toDouble() / total) to fresh.distinct()
     }
