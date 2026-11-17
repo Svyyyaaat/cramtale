@@ -6,6 +6,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
+import com.cramtale.app.R
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
 import com.android.resources.NightMode
@@ -188,6 +193,28 @@ class Shots {
             tapVersion = 0, isTapped = { false }, statusOf = { Status.DECK }, onBack = {}, onTap = { _, _ -> }, onGrammar = {},
             onReroll = {}, onEdit = {}, onSend = {}, onDecide = { _, _ -> },
             study = listOf(due(1, "見逃す", "to miss; to overlook"), due(2, "手間", "time; labour")))
+    }
+
+    @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+    /** The launcher icon at large size: circle and rounded-square masks, and the themed (monochrome) version. */
+    @Test fun z1_icon() = shot {
+        androidx.compose.foundation.layout.FlowRow(Modifier.padding(16.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)) {
+            for (shape in listOf(androidx.compose.foundation.shape.CircleShape, androidx.compose.foundation.shape.RoundedCornerShape(28.dp))) {
+                androidx.compose.foundation.layout.Box(Modifier.size(180.dp).clip(shape)) {
+                    androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher_background), null, Modifier.size(180.dp))
+                    androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher_foreground), null, Modifier.size(180.dp))
+                }
+            }
+            for (small in listOf(48.dp, 64.dp)) androidx.compose.foundation.layout.Box(Modifier.size(small).clip(androidx.compose.foundation.shape.CircleShape)) {
+                androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher_background), null, Modifier.size(small))
+                androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher_foreground), null, Modifier.size(small))
+            }
+            androidx.compose.foundation.layout.Box(Modifier.size(180.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                .background(androidx.compose.ui.graphics.Color(0xFF2B3A55))) {
+                androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher_monochrome), null, Modifier.size(180.dp),
+                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(androidx.compose.ui.graphics.Color(0xFFD6E3FF)))
+            }
+        }
     }
 
     @Test fun e1_settings() = shot {
