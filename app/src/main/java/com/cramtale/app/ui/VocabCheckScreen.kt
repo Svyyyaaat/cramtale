@@ -57,7 +57,7 @@ fun VocabQuestion(
             trackColor = MaterialTheme.colorScheme.surfaceVariant, drawStopIndicator = {})
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("${index + 1} of $total", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-            Text("frequency ${item.band / 1000}k+", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
+            Text("frequency ${item.band / 1000}k+", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.accent)
         }
         Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -106,7 +106,7 @@ fun VocabResults(results: List<VocabCheck.BandResult>, suggested: Int, applied: 
             for (r in results) Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("${r.from / 1000}k–${r.to / 1000}k", Modifier.width(76.dp), style = MaterialTheme.typography.labelLarge, fontFamily = FontFamily.Monospace)
                 LinearProgressIndicator(progress = { r.share.toFloat() }, modifier = Modifier.weight(1f).height(10.dp).clip(RoundedCornerShape(5.dp)),
-                    color = if (r.share >= VocabCheck.TARGET) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.secondary, drawStopIndicator = {},
+                    color = if (r.share >= VocabCheck.TARGET) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.accent, drawStopIndicator = {},
                     trackColor = MaterialTheme.colorScheme.surfaceVariant)
                 Text("${r.known}/${r.asked}", Modifier.width(52.dp), textAlign = TextAlign.End, style = MaterialTheme.typography.labelLarge)
             }

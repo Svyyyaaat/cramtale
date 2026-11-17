@@ -167,9 +167,10 @@ class StoryControllerTest {
     fun `a reply whose send failed at the commit survives a restart`() = runBlocking {
         val c = controller()
         c.setup("")
+        // the scribe fails throughout (the early background run as well), so the send fails at the commit
+        failing += "scribe"
         c.start()
         val shown = c.current!!.passage.text
-        failing += "scribe"
         c.send("ありがとう。")
         failing.clear()
 

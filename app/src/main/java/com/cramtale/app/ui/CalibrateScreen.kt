@@ -94,7 +94,7 @@ fun CalibrateScreen(state: AppState) {
         val stats = a.stats(policy, lists)
         PaperCard {
             Text("%.1f%% unknown".format(stats.unknownRate * 100), style = MaterialTheme.typography.headlineSmall,
-                color = if (stats.unknownRate <= 0.03) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.secondary)
+                color = if (stats.unknownRate <= 0.03) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.accent)
             Text("${stats.unknown} of ${stats.counted} words · the story aims for under 3%", style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -155,7 +155,7 @@ private fun Toggle(label: String, value: Boolean, onChange: (Boolean) -> Unit) {
 
 @Composable
 private fun AnnotatedResult(a: Analysis, policy: KnownPolicy, lists: KnownLists, onTap: (Span) -> Unit) {
-    val unknownBg = MaterialTheme.colorScheme.secondaryContainer
+    val unknownBg = MaterialTheme.colorScheme.accentContainer
     val newBg = MaterialTheme.colorScheme.tertiaryContainer
     val text = buildAnnotatedString {
         var pos = 0
@@ -186,7 +186,7 @@ private fun MarkWordDialog(state: AppState, span: Span, policy: KnownPolicy, lis
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("${span.status(policy, lists).name.lowercase().replace('_', ' ')} · rank ${span.rank?.let { "%,d".format(it) } ?: "–"}",
-                    style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
+                    style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.accent)
                 span.ignoredBecause?.let { Text("Not counted: $it", style = MaterialTheme.typography.bodySmall) }
                 for (w in span.deck) Text("${w.deck.substringAfterLast("::")}: ${w.word} (${w.state.name.lowercase().replace('_', ' ')})", style = MaterialTheme.typography.bodySmall)
                 if (span.parts.isNotEmpty()) Text("Parts: " + span.parts.joinToString(" + ") { it.lemma }, style = MaterialTheme.typography.bodySmall)

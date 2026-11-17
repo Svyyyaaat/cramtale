@@ -1,5 +1,8 @@
 package com.cramtale.app.ui
 
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -72,35 +75,44 @@ fun Page(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> U
 
 @Composable
 fun SectionTitle(text: String) {
-    Text(text.uppercase(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = 8.dp, start = 4.dp))
+    Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 10.dp, start = 4.dp))
 }
 
-/** A soft paper card. */
+/** A card: white on the cool paper, lifted by a soft shadow (no outline). */
 @Composable
 fun PaperCard(modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
     Surface(
         modifier = modifier.fillMaxWidth().let { if (onClick != null) it.clip(MaterialTheme.shapes.medium).clickable(onClick = onClick) else it },
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerLowest,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shadowElevation = 1.dp,
     ) { Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = content) }
 }
 
-/** A row in a list of tools: icon, title, one line, chevron. */
+/** An icon on a tinted rounded square (the app's icon language). */
 @Composable
-fun ToolRow(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
+fun IconTile(icon: ImageVector, container: Color = MaterialTheme.colorScheme.primaryContainer,
+             content: Color = MaterialTheme.colorScheme.onPrimaryContainer, size: androidx.compose.ui.unit.Dp = 40.dp) {
+    Box(Modifier.size(size).clip(RoundedCornerShape(size * 0.3f)).background(container), contentAlignment = Alignment.Center) {
+        Icon(icon, null, tint = content, modifier = Modifier.size(size * 0.55f))
+    }
+}
+
+/** A row in a list of tools: icon, title, an optional short line, chevron. */
+@Composable
+fun ToolRow(icon: ImageVector, title: String, subtitle: String?,
+            container: Color = MaterialTheme.colorScheme.primaryContainer, content: Color = MaterialTheme.colorScheme.onPrimaryContainer,
+            onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).clickable(onClick = onClick).padding(vertical = 12.dp, horizontal = 4.dp),
+        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).clickable(onClick = onClick).padding(vertical = 10.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
-            Icon(icon, null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(22.dp))
-        }
+        IconTile(icon, container, content)
         Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleSmall)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (!subtitle.isNullOrBlank()) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.outline)
     }
@@ -149,7 +161,7 @@ fun StepHeader(step: Int, of: Int, title: String, body: String) {
                 ))
             }
         }
-        Text("Step $step of $of", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
+        Text("Step $step of $of", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.accent)
         Text(title, style = MaterialTheme.typography.headlineSmall)
         Text(body, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -178,14 +190,17 @@ fun ErrorNote(text: String, onRetry: (() -> Unit)? = null) {
     // the first paragraph is what to do; the rest is the technical chain, smaller, for reports
     val headline = text.substringBefore("\n\n")
     val details = text.substringAfter("\n\n", "")
-    Column(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).background(MaterialTheme.colorScheme.errorContainer).padding(14.dp),
+    Column(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(MaterialTheme.colorScheme.errorContainer).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(headline, color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodyMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Icon(Icons.Filled.ErrorOutline, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.error)
+            Text(headline, color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+        }
         if (details.isNotBlank()) Text(details, color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f),
             style = MaterialTheme.typography.bodySmall)
-        if (onRetry != null) androidx.compose.material3.FilledTonalButton(onRetry,
-            colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)) {
-            Text("Try again")
+        if (onRetry != null) Button(onRetry, colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.accent, contentColor = MaterialTheme.colorScheme.onAccent)) {
+            Icon(Icons.Filled.Refresh, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Try again")
         }
     }
 }
@@ -193,7 +208,7 @@ fun ErrorNote(text: String, onRetry: (() -> Unit)? = null) {
 @Composable
 fun Bullet(text: String) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(Modifier.padding(top = 9.dp).size(6.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondary))
+        Box(Modifier.padding(top = 9.dp).size(6.dp).clip(CircleShape).background(MaterialTheme.colorScheme.accent))
         Text(text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
     }
 }

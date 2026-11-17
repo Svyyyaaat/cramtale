@@ -127,7 +127,7 @@ private fun Stat(label: String, n: Int, warn: Boolean = false) {
     Row {
         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
         Text("$n", style = MaterialTheme.typography.labelLarge,
-            color = if (warn && n > 0) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface)
+            color = if (warn && n > 0) MaterialTheme.colorScheme.accent else MaterialTheme.colorScheme.onSurface)
     }
 }
 

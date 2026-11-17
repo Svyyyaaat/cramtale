@@ -1,5 +1,10 @@
 package com.cramtale.app.ui
 
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.material.icons.filled.AutoStories
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.Spellcheck
 import androidx.compose.material.icons.filled.Style
 import com.cramtale.core.review.DueCard
 import androidx.compose.material.icons.filled.Check
@@ -13,6 +18,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -93,36 +99,47 @@ import kotlinx.coroutines.launch
 @Composable
 fun PlayerBubble(text: String, corrections: List<Correction>) {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(20.dp, 20.dp, 6.dp, 20.dp),
-            modifier = Modifier.widthIn(max = 320.dp)) {
+        // solid indigo by day; at night the deep container (a bright bubble would outshine the story)
+        val night = MaterialTheme.colorScheme.background.luminance() < 0.5f
+        Surface(color = if (night) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.primary,
+            shape = RoundedCornerShape(22.dp, 22.dp, 6.dp, 22.dp), modifier = Modifier.widthIn(max = 320.dp)) {
             Text(text, Modifier.padding(horizontal = 16.dp, vertical = 12.dp), style = MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp),
-                color = MaterialTheme.colorScheme.onPrimaryContainer)
+                color = if (night) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onPrimary)
         }
         // corrections beside your message
-        for (c in corrections) Column(Modifier.widthIn(max = 320.dp), horizontalAlignment = Alignment.End) {
-            Text(buildAnnotatedString {
-                withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough, color = MaterialTheme.colorScheme.error)) { append(c.wrong) }
-                append("  →  ")
-                withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.tertiary)) { append(c.right) }
-            }, style = MaterialTheme.typography.bodyLarge)
-            Text(c.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.End)
+        for (c in corrections) Row(Modifier.widthIn(max = 320.dp).clip(MaterialTheme.shapes.small)
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest).padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Icon(Icons.Filled.Spellcheck, null, Modifier.size(18.dp).padding(top = 2.dp), tint = MaterialTheme.colorScheme.accent)
+            Column {
+                Text(buildAnnotatedString {
+                    withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough, color = MaterialTheme.colorScheme.accent)) { append(c.wrong) }
+                    append("  →  ")
+                    withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.tertiary)) { append(c.right) }
+                }, style = MaterialTheme.typography.bodyLarge)
+                Text(c.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }
 
 @Composable
 fun Ornament() {
-    Text("◇", Modifier.fillMaxWidth().padding(vertical = 4.dp), textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.outline,
-        style = MaterialTheme.typography.labelMedium)
+    // a short rule with a vermilion dot between passages
+    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.width(36.dp).height(1.dp).background(MaterialTheme.colorScheme.outlineVariant))
+        Box(Modifier.padding(horizontal = 10.dp).size(5.dp).clip(CircleShape).background(MaterialTheme.colorScheme.accent))
+        Box(Modifier.width(36.dp).height(1.dp).background(MaterialTheme.colorScheme.outlineVariant))
+    }
 }
 
 /** The passage as reading text: every word tappable; tapped words marked; new cards with their meaning inline. */
 @Composable
 fun PassageText(p: ShownPassage, interactive: Boolean, isTapped: (Span) -> Boolean, statusOf: (Span) -> Status, tapVersion: Int, onTap: (Span) -> Unit) {
     // names are tappable too (for the reading); other ignored tokens (particles, numbers…) aren't
-    val tappedBg = MaterialTheme.colorScheme.secondaryContainer
+    val tappedBg = LocalAccents.current.tapped
     val glossColor = MaterialTheme.colorScheme.tertiary
-    val unknownLine = MaterialTheme.colorScheme.secondary
+    val unknownLine = MaterialTheme.colorScheme.accent
     val text = remember(p, tapVersion, interactive) {
         buildAnnotatedString {
             var pos = 0
@@ -151,24 +168,30 @@ fun PassageText(p: ShownPassage, interactive: Boolean, isTapped: (Span) -> Boole
 fun PassageTools(p: ShownPassage, enabled: Boolean, onReroll: () -> Unit, onEdit: () -> Unit, onGrammar: (GrammarPatterns.Found) -> Unit,
                   onVersion: (Int) -> Unit = {}, listening: Boolean = false, onListen: (() -> Unit)? = null) {
     var notes by remember { mutableStateOf(false) }
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.Center) {
+    // a quiet row of round tools; the passage is what matters
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (onListen != null) Tool(if (listening) Icons.Filled.Stop else Icons.AutoMirrored.Filled.VolumeUp, if (listening) "Stop" else "Listen",
+            active = listening, onClick = onListen)
+        Tool(Icons.Filled.Refresh, "Reroll", enabled = enabled, onClick = onReroll)
+        Tool(Icons.Filled.Edit, "Edit", enabled = enabled, onClick = onEdit)
+        Tool(Icons.Filled.Casino, "Game master notes", active = notes) { notes = !notes }
+        Spacer(Modifier.weight(1f))
         if (p.versions > 1) Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton({ onVersion(p.version - 1) }, enabled = enabled && p.version > 0) {
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Previous version")
             }
-            Text("${p.version + 1} / ${p.versions}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("${p.version + 1}/${p.versions}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             IconButton({ onVersion(p.version + 1) }, enabled = enabled && p.version < p.versions - 1) {
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Next version")
             }
         }
-        if (onListen != null) AssistChip(onListen, { Text(if (listening) "Stop" else "Listen") },
-            leadingIcon = { Icon(if (listening) Icons.Filled.Stop else Icons.AutoMirrored.Filled.VolumeUp, null, Modifier.size(18.dp)) })
-        AssistChip(onReroll, { Text("Reroll") }, enabled = enabled, leadingIcon = { Icon(Icons.Filled.Refresh, null, Modifier.size(18.dp)) })
-        AssistChip(onEdit, { Text("Edit") }, enabled = enabled, leadingIcon = { Icon(Icons.Filled.Edit, null, Modifier.size(18.dp)) })
-        AssistChip({ notes = !notes }, { Text("Notes") }, leadingIcon = { Icon(Icons.Filled.Casino, null, Modifier.size(18.dp)) })
+    }
+    if (p.grammar.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         for (g in p.grammar.distinctBy { it.pattern.id }) {
-            AssistChip({ onGrammar(g) }, { Text(g.pattern.id) },
-                colors = AssistChipDefaults.assistChipColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer, labelColor = MaterialTheme.colorScheme.onTertiaryContainer))
+            AssistChip({ onGrammar(g) }, { Text(g.pattern.id) }, border = null,
+                leadingIcon = { Icon(Icons.Filled.AutoStories, null, Modifier.size(16.dp)) },
+                colors = AssistChipDefaults.assistChipColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    labelColor = MaterialTheme.colorScheme.onTertiaryContainer, leadingIconContentColor = MaterialTheme.colorScheme.onTertiaryContainer))
         }
     }
     if (notes) PaperCard {
@@ -180,11 +203,12 @@ fun PassageTools(p: ShownPassage, enabled: Boolean, onReroll: () -> Unit, onEdit
 @Composable
 fun ProposalCard(p: MistakeLog.Key, onDecide: (Boolean) -> Unit) {
     PaperCard {
-        Text("You've made this mistake twice", style = MaterialTheme.typography.titleSmall)
-        Text(p.key, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
-        p.examples.lastOrNull()?.let { (_, c) -> Text("${c.wrong} → ${c.right}", style = MaterialTheme.typography.bodyMedium) }
-        Text("Make a card from your corrected sentence? (Cards are created from the next version on; this records your choice.)",
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            IconTile(Icons.Filled.Spellcheck, MaterialTheme.colorScheme.accentContainer, MaterialTheme.colorScheme.onAccentContainer, 32.dp)
+            Text("Same mistake twice: make a card?", style = MaterialTheme.typography.titleSmall)
+        }
+        Text(p.key, style = MaterialTheme.typography.bodyMedium)
+        p.examples.lastOrNull()?.let { (_, c) -> Text("${c.wrong} → ${c.right}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilledTonalButton({ onDecide(true) }) { Text("Make a card") }
             TextButton({ onDecide(false) }) { Text("No") }
@@ -199,14 +223,23 @@ fun ReplyBar(busy: String?, canSend: Boolean, input: String, onInput: (String) -
             if (busy != null) LinearProgressIndicator(Modifier.fillMaxWidth())
             Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(input, onInput, Modifier.weight(1f).heightIn(min = 52.dp),
-                    placeholder = { Text(busy ?: "日本語で返事…") }, shape = RoundedCornerShape(26.dp), maxLines = 5,
-                    colors = OutlinedTextFieldDefaults.colors(unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest))
+                    placeholder = { Text(busy ?: "日本語で返事…", maxLines = 1) }, shape = RoundedCornerShape(26.dp), maxLines = 5,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                        unfocusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary))
                 Spacer(Modifier.width(8.dp))
                 if (input.isBlank()) {
-                    FilledTonalButton({ onSend("") }, enabled = canSend && busy == null, contentPadding = PaddingValues(horizontal = 18.dp)) { Text("Continue") }
+                    // nothing typed: let the scene go on
+                    FilledTonalButton({ onSend("") }, Modifier.heightIn(min = 52.dp), enabled = canSend && busy == null,
+                        contentPadding = PaddingValues(start = 18.dp, end = 14.dp)) {
+                        Text("Continue"); Spacer(Modifier.width(4.dp)); Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, Modifier.size(20.dp))
+                    }
                 } else {
-                    FilledIconButton({ onSend(input) }, Modifier.size(52.dp), enabled = canSend && busy == null) {
+                    FilledIconButton({ onSend(input) }, Modifier.size(52.dp), enabled = canSend && busy == null,
+                        colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.accent, contentColor = MaterialTheme.colorScheme.onAccent)) {
                         Icon(Icons.AutoMirrored.Filled.Send, "Send")
                     }
                 }
@@ -255,10 +288,12 @@ fun StoryContent(
             verticalArrangement = Arrangement.spacedBy(18.dp)) {
             if (intro != null && history.isEmpty()) item {
                 PaperCard {
-                    Text("You are", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        IconTile(Icons.Filled.Person, MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer, 32.dp)
+                        Text("You are", style = MaterialTheme.typography.titleSmall)
+                    }
                     Text(intro, style = MaterialTheme.typography.bodyLarge)
-                    Text("Tap any word you don't know. Reply in Japanese, or press Continue to let the scene go on.",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Tap words you don't know.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             items(history) { t ->
@@ -316,51 +351,60 @@ fun WordSheet(info: WordInfo, onKnow: () -> Unit, onClose: () -> Unit, onSay: ((
 
 @Composable
 fun WordSheetBody(info: WordInfo, onKnow: () -> Unit, onClose: () -> Unit, onSay: (() -> Unit)? = null, onKnownNew: () -> Unit = {}) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(info.word, style = WordText.copy(fontSize = 40.sp))
-            info.reading?.let { Text("  $it", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp)) }
-            if (onSay != null) {
-                Spacer(Modifier.weight(1f))
-                IconButton(onSay) { Icon(Icons.AutoMirrored.Filled.VolumeUp, "Say it", tint = MaterialTheme.colorScheme.primary) }
+    val cs = MaterialTheme.colorScheme
+    Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        // what this word is to you, first: it decides what the buttons do
+        val (status, colors) = when {
+            info.isName -> "Name · not graded" to (cs.surfaceContainerHigh to cs.onSurfaceVariant)
+            info.newCard -> "New card" to (cs.accentContainer to cs.onAccentContainer)
+            info.earlier && info.inDeck -> "In your deck · lookup only" to (cs.surfaceContainerHigh to cs.onSurfaceVariant)
+            info.inDeck -> "In your deck · this tap = Again" to (cs.accentContainer to cs.onAccentContainer)
+            else -> "Not in your decks" to (cs.tertiaryContainer to cs.onTertiaryContainer)
+        }
+        Pill(status, colors.first, colors.second)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                info.reading?.let { Text(it, style = MaterialTheme.typography.titleMedium, color = cs.onSurfaceVariant) }
+                Text(info.word, style = WordText.copy(fontSize = 44.sp, lineHeight = 52.sp))
+            }
+            if (onSay != null) androidx.compose.material3.FilledTonalIconButton(onSay, Modifier.size(48.dp)) {
+                Icon(Icons.AutoMirrored.Filled.VolumeUp, "Say it")
             }
         }
-        Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = MaterialTheme.shapes.medium) {
-            Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                Text("In this sentence", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                Text(info.inSentence ?: "…", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+        Surface(color = cs.primaryContainer, shape = MaterialTheme.shapes.medium) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Here", style = MaterialTheme.typography.labelMedium, color = cs.onPrimaryContainer.copy(alpha = 0.7f))
+                Text(info.inSentence ?: "…", style = MaterialTheme.typography.titleMedium, color = cs.onPrimaryContainer)
             }
         }
         info.card?.let {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("Your card", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Your card", style = MaterialTheme.typography.labelMedium, color = cs.onSurfaceVariant)
                 Text(it, style = MaterialTheme.typography.bodyLarge)
             }
         }
         if (info.senses.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("Dictionary", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Dictionary", style = MaterialTheme.typography.labelMedium, color = cs.onSurfaceVariant)
             info.senses.forEachIndexed { i, s -> Text("${i + 1}. $s", style = MaterialTheme.typography.bodyMedium) }
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.Info, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.width(8.dp))
-            Text(when {
-                info.isName -> "A name: not graded, and no card is made."
-                info.newCard -> "A new card. If you already know it, it's skipped from now on (and would be suspended in Anki once the app may write)."
-                info.earlier && info.inDeck -> "In your deck. Looking words up in earlier passages doesn't count against them."
-                info.inDeck -> "In your deck: this tap counts as Again. If it was a mis-tap, say you know it."
-                else -> "Not in your deck. From the next version, unknown words go to your RP deck."
-            }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        if (info.newCard) Text("Know it already? It's skipped from now on (and would be suspended in Anki once the app may write).",
+            style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (info.newCard) {
-                SecondaryButton("Close", onClose, Modifier.weight(1f))
-                PrimaryButton("Already know it", onKnownNew, Modifier.weight(1f), icon = Icons.Filled.Check)
-            } else if (info.isName || (info.earlier && info.inDeck)) PrimaryButton("Close", onClose, Modifier.weight(1f))
-            else {
-                SecondaryButton("Close", onClose, Modifier.weight(1f))
-                PrimaryButton("I know it", onKnow, Modifier.weight(1f))
+            when {
+                info.newCard -> {
+                    SecondaryButton("Close", onClose, Modifier.weight(1f))
+                    PrimaryButton("Already know it", onKnownNew, Modifier.weight(1f), icon = Icons.Filled.Check)
+                }
+                info.isName || (info.earlier && info.inDeck) -> PrimaryButton("Close", onClose, Modifier.weight(1f))
+                info.inDeck -> {
+                    SecondaryButton("Close", onClose, Modifier.weight(1f))
+                    // a mis-tap: undoes the Again
+                    PrimaryButton("Mis-tap, I know it", onKnow, Modifier.weight(1f))
+                }
+                else -> {
+                    SecondaryButton("Close", onClose, Modifier.weight(1f))
+                    PrimaryButton("I know it", onKnow, Modifier.weight(1f))
+                }
             }
         }
     }
@@ -466,26 +510,26 @@ fun StoryInfoBody(info: StoryController.StoryInfo) {
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("The story so far", style = MaterialTheme.typography.titleLarge)
         info.role?.let {
-            Text("You", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
+            Text("You", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.accent)
             Text(it, style = MaterialTheme.typography.bodyLarge)
         }
         if (info.met.isNotEmpty()) {
-            Text("People you've met", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
+            Text("People you've met", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.accent)
             Text(info.met.joinToString("、"), style = readingStyle().copy(fontSize = 18.sp, lineHeight = 28.sp))
         }
         if (info.today.isNotEmpty()) {
             Text("Read today · ${info.today.count { it.second }} Good · ${info.today.count { !it.second }} Again",
-                style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
+                style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.accent)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 info.today.forEach { (w, good) ->
-                    Pill(w, if (good) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer,
-                        if (good) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer)
+                    Pill(w, if (good) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.accentContainer,
+                        if (good) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onAccentContainer)
                 }
             }
             Text("Would-be grades: this build doesn't answer cards in Anki yet.", style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Text("Chapters", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
+        Text("Chapters", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.accent)
         if (info.chapters.isEmpty()) Text("Chapter 1 is still being written. A summary appears here when it closes.",
             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         info.chapters.forEach { (n, text) ->
@@ -521,20 +565,23 @@ fun Flashcard(card: DueCard, left: Int, onAnswer: (DueCard, Boolean) -> Unit, on
     var shown by remember(card.ref) { mutableStateOf(false) }
     PaperCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Filled.Style, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.secondary)
-            Spacer(Modifier.width(8.dp))
-            Text(if (card.isNew) "New card · meanwhile" else "Anki · meanwhile", style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.secondary, modifier = Modifier.weight(1f))
+            Icon(Icons.Filled.Style, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.accent)
+            Spacer(Modifier.width(6.dp))
+            Text(if (card.isNew) "New card, meanwhile" else "Review, meanwhile", style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.accent, modifier = Modifier.weight(1f))
             Text("$left left", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Text(card.word.word, style = WordText.copy(fontSize = 40.sp, lineHeight = 48.sp), modifier = Modifier.padding(vertical = 4.dp))
-        if (shown) {
-            (card.word.reading ?: nameReading(card.word.word))?.let { Text(it, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            Text(card.word.meaning ?: "(no meaning on the card)", style = MaterialTheme.typography.bodyLarge)
+        Column(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(if (shown) (card.word.reading ?: nameReading(card.word.word)).orEmpty() else " ",
+                style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(card.word.word, style = WordText.copy(fontSize = 44.sp, lineHeight = 52.sp))
+            if (shown) Text(card.word.meaning ?: "(no meaning on the card)", style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Center)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             when {
-                !shown -> SecondaryButton("Show", { shown = true }, Modifier.weight(1f))
+                !shown -> androidx.compose.material3.FilledTonalButton({ shown = true }, Modifier.weight(1f).heightIn(min = 52.dp)) { Text("Show") }
                 card.isNew -> {
                     SecondaryButton("For the story", { onTriage(card, false) }, Modifier.weight(1f))
                     PrimaryButton("Already know it", { onTriage(card, true) }, Modifier.weight(1f))
@@ -545,5 +592,16 @@ fun Flashcard(card: DueCard, left: Int, onAnswer: (DueCard, Boolean) -> Unit, on
                 }
             }
         }
+    }
+}
+
+/** A round tool button under the passage. */
+@Composable
+private fun Tool(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, enabled: Boolean = true, active: Boolean = false, onClick: () -> Unit) {
+    androidx.compose.material3.FilledTonalIconButton(onClick, enabled = enabled,
+        colors = androidx.compose.material3.IconButtonDefaults.filledTonalIconButtonColors(
+            containerColor = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh,
+            contentColor = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)) {
+        Icon(icon, label, Modifier.size(20.dp))
     }
 }

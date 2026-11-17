@@ -1,5 +1,12 @@
 package com.cramtale.app.ui
 
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.TouchApp
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -55,22 +62,39 @@ const val SETUP_STEPS = 7
 
 @Composable
 fun WelcomeContent(onStart: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
     Column(Modifier.fillMaxSize()) {
         Page(Modifier.weight(1f)) {
-            Spacer(Modifier.height(32.dp))
-            Text("Cramtale", style = MaterialTheme.typography.displaySmall.copy(fontFamily = FontFamily.Serif), color = MaterialTheme.colorScheme.primary)
-            Text("物語で、復習を。", style = ReadingText.copy(fontSize = 22.sp), color = MaterialTheme.colorScheme.secondary)
+            Spacer(Modifier.height(24.dp))
+            AppMark(64.dp)
+            Text("Cramtale", style = MaterialTheme.typography.displaySmall, color = cs.onBackground)
+            Text("物語で、復習を。", style = ReadingText.copy(fontSize = 22.sp), color = cs.accent)
+            Text("A story you play in Japanese. Reading it is your Anki review.", style = MaterialTheme.typography.titleMedium,
+                color = cs.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))
-            Text("A story you play in Japanese, where reading is your Anki review.", style = MaterialTheme.typography.titleLarge)
-            Spacer(Modifier.height(4.dp))
-            Bullet("A game master writes a hard-edged story at your level. You reply in Japanese, and your mistakes are marked beside your message.")
-            Bullet("Words Anki says are due are woven into the passages. Read one without tapping and it counts as Good; tap it and it counts as Again.")
-            Bullet("Tap any word for its reading and meaning in that sentence.")
-            Bullet("This version is read-only: it logs what it would answer and never changes your collection.")
-            Spacer(Modifier.height(4.dp))
-            Text("Setup takes about five minutes.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Feature(Icons.AutoMirrored.Filled.MenuBook, cs.primaryContainer, cs.onPrimaryContainer,
+                "Your due cards, woven in", "Read a word without tapping: Good. Tap it: Again.")
+            Feature(Icons.Filled.TouchApp, cs.tertiaryContainer, cs.onTertiaryContainer,
+                "Tap any word", "Reading, your card's meaning, the meaning in that sentence.")
+            Feature(Icons.Filled.Edit, cs.accentContainer, cs.onAccentContainer,
+                "Reply in Japanese", "A game master answers; your mistakes are marked.")
+            Feature(Icons.Filled.Lock, cs.surfaceContainerHigh, cs.onSurfaceVariant,
+                "Read-only for now", "Nothing in your collection changes.")
         }
-        StepFooter("Get started", onStart)
+        StepFooter("Get started · about 5 minutes", onStart)
+    }
+}
+
+@Composable
+private fun Feature(icon: androidx.compose.ui.graphics.vector.ImageVector, container: androidx.compose.ui.graphics.Color,
+                    content: androidx.compose.ui.graphics.Color, title: String, body: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        IconTile(icon, container, content, 44.dp)
+        Spacer(Modifier.width(16.dp))
+        Column {
+            Text(title, style = MaterialTheme.typography.titleSmall)
+            Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 
@@ -81,7 +105,7 @@ fun AnkiStepContent(installs: List<InstallUi>, selected: String?, onSelect: (Str
     val chosen = installs.firstOrNull { it.packageName == selected }
     StepFrame(onBack, footer = { StepFooter("Continue", onNext, enabled = chosen?.granted == true) }) {
         StepHeader(1, SETUP_STEPS, "Connect AnkiDroid",
-            "Cramtale reads your decks and Anki's due queue from AnkiDroid. It only reads; nothing in your collection changes.")
+            "Your decks and what's due come from AnkiDroid. Read-only.")
         if (installs.isEmpty()) ErrorNote("AnkiDroid isn't installed on this phone.")
         for (i in installs) {
             Surface(
@@ -103,8 +127,8 @@ fun AnkiStepContent(installs: List<InstallUi>, selected: String?, onSelect: (Str
         }
         if (chosen != null && !chosen.granted) PrimaryButton("Allow access to ${chosen.title}", { onGrant(chosen.packageName) })
         PaperCard {
-            Text("Using a copy", style = MaterialTheme.typography.titleSmall)
-            Text("Later versions will answer cards and add notes. For that, use a parallel AnkiDroid build with a backup of your collection imported, never logged into sync, with an empty deck named ${AnkiTarget.SANDBOX_MARKER_DECK}. Reading your real AnkiDroid now is safe.",
+            Text("For later: a copy to write to", style = MaterialTheme.typography.titleSmall)
+            Text("Answering cards will need a parallel AnkiDroid with your backup imported, sync off, and an empty ${AnkiTarget.SANDBOX_MARKER_DECK} deck. Reading the real one now is safe.",
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -114,7 +138,7 @@ fun AnkiStepContent(installs: List<InstallUi>, selected: String?, onSelect: (Str
 fun DictionaryStepContent(status: String, busy: Boolean, ready: Boolean, onDownload: () -> Unit, onImport: () -> Unit, onNext: () -> Unit, onBack: () -> Unit) {
     StepFrame(onBack, footer = { StepFooter("Continue", onNext, enabled = ready) }) {
         StepHeader(2, SETUP_STEPS, "Get the dictionary",
-            "JMdict gives every word's readings and meanings, and lets Cramtale recognise spelling variants of your cards (付属 / 附属, なぜ / 何故). It comes with the app and only needs unpacking.")
+            "Readings, meanings and spelling variants (付属 / 附属). It ships with the app.")
         PaperCard {
             if (busy) Busy(status) else Text(status, style = MaterialTheme.typography.bodyLarge)
             if (!ready && !busy) {
@@ -132,7 +156,7 @@ data class DeckRowUi(val name: String, val total: Int, val known: Int, val new: 
 fun DeckStepContent(rows: List<DeckRowUi>, status: String?, busy: Boolean, error: String?, onRead: () -> Unit, onNext: () -> Unit, onBack: () -> Unit) {
     StepFrame(onBack, footer = { StepFooter("Continue", onNext, enabled = rows.isNotEmpty() && !busy) }) {
         StepHeader(3, SETUP_STEPS, "Read your decks",
-            "Your Core 5k, V2K and sentence decks, with the state of each recognition card. This decides which words count as known.")
+            "Which words you know, from your recognition cards.")
         if (busy) Busy(status ?: "Reading…")
         else if (rows.isEmpty()) PrimaryButton("Read my decks", onRead)
         if (error != null) ErrorNote(error)
@@ -157,7 +181,7 @@ fun DeckStepContent(rows: List<DeckRowUi>, status: String?, busy: Boolean, error
 fun VocabIntroContent(cutoff: Int, onStart: () -> Unit, onSkip: () -> Unit, onBack: () -> Unit) {
     StepFrame(onBack, footer = { StepFooter("Start (2 minutes)", onStart, secondary = "Skip for now", onSecondary = onSkip) }) {
         StepHeader(4, SETUP_STEPS, "How far does your vocabulary reach?",
-            "About 80 words that aren't in your decks, from common to rare. Say whether you know each one. If you tap the wrong button, Back undoes it.")
+            "About 80 words outside your decks, common to rare. Back undoes a mis-tap.")
         PaperCard {
             Text("Why", style = MaterialTheme.typography.titleSmall)
             Text("Passages are kept to under 3% words you don't know. Your decks cover most of what you know; this finds the frequency cut-off for the rest.",
@@ -171,7 +195,7 @@ fun VocabIntroContent(cutoff: Int, onStart: () -> Unit, onSkip: () -> Unit, onBa
 fun KeyStepContent(key: String, onKey: (String) -> Unit, onNext: () -> Unit, onBack: () -> Unit) {
     StepFrame(onBack, footer = { StepFooter("Save key", onNext, enabled = key.trim().startsWith("sk-ant-")) }) {
         StepHeader(5, SETUP_STEPS, "Your Claude API key",
-            "The game master is Claude Opus 5.5, with Claude Haiku 5.5 doing the checks. Calls are paid from your Anthropic account: roughly 5–6 cents a turn.")
+            "Opus writes, Haiku checks. Paid from your Anthropic account: about 5–6¢ a turn.")
         OutlinedTextField(key, onKey, Modifier.fillMaxWidth(), label = { Text("API key") }, placeholder = { Text("sk-ant-…") },
             singleLine = true, visualTransformation = PasswordVisualTransformation(), shape = MaterialTheme.shapes.medium)
         Text("Stored only on this phone, encrypted with a key from the Android Keystore. Every call's cost is logged.",
@@ -184,7 +208,7 @@ fun StoryStepContent(seed: String, onSeed: (String) -> Unit, busy: String?, erro
                      taste: String = "", wait: (@Composable (String) -> Unit)? = null) {
     StepFrame(onBack, footer = { StepFooter("Create the story", onCreate, enabled = busy == null) }) {
         StepHeader(6, SETUP_STEPS, "Your story",
-            "The game master builds a small world from your taste: a place, three or four people with their own goals, limits and secrets, and threats that move while you're away.")
+            "A place, a few people with their own goals and secrets, and trouble that moves while you're away.")
         PaperCard {
             Text("Your taste (config/plot.md)", style = MaterialTheme.typography.titleSmall)
             Text(taste.ifBlank { "(empty: edit config/plot.md in Prompts and story files)" },
@@ -202,7 +226,7 @@ fun StyleStepContent(options: List<Pair<StoryEngine.StyleOption, Double>>?, busy
                      wait: (@Composable (String) -> Unit)? = null) {
     StepFrame(onBack, footer = {}) {
         StepHeader(7, SETUP_STEPS, "Pick the one you like reading",
-            "The same short scene in four styles. Your choice becomes the writer's style sample for the whole story.")
+            "One scene, four styles. Your pick sets the voice of the whole story.")
         if (busy != null) wait?.invoke(busy) ?: Busy(busy)
         if (error != null) ErrorNote(error, onMore)
         for ((o, rate) in options.orEmpty()) {
@@ -212,7 +236,9 @@ fun StyleStepContent(options: List<Pair<StoryEngine.StyleOption, Double>>?, busy
                     Pill("%.0f%% unknown".format(rate * 100), MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Text(o.passage, style = ReadingText.copy(fontSize = 17.sp, lineHeight = 30.sp))
-                PrimaryButton("Read in this style", { onPick(o) })
+                androidx.compose.material3.FilledTonalButton({ onPick(o) }, Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                    Icon(Icons.Filled.Check, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("This one")
+                }
             }
         }
         if (options != null && busy == null) SecondaryButton("Show me four more", onMore, icon = Icons.Filled.Refresh)

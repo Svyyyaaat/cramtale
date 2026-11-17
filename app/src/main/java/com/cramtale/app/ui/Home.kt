@@ -1,5 +1,27 @@
 package com.cramtale.app.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.Inbox
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.LinkOff
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -56,85 +78,176 @@ data class HomeInfo(
 @Composable
 fun HomeContent(info: HomeInfo, go: (Screen) -> Unit, onRestartSetup: () -> Unit) {
     Page {
-        Spacer(Modifier.height(8.dp))
+        // wordmark and the collection's state
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Cramtale", style = MaterialTheme.typography.headlineMedium.copy(fontFamily = FontFamily.Serif),
-                color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+            AppMark(36.dp)
+            Spacer(Modifier.width(10.dp))
+            Text("Cramtale", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.weight(1f))
             when {
-                !info.connected -> Pill("Anki not connected", MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant)
-                info.collectionIsReal -> Pill("Real collection · read-only", MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer)
-                else -> Pill("Copy · read-only", MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer)
+                !info.connected -> StatusPill(Icons.Filled.LinkOff, "No Anki", MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.onSurfaceVariant)
+                info.collectionIsReal -> StatusPill(Icons.Filled.Lock, "Read-only", MaterialTheme.colorScheme.accentContainer, MaterialTheme.colorScheme.onAccentContainer)
+                else -> StatusPill(Icons.Filled.Lock, "Copy · read-only", MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer)
             }
         }
 
-        // the story, first
-        PaperCard(onClick = { go(Screen.STORY) }) {
-            Text(if (info.turn == 0) "Your story is ready" else "Chapter ${info.chapter} · turn ${info.turn}",
-                style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
-            Text(info.place ?: "A new story", style = MaterialTheme.typography.titleLarge)
-            info.lastLines?.let {
-                Text(it, style = ReadingText.copy(fontSize = 16.sp, lineHeight = 28.sp), color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 3, overflow = TextOverflow.Ellipsis)
-            }
-            PrimaryButton(if (info.turn == 0) "Begin" else "Continue the story", { go(Screen.STORY) }, icon = Icons.AutoMirrored.Filled.MenuBook)
-        }
-
+        StoryHero(info) { go(Screen.STORY) }
         TodayCard(info)
 
-        SectionTitle("Your Japanese")
-        Column {
-            ToolRow(Icons.Filled.Quiz, "Vocabulary check", "Cut-off now %,d. About 80 words, two minutes.".format(info.cutoff)) { go(Screen.VOCAB) }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            ToolRow(Icons.Filled.Spellcheck, "Calibrate on real text", "Paste text, see what counts as unknown, mark what you know") { go(Screen.CALIBRATE) }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            ToolRow(Icons.Filled.Style, "Your decks", "%,d words read from AnkiDroid".format(info.deckWords)) { go(Screen.DECK) }
-        }
-
-        SectionTitle("Behind the scenes")
-        Column {
-            ToolRow(Icons.Filled.BarChart, "Review log and costs", "What would have been answered, vs what you pressed in AnkiDroid · $%.2f so far".format(info.totalCost)) { go(Screen.LOGS) }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            ToolRow(Icons.Filled.Description, "Prompts and story files", "Your taste, the game master's prompts, characters, secrets") { go(Screen.FILES) }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            ToolRow(Icons.Filled.Link, "AnkiDroid connection", info.collection) { go(Screen.TARGET) }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            ToolRow(Icons.Filled.Settings, "Settings", "Text size, passage length, API key, new story") { go(Screen.SETTINGS) }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            ToolRow(Icons.Filled.Tune, "Run setup again", "Welcome, dictionary, decks, vocabulary, key, story") { onRestartSetup() }
-        }
-        Spacer(Modifier.height(16.dp))
+        SectionTitle("Tools")
+        TileGrid(listOf(
+            Tile(Icons.Filled.Quiz, "Vocab check", "cut-off %,d".format(info.cutoff)) { go(Screen.VOCAB) },
+            Tile(Icons.Filled.Spellcheck, "Calibrate", "on real text", Tint.JADE) { go(Screen.CALIBRATE) },
+            Tile(Icons.Filled.Style, "Your decks", "%,d words".format(info.deckWords), Tint.VERMILION) { go(Screen.DECK) },
+            Tile(Icons.Filled.BarChart, "Review log", "$%.2f spent".format(info.totalCost)) { go(Screen.LOGS) },
+            Tile(Icons.Filled.Description, "Story files", "prompts, cast", Tint.JADE) { go(Screen.FILES) },
+            Tile(Icons.Filled.Link, "AnkiDroid", if (info.collectionIsReal) "real collection" else if (info.connected) "copy" else "connect", Tint.VERMILION) { go(Screen.TARGET) },
+            Tile(Icons.Filled.Settings, "Settings", "text, length, key") { go(Screen.SETTINGS) },
+            Tile(Icons.Filled.Tune, "Setup again", "the walk-through", Tint.NEUTRAL) { onRestartSetup() },
+        ))
+        Spacer(Modifier.height(12.dp))
     }
 }
 
-/** Today in numbers: what Anki has due, what the story has covered (read-only: would-be grades). */
+/** The app's mark: the launcher icon's page on its indigo tile, drawn small. */
+@Composable
+fun AppMark(size: androidx.compose.ui.unit.Dp) {
+    Box(Modifier.size(size).clip(RoundedCornerShape(size * 0.28f))) {
+        androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.cramtale.app.R.drawable.ic_launcher_background), null, Modifier.size(size))
+        androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.cramtale.app.R.drawable.ic_launcher_foreground), null,
+            Modifier.size(size * 1.35f).offset(x = -size * 0.175f, y = -size * 0.175f))
+    }
+}
+
+@Composable
+fun StatusPill(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, container: Color, content: Color) {
+    Row(Modifier.clip(RoundedCornerShape(50)).background(container).padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Icon(icon, null, Modifier.size(14.dp), tint = content)
+        Text(text, style = MaterialTheme.typography.labelMedium, color = content)
+    }
+}
+
+/** The story, first and loudest: where you are, the last lines, Continue. */
+@Composable
+fun StoryHero(info: HomeInfo, onOpen: () -> Unit) {
+    val a = LocalAccents.current
+    Column(
+        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large)
+            .background(Brush.linearGradient(listOf(a.heroStart, a.heroEnd)))
+            .clickable(onClick = onOpen).padding(22.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(if (info.turn == 0) "A new story" else "Chapter ${info.chapter} · turn ${info.turn}",
+            style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.7f))
+        Text(info.place ?: "Your story", style = MaterialTheme.typography.titleLarge, color = Color.White)
+        info.lastLines?.let {
+            Text(it, style = ReadingText.copy(fontSize = 16.sp, lineHeight = 28.sp), color = Color.White.copy(alpha = 0.85f),
+                maxLines = 3, overflow = TextOverflow.Ellipsis)
+        }
+        Spacer(Modifier.height(4.dp))
+        Button(onOpen, Modifier.heightIn(min = 48.dp), shape = RoundedCornerShape(24.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = a.amber, contentColor = Color(0xFF231700))) {
+            Icon(Icons.AutoMirrored.Filled.MenuBook, null, Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(if (info.turn == 0) "Begin" else "Continue", style = MaterialTheme.typography.labelLarge)
+        }
+    }
+}
+
+enum class Tint { INDIGO, JADE, VERMILION, NEUTRAL }
+
+data class Tile(val icon: androidx.compose.ui.graphics.vector.ImageVector, val title: String, val value: String?,
+                val tint: Tint = Tint.INDIGO, val onClick: () -> Unit)
+
+/** Tools as a two-column grid of tiles: an icon, a name, one number or word. */
+@Composable
+fun TileGrid(tiles: List<Tile>) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        tiles.chunked(2).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                row.forEach { t -> ToolTile(t, Modifier.weight(1f)) }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+fun ToolTile(t: Tile, modifier: Modifier = Modifier) {
+    val cs = MaterialTheme.colorScheme
+    val (container, content) = when (t.tint) {
+        Tint.INDIGO -> cs.primaryContainer to cs.onPrimaryContainer
+        Tint.JADE -> cs.tertiaryContainer to cs.onTertiaryContainer
+        Tint.VERMILION -> cs.accentContainer to cs.onAccentContainer
+        Tint.NEUTRAL -> cs.surfaceContainerHigh to cs.onSurfaceVariant
+    }
+    Surface(modifier.clip(MaterialTheme.shapes.medium).clickable(onClick = t.onClick), shape = MaterialTheme.shapes.medium,
+        color = cs.surfaceContainerLowest, shadowElevation = 1.dp) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconTile(t.icon, container, content, size = 36.dp)
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(t.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                t.value?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            }
+        }
+    }
+}
+
+/** Today in numbers: what Anki has due, what the story read (would-be grades while read-only). */
 @Composable
 fun TodayCard(info: HomeInfo) {
     if (info.due == null && info.readToday == 0) return
-    PaperCard {
-        Text("Today", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            info.due?.let { d ->
-                Figure(Modifier.weight(1f), d.total.toString(), "due in Anki",
-                    listOfNotNull(d.review.takeIf { it > 0 }?.let { "$it review" }, d.learn.takeIf { it > 0 }?.let { "$it learning" },
-                        d.new.takeIf { it > 0 }?.let { "$it new" }).joinToString(" · ").ifEmpty { "all done" })
+    val cs = MaterialTheme.colorScheme
+    // both cards as tall as the taller one
+    Row(Modifier.height(androidx.compose.foundation.layout.IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        info.due?.let { d ->
+            StatCard(Modifier.weight(1f), Icons.Filled.Inbox, d.total.toString(), "due in Anki", cs.primary) {
+                if (d.total == 0) Text("all done", style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
+                else Breakdown(listOf(d.review to "review", d.learn to "learning", d.new to "new"))
             }
-            Figure(Modifier.weight(1f), info.readToday.toString(), "read in the story",
-                if (info.readToday == 0) "none yet" else "${info.goodToday} Good · ${info.againToday} Again")
         }
-        if (info.due != null && info.due.total > 0) {
-            val n = kotlin.math.ceil(info.due.total / info.perPassage.coerceAtLeast(1.0)).toInt()
-            Text("About $n passages to cover what's due (about ${"%.0f".format(info.perPassage)} review words each). " +
-                "Read-only for now: Anki's count only drops once the app answers cards.",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        StatCard(Modifier.weight(1f), Icons.AutoMirrored.Filled.MenuBook, info.readToday.toString(), "read in the story", cs.tertiary) {
+            if (info.readToday == 0) Text("none yet", style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
+            else Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Dot(cs.tertiary, "${info.goodToday} good")
+                Dot(cs.accent, "${info.againToday} again")
+            }
+        }
+    }
+    if (info.due != null && info.due.total > 0) {
+        val n = kotlin.math.ceil(info.due.total / info.perPassage.coerceAtLeast(1.0)).toInt()
+        Text("≈ $n passages to get through what's due", style = MaterialTheme.typography.bodySmall,
+            color = cs.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp))
+    }
+}
+
+@Composable
+private fun StatCard(modifier: Modifier, icon: androidx.compose.ui.graphics.vector.ImageVector, number: String, label: String, accent: Color,
+                     detail: @Composable () -> Unit) {
+    Surface(modifier.fillMaxHeight(), shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerLowest, shadowElevation = 1.dp) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(icon, null, Modifier.size(16.dp), tint = accent)
+                Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text(number, style = MaterialTheme.typography.displaySmall, color = accent)
+            detail()
         }
     }
 }
 
 @Composable
-private fun Figure(modifier: Modifier, number: String, label: String, detail: String) {
-    Column(modifier) {
-        Text(number, style = MaterialTheme.typography.headlineMedium.copy(fontFamily = FontFamily.Serif), color = MaterialTheme.colorScheme.primary)
-        Text(label, style = MaterialTheme.typography.labelLarge)
-        Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun Breakdown(parts: List<Pair<Int, String>>) {
+    Text(parts.filter { it.first > 0 }.joinToString(" · ") { "${it.first} ${it.second}" }, style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+}
+
+@Composable
+private fun Dot(color: Color, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+        Box(Modifier.size(8.dp).clip(CircleShape).background(color))
+        Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
