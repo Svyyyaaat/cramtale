@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -64,7 +65,7 @@ fun AppBar(title: String, onBack: (() -> Unit)? = null, actions: @Composable Row
 @Composable
 fun Page(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Column(
-        modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp),
+        modifier.fillMaxSize().verticalScroll(rememberScrollState()).navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp), content = content,
     )
 }
@@ -157,7 +158,7 @@ fun StepHeader(step: Int, of: Int, title: String, body: String) {
 /** A step's buttons, pinned to the bottom. */
 @Composable
 fun StepFooter(primary: String, onPrimary: () -> Unit, enabled: Boolean = true, secondary: String? = null, onSecondary: (() -> Unit)? = null) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         PrimaryButton(primary, onPrimary, enabled = enabled)
         if (secondary != null && onSecondary != null) TextButton(onSecondary, Modifier.fillMaxWidth()) { Text(secondary) }
     }

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -37,6 +38,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.cramtale.app.AppState
 import com.cramtale.core.match.DeckIndex
 import com.cramtale.core.match.VocabCheck
@@ -50,7 +52,7 @@ fun VocabQuestion(
     previous: Pair<VocabCheck.Item, Boolean>?,
     onAnswer: (Boolean) -> Unit, onBack: () -> Unit,
 ) {
-    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(Modifier.fillMaxSize().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         LinearProgressIndicator(progress = { index / total.toFloat() }, modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
             trackColor = MaterialTheme.colorScheme.surfaceVariant, drawStopIndicator = {})
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -67,8 +69,16 @@ fun VocabQuestion(
         if (previous != null) PaperCard {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("${previous.first.spelling}  ·  ${if (previous.second) "you said known" else "you said unknown"}",
-                        style = MaterialTheme.typography.labelLarge)
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        // the word with its reading above it, like furigana
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            if (previous.first.reading.isNotEmpty()) Text(previous.first.reading, style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(previous.first.spelling, style = ReadingText.copy(fontSize = 20.sp, lineHeight = 24.sp))
+                        }
+                        Text("  ·  ${if (previous.second) "you said known" else "you said unknown"}",
+                            style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(bottom = 2.dp))
+                    }
                     Text(previous.first.gloss, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
                 }
                 QuietButton("Back", onBack, icon = Icons.AutoMirrored.Filled.Undo)

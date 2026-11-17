@@ -73,7 +73,7 @@ class Shots {
 
     @Test fun a6_vocab_question() = shot {
         VocabQuestion(VocabCheck.Item(1, "見比べる", 6400, 6000, "to compare with the eye"), 23, 80,
-            VocabCheck.Item(2, "娯楽", 6900, 6000, "amusement; entertainment; recreation") to true, {}, {})
+            VocabCheck.Item(2, "娯楽", 6900, 6000, "amusement; entertainment; recreation", "ごらく") to true, {}, {})
     }
 
     @Test fun a7_vocab_results() = shot {
@@ -134,7 +134,7 @@ class Shots {
 
     @Test fun a6b_vocab_question_dark() = shot(dark = true) {
         VocabQuestion(VocabCheck.Item(1, "見比べる", 6400, 6000, "to compare with the eye"), 23, 80,
-            VocabCheck.Item(2, "娯楽", 6900, 6000, "amusement; entertainment; recreation") to false, {}, {})
+            VocabCheck.Item(2, "娯楽", 6900, 6000, "amusement; entertainment; recreation", "ごらく") to false, {}, {})
     }
 
     @Test fun d1_story() = storyShot(false)

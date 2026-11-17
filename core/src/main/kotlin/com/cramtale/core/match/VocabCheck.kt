@@ -14,7 +14,8 @@ object VocabCheck {
     const val PER_BAND = 10
     const val TARGET = 0.9
 
-    data class Item(val entry: Long, val spelling: String, val rank: Int, val band: Int, val gloss: String)
+    /** [reading]: kana for a spelling with kanji (shown as furigana once answered), "" otherwise. */
+    data class Item(val entry: Long, val spelling: String, val rank: Int, val band: Int, val gloss: String, val reading: String = "")
 
     data class BandResult(val from: Int, val to: Int, val asked: Int, val known: Int) {
         val share get() = if (asked == 0) 0.0 else known.toDouble() / asked
@@ -36,7 +37,8 @@ object VocabCheck {
                     // a kana spelling of a word normally written in kanji is a reading test, not a word test
                     val forms = dict.forms(r.entry)
                     if (Kana.isKana(r.spelling) && forms.kanji.isNotEmpty() && senses.none { "uk" in it.misc }) return@mapNotNull null
-                    Item(r.entry, r.spelling, r.rank, from, senses.first().gloss)
+                    Item(r.entry, r.spelling, r.rank, from, senses.first().gloss,
+                        if (Kana.hasKanji(r.spelling)) forms.kana.firstOrNull().orEmpty() else "")
                 }
                 .distinctBy { it.entry }
                 .take(PER_BAND)
