@@ -10,7 +10,7 @@ import com.cramtale.core.match.DeckDefaults
  */
 object Probe {
     private val CARD_COLUMNS = listOf(
-        "note_id", "ord", "card_name", "deck_id", "type", "queue", "due", "reps", "ivl", "lapses", "left", "odue", "factor", "flags",
+        "note_id", "ord", "card_name", "deck_id", "type", "queue", "due", "reps", "interval", "lapses", "left", "original_due", "flags",
     )
 
     fun run(context: Context, target: AnkiTarget): String = buildString {

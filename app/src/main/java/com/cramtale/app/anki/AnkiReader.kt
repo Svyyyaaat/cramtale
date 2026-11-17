@@ -66,7 +66,8 @@ class AnkiReader(private val context: Context, val target: AnkiTarget) : AnkiSou
     /** Template ord → name for a note type. */
     fun templates(modelId: Long): Map<Int, String> {
         val uri = Uri.withAppendedPath(Uri.withAppendedPath(modelsUri, modelId.toString()), "templates")
-        return query(uri, arrayOf("ord", "name"), null) { c -> c.int("ord") to (c.string("name") ?: "") }.toMap()
+        // column names from AnkiDroid's FlashCardsContract.CardTemplate
+        return query(uri, arrayOf("ord", "card_template_name"), null) { c -> c.int("ord") to (c.string("card_template_name") ?: "") }.toMap()
     }
 
     /** Note ids matching an Anki search string. */
@@ -125,7 +126,8 @@ class AnkiReader(private val context: Context, val target: AnkiTarget) : AnkiSou
     /** The card's scheduling state; reps and ivl only where this AnkiDroid reports them. */
     override fun card(ref: CardRef): CardInfo? {
         val uri = cardUri(ref.noteId, ref.ord)
-        for (cols in listOf(arrayOf("type", "queue", "due", "reps", "ivl"), arrayOf("type", "queue", "due", "reps"), arrayOf("type", "queue", "due"))) {
+        // FlashCardsContract.Card: "interval" (not "ivl"); older AnkiDroids lack reps/interval
+        for (cols in listOf(arrayOf("type", "queue", "due", "reps", "interval"), arrayOf("type", "queue", "due", "reps"), arrayOf("type", "queue", "due"))) {
             val r = runCatching {
                 query(uri, cols, null) { c ->
                     CardInfo(c.getInt(0), c.getInt(1), c.getLong(2), if (cols.size > 3) c.getInt(3) else -1, if (cols.size > 4) c.getInt(4) else -1)
