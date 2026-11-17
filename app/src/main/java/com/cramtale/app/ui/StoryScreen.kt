@@ -362,7 +362,9 @@ fun StoryScreen(state: AppState, onBack: () -> Unit) {
     var grammar by remember { mutableStateOf<GrammarPatterns.Found?>(null) }
     var editing by remember { mutableStateOf<String?>(null) }
     var tapVersion by remember { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) { if (story.current == null && story.busy == null && story.error == null) story.launch { start() } }
+    // start() is safe to repeat: it shows the waiting passage, finishes a half-done turn, or answers an
+    // unsent reply; an error left over from elsewhere (setup, styles) must not keep the story from opening
+    LaunchedEffect(Unit) { if (story.current == null && !story.isWorking) story.launch { start() } }
 
     StoryContent(
         title = story.title ?: "Story", cost = story.sessionCost(), history = story.history, current = story.current,

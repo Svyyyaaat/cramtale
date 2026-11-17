@@ -297,6 +297,8 @@ class StoryController(
         // a waiting passage comes back as it was; a half-done turn is finished; otherwise the next one
         val t = if (e.pending != null) e.resume() else e.playerTurn(message, pool, knownKeys())
         afterTurn(t)
+        // the reply that was waiting is answered: it leaves the box
+        t.player?.let { p -> if (replyDraft.trim() == p.trim()) replyDraft = "" }
     }
 
     /** Your reply: the current passage is graded (read-only: logged), then the next one is written. */
