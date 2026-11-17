@@ -21,6 +21,8 @@ data class NoteTypeRule(
     val wordField: String,
     val readingField: String? = null,
     val recognitionTemplates: Set<String>,
+    /** The card's own meaning, shown when the word is tapped (null: the dictionary's). */
+    val meaningField: String? = null,
 )
 
 enum class CardState { STUDIED, STUDIED_SUSPENDED, NEW, NEW_SUSPENDED }
@@ -36,13 +38,15 @@ data class DeckWord(
     val cards: List<RawCard>,
     /** Every spelling the field lists (良い，いい → 良い, いい). */
     val variants: List<String> = listOf(word),
+    /** The meaning on the user's card (HTML stripped), if the note type has one. */
+    val meaning: String? = null,
 )
 
 object DeckDefaults {
     /** The four note types in the user's collection (PLAN.md §1). */
     val rules = listOf(
-        NoteTypeRule("Japanese Core 5k", "Lemma", null, setOf("Recognition")),
-        NoteTypeRule("Japanese (Furigana1, Kanji2 V2K)", "Expression", "Reading", setOf("Furigana1", "Kanji2")),
+        NoteTypeRule("Japanese Core 5k", "Lemma", null, setOf("Recognition"), meaningField = "English Gloss"),
+        NoteTypeRule("Japanese (Furigana1, Kanji2 V2K)", "Expression", "Reading", setOf("Furigana1", "Kanji2"), meaningField = "Meaning"),
         NoteTypeRule("基本", "裏", null, setOf("カード:1")),
     )
 
@@ -61,6 +65,10 @@ object WordExtract {
         entities.forEach { (k, v) -> s = s.replace(k, v) }
         return s.lines().map { it.trim() }.filter { it.isNotEmpty() }
     }
+
+    /** A field as plain text: HTML and sound/image references gone, lines joined with "; ". */
+    fun plain(field: String): String = plainLines(field.replace(Regex("\\[sound:[^\\]]*\\]"), ""))
+        .joinToString("; ").replace(Regex("\\s+"), " ").trim()
 
     /** The word from a field: first line, no HTML, no furigana brackets, no parenthesised notes or tildes. */
     fun word(field: String): String = variants(field).firstOrNull() ?: ""
@@ -115,7 +123,8 @@ object DeckReader {
             val variants = WordExtract.variants(n.fields[rule.wordField].orEmpty())
             if (variants.isEmpty()) return@mapNotNull null
             val reading = rule.readingField?.let { n.fields[it] }?.let(WordExtract::reading)
-            DeckWord(n.noteId, n.deck, n.noteType, variants.first(), reading, state(cards), cards, variants)
+            val meaning = rule.meaningField?.let { n.fields[it] }?.let(WordExtract::plain)?.takeIf { it.isNotBlank() }
+            DeckWord(n.noteId, n.deck, n.noteType, variants.first(), reading, state(cards), cards, variants, meaning)
         }
     }
 }

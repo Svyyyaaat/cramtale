@@ -272,7 +272,9 @@ fun StoryContent(
 data class WordInfo(val word: String, val reading: String?, val inSentence: String?, val senses: List<String>, val inDeck: Boolean,
                     val isName: Boolean = false,
                     /** Looked up in an earlier passage: not graded, nothing to cancel. */
-                    val earlier: Boolean = false)
+                    val earlier: Boolean = false,
+                    /** The meaning on your own card, for deck words. */
+                    val card: String? = null)
 
 /** How a name is read, from the tokenizer, in hiragana; null when it's already all kana. */
 fun nameReading(surface: String): String? {
@@ -302,7 +304,13 @@ fun WordSheetBody(info: WordInfo, onKnow: () -> Unit, onClose: () -> Unit) {
                 Text(info.inSentence ?: "…", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
             }
         }
-        if (info.senses.isNotEmpty()) {
+        info.card?.let {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Your card", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(it, style = MaterialTheme.typography.bodyLarge)
+            }
+        }
+        if (info.senses.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text("Dictionary", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             info.senses.forEachIndexed { i, s -> Text("${i + 1}. $s", style = MaterialTheme.typography.bodyMedium) }
         }
@@ -372,7 +380,7 @@ fun StoryScreen(state: AppState, onBack: () -> Unit) {
             if (story.isName(span)) WordInfo(span.surface, nameReading(span.surface), meaning, emptyList(), false, isName = true)
             else WordInfo(span.lemma, span.entries.firstOrNull()?.let { dict?.forms(it)?.kana?.firstOrNull() }, meaning,
                 span.entries.take(2).flatMap { e -> dict?.senses(e).orEmpty().take(3).map { it.gloss } }, span.deck.isNotEmpty(),
-                earlier = lookupOnly)
+                earlier = lookupOnly, card = span.deck.firstNotNullOfOrNull { it.meaning })
         }
         WordSheet(info, onKnow = { story.iKnowIt(span); tapVersion++; picked = null }, onClose = { picked = null })
     }

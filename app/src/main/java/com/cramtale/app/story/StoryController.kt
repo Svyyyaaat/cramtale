@@ -382,7 +382,9 @@ class StoryController(
         val dict = app.jmdict()
         analysis?.spans?.forEach { s ->
             s.deck.filter { it.noteId in newNotes }.forEach { w ->
-                glosses[w.noteId] = s.entries.firstOrNull()?.let { dict?.senses(it)?.firstOrNull()?.gloss }?.substringBefore(";").orEmpty()
+                // the card's own meaning first (it's what you'll study), else the dictionary's first sense
+                glosses[w.noteId] = (w.meaning ?: s.entries.firstOrNull()?.let { dict?.senses(it)?.firstOrNull()?.gloss })
+                    ?.substringBefore(";")?.trim().orEmpty()
             }
         }
         val passage = ShownPassage(turn, d.passage, analysis?.spans.orEmpty(), grammarFound, newNotes, glosses,

@@ -174,7 +174,7 @@ class Shots {
     }
 
     @Test fun d3_word_sheet() = shot {
-        WordSheetBody(WordInfo("返済", "へんさい", "repaying the loan", listOf("repayment; reimbursement; refund"), false), {}, {})
+        WordSheetBody(WordInfo("返済", "へんさい", "repaying the loan", listOf("repayment; reimbursement; refund"), true, card = "repayment"), {}, {})
     }
 
     @Test fun d4_name_sheet() = shot {
