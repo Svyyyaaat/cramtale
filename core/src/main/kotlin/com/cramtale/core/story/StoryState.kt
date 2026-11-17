@@ -8,7 +8,7 @@ import java.io.File
  * Everything the story knows, in plain files under one directory (PLAN.md §6.2). Code owns it:
  * models only propose changes ([StateOp]), which [apply] checks before writing.
  *
- *   state/characters/<name>.md   goals, limits, secrets, what they want, attitude (free text for the model)
+ *   state/characters/c1.md…     "# name" then goals, limits, secrets, what they want, attitude (free text)
  *   state/world.md               places, factions; "## Clocks" lines: "- name: 3/6 — when full: …"
  *   state/secrets.md             "- S1: text [knows: 佐伯, 北村]"
  *   state/consequences.md        "- C1: text [due: turn 12] [open]"
@@ -34,6 +34,8 @@ class StoryState(val dir: File) {
         var present: MutableList<String> = ArrayList(),
         var beats: MutableList<Beat> = ArrayList(),
         var complication: String? = null,
+        /** The beat the complication was drawn for; a new beat draws a new one. */
+        var complicationFor: String? = null,
         var usedComplications: MutableList<String> = ArrayList(),
         /** Grammar or weak-point openings the director planned this session (at most one). */
         var openingsThisSession: Int = 0,
@@ -41,11 +43,20 @@ class StoryState(val dir: File) {
 
     // ---------- characters (free text) ----------
 
-    fun characterNames(): List<String> = charDir.listFiles { f -> f.extension == "md" }?.map { it.nameWithoutExtension }?.sorted().orEmpty()
+    // files are c1.md, c2.md…; the name is the first line ("# 佐伯"), so file names stay ASCII
+    private fun characterFiles(): Map<String, File> = charDir.listFiles { f -> f.extension == "md" }.orEmpty()
+        .associateBy { f -> f.useLines { it.firstOrNull() }.orEmpty().removePrefix("#").trim() }
 
-    fun character(name: String): String? = File(charDir, "$name.md").takeIf { it.exists() }?.readText()
+    fun characterNames(): List<String> = characterFiles().keys.sorted()
 
-    fun writeCharacter(name: String, text: String) { charDir.mkdirs(); File(charDir, "$name.md").writeText(text) }
+    /** The character's file without its name line. */
+    fun character(name: String): String? = characterFiles()[name]?.readLines()?.drop(1)?.joinToString("\n")?.trim()
+
+    fun writeCharacter(name: String, text: String) {
+        charDir.mkdirs()
+        val f = characterFiles()[name] ?: File(charDir, "c${(charDir.list()?.size ?: 0) + 1}.md")
+        f.writeText("# $name\n" + text.trim() + "\n")
+    }
 
     // ---------- world and clocks ----------
 
@@ -127,6 +138,7 @@ class StoryState(val dir: File) {
                 }
             }.orEmpty().toMutableList(),
             complication = o.optString("complication").ifEmpty { null },
+            complicationFor = o.optString("complicationFor").ifEmpty { null },
             usedComplications = o.optJSONArray("usedComplications").strings().toMutableList(),
             openingsThisSession = o.optInt("openingsThisSession"),
         )
@@ -142,6 +154,7 @@ class StoryState(val dir: File) {
                     .put("pressure", it.pressure).put("done", it.done)
             }))
             .put("complication", s.complication ?: "")
+            .put("complicationFor", s.complicationFor ?: "")
             .put("usedComplications", JSONArray(s.usedComplications))
             .put("openingsThisSession", s.openingsThisSession)
         sceneFile.writeText(o.toString(2))

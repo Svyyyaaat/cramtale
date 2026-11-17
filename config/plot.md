@@ -1,0 +1,1 @@
+Hard stories with real stakes where I can lose; adults with conflicting interests; no moral lessons and no guaranteed good endings; emotion only when something caused it, at the size the cause deserves; things happen on the page and people say what they mean.

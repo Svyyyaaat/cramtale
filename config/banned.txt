@@ -1,0 +1,23 @@
+# One regular expression per line. A hit sends the sentence back for one rewrite.
+# Starter list written for this project (no published Japanese list exists); grow it from what shows up.
+# Stock bodily reactions
+息を(呑|の)[むんみ]
+拳を(固く)?握りしめ
+心臓が(跳ね|早鐘)
+唇を噛[むみん]
+胸が(締め付け|締めつけ)
+背筋[がに]冷た
+喉の奥で
+# Time and silence clichés
+時が止まった
+沈黙が(落ち|降り|満ち)
+空気が(凍|張り詰め|張りつめ)
+静寂が(落ち|支配)
+# Announcing impact or meaning
+言葉が(胸に)?(刺さ|響い)
+その言葉の重み
+# "Not X but Y"
+ではなく、.{1,20}(だった|である)。
+# Smells and textures the model reaches for
+オゾン
+金属(的な|の)(匂い|臭い|味)

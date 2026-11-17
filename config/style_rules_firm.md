@@ -1,0 +1,1 @@
+Never use stock reactions (息を呑む, 拳を握りしめる, 心臓が跳ねる, 唇を噛む, 時が止まる, 沈黙が落ちる); never write "not X but Y" (〜ではなく、〜だった); never explain what a line meant or say that words "landed"; never end on the meaning of the scene; never repeat or paraphrase the player's last words. Instead: a specific physical action, a sound with a source, a plain statement of what is.

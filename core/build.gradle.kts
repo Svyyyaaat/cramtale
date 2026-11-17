@@ -26,6 +26,12 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.3")
 }
 
+// prompts/ and config/ (the editable defaults) ship inside core's resources as /prompts and /config
+tasks.processResources {
+    from(rootProject.file("prompts")) { into("prompts") }
+    from(rootProject.file("config")) { into("config") }
+}
+
 tasks.test {
     useJUnitPlatform()
     // Real-data tests find JMdict and the deck export here; they skip when the files are absent.

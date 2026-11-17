@@ -1,0 +1,16 @@
+Create the starting material for a Japanese roleplaying game, as its game master. The player's taste in stories:
+
+{{plot}}
+
+{{seed}}
+
+Make a small, grounded world: one town or neighbourhood, present day unless the seed says otherwise, adults with work, money and history. The player's character is someone with a stake in it and something to lose (describe them only by situation, never by personality or feelings: the player plays them).
+
+Return JSON:
+- `world`: markdown, under 250 words: the place, the institutions and money that matter, what is going wrong.
+- `player`: two sentences: who the player character is, what they have, what they owe.
+- `characters`: three or four people, each `name` (Japanese), `file` (markdown, under 150 words, with sections Goals, Limits, Secrets, Wants from the player, Attitude: each person wants something that conflicts with someone else, is slow to agree and hard to impress).
+- `secrets`: `text` and `knows` (names).
+- `clocks`: two or three off-screen threats, `name` (Japanese), `size` 4–8, `when_full`.
+- `complications`: ten grounded complications for this world, each one line, optionally starting with a place tag in brackets.
+- `opening`: `place`, `present` (names), and one sentence on the situation the first passage starts in.
