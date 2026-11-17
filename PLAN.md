@@ -229,16 +229,18 @@ Ignored parts of speech: interjections (感動詞), particles (助詞), auxiliar
 suffixes and prefixes are attached to their word.
 
 ### 5.2 Normalisation and matching
-- JMdict (downloaded once on first run, about 60 MB compressed, streamed into SQLite like the
+- JMdict (downloaded once on first run, about 10 MB compressed, streamed into SQLite like the
   Miner's `build_jmdict.py`) maps every kanji and kana spelling to an **entry id**. The match
   key is that entry id, with the base form as fallback. That covers 何故/なぜ, 付属/附属,
   かつ丼/カツ丼, and okurigana variants.
 - **Multi-word deck entries** (腹が立つ, 気がする, 仕方ない) are matched over token sequences on
   base forms, **longest first**, before single words.
 - **Known** = deck ∪ frequency list ∪ words you marked known ∪ names.
-- **Frequency list:** built in from JMdict's priority tags (`nf01–nf48` ranks, `ichi1`, `news1`,
-  `spec1`), so no extra licence is needed. Step 1 calibrates the threshold on your marks.
-  Importing a ranked list (one word per line) is optional.
+- **Frequency list:** jpdb.io's ranks, keyed by JMdict entry id. The rank used is the median of the
+  Anime, Visual Novel, Books, Web Novel and Live Action ranks, so it reflects fiction and dialogue,
+  not news. Collected from the vocabulary lists of four light-novel series by `tools/jpdb_ranks.py`.
+  Words it lacks fall back to JMdict's priority tags. Step 1 calibrates the threshold on your marks.
+  (A list built from news corpora was tried first and dropped: it ranked サービス above どきどき.)
 
 ### 5.3 Checks on every passage, before you see it
 1. **Target words:** the writer returns `{lemma, form}` for each due word it used. Code

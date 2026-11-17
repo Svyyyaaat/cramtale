@@ -20,4 +20,17 @@ object DeckExport {
             tags = o.optString("tags"),
         )
     }.toList()
+
+    /** The same JSON-lines shape, so a deck read from AnkiDroid can be cached and reloaded. */
+    fun write(notes: List<RawNote>, out: Appendable) {
+        for (n in notes) {
+            val o = JSONObject()
+            o.put("noteId", n.noteId).put("deck", n.deck).put("noteType", n.noteType).put("tags", n.tags)
+            o.put("fields", JSONObject(n.fields))
+            o.put("cards", org.json.JSONArray(n.cards.map {
+                JSONObject().put("ord", it.ord).put("template", it.template).put("type", it.type).put("queue", it.queue)
+            }))
+            out.append(o.toString()).append('\n')
+        }
+    }
 }

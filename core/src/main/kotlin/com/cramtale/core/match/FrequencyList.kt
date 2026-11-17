@@ -3,23 +3,37 @@ package com.cramtale.core.match
 import java.io.InputStream
 
 /**
- * Lemma frequency ranks (1 = most frequent), in the same lemma forms the matcher produces.
- * The bundled list is built by `cli build-freq` from the Leipzig Corpora Collection
- * (Japanese news 2010, 2011 and 2019, 300k sentences each, CC BY 4.0).
+ * Word frequency ranks from jpdb.io, keyed by JMdict entry id (jpdb's vocabulary ids are JMdict
+ * sequence numbers) and spelling. The rank is the median of jpdb's Anime, Visual Novel, Books,
+ * Web Novel and Live Action ranks: how common a word is in fiction and dialogue, not in news.
+ * Collected by tools/jpdb_ranks.py; see freq/SOURCES.md.
  */
-class FrequencyList(private val ranks: Map<String, Int>) {
-    fun rank(lemma: String): Int? = ranks[lemma]
-    val size get() = ranks.size
+class FrequencyList(
+    private val bySpelling: Map<Long, Map<String, Int>>,
+) {
+    val size get() = bySpelling.size
+
+    /** The rank of this spelling of one of [entries], else the entry's best rank. */
+    fun rank(entries: Collection<Long>, spelling: String): Int? {
+        val maps = entries.mapNotNull { bySpelling[it] }
+        if (maps.isEmpty()) return null
+        maps.mapNotNull { it[spelling] }.minOrNull()?.let { return it }
+        return maps.flatMap { it.values }.minOrNull()
+    }
 
     companion object {
-        const val RESOURCE = "/freq/leipzig_lemmas.tsv"
+        const val RESOURCE = "/freq/jpdb_ranks.tsv"
 
         fun parse(input: InputStream): FrequencyList {
-            val map = HashMap<String, Int>(65_536)
+            val map = HashMap<Long, HashMap<String, Int>>(65_536)
             input.bufferedReader(Charsets.UTF_8).useLines { lines ->
-                lines.filter { it.isNotBlank() && !it.startsWith("#") }.forEach { line ->
-                    val tab = line.indexOf('\t')
-                    if (tab > 0) map.putIfAbsent(line.substring(0, tab), map.size + 1)
+                for (line in lines) {
+                    if (line.isBlank() || line.startsWith("#")) continue
+                    val f = line.split('\t')
+                    if (f.size < 3) continue
+                    val id = f[0].toLongOrNull() ?: continue
+                    val rank = f[2].toIntOrNull() ?: continue
+                    map.getOrPut(id) { HashMap(2) }.merge(f[1], rank, ::minOf)
                 }
             }
             return FrequencyList(map)

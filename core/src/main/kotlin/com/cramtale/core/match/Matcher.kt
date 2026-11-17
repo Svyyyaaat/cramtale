@@ -205,12 +205,9 @@ class Matcher(
         )
     }
 
-    /** The corpus rank when the list has the word, else JMdict's (coarser) priority rank. */
-    private fun rank(entries: Set<Long>, lemma: String): Int? {
-        val corpus = frequency?.rank(lemma)
-        val jm = Normalize.bestRank(dict, entries, lemma)
-        return listOfNotNull(corpus, jm).minOrNull()
-    }
+    /** jpdb's fiction rank when the list has the word, else JMdict's coarser priority rank. */
+    private fun rank(entries: Set<Long>, lemma: String): Int? =
+        frequency?.rank(entries, lemma) ?: Normalize.bestRank(dict, entries, lemma)
 
     /** The tokenizer's reading narrows homographs only when it reads the dictionary form itself. */
     private fun readingIfPlain(t: Tok) = t.reading.takeIf { it.isNotEmpty() && t.surface == t.base && Kana.hasKanji(t.surface) }

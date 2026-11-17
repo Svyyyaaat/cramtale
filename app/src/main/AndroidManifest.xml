@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- JMdict download (first run) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- AnkiDroid and its parallel builds (a–e): each has its own collection, provider and permission -->
+    <uses-permission android:name="com.ichi2.anki.permission.READ_WRITE_DATABASE" />
+    <uses-permission android:name="com.ichi2.anki.a.permission.READ_WRITE_DATABASE" />
+    <uses-permission android:name="com.ichi2.anki.b.permission.READ_WRITE_DATABASE" />
+    <uses-permission android:name="com.ichi2.anki.c.permission.READ_WRITE_DATABASE" />
+    <uses-permission android:name="com.ichi2.anki.d.permission.READ_WRITE_DATABASE" />
+    <uses-permission android:name="com.ichi2.anki.e.permission.READ_WRITE_DATABASE" />
+
+    <queries>
+        <package android:name="com.ichi2.anki" />
+        <package android:name="com.ichi2.anki.a" />
+        <package android:name="com.ichi2.anki.b" />
+        <package android:name="com.ichi2.anki.c" />
+        <package android:name="com.ichi2.anki.d" />
+        <package android:name="com.ichi2.anki.e" />
+    </queries>
+
+    <application
+        android:name=".CramtaleApp"
+        android:allowBackup="false"
+        android:icon="@drawable/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Cramtale">
+
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

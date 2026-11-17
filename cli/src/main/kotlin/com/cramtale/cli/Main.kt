@@ -20,8 +20,6 @@ import kotlin.system.exitProcess
 private const val USAGE = """cramtale CLI (matcher calibration)
 
   build-jmdict <JMdict_e.gz> <out.sqlite>
-  build-freq   --jmdict <db> --out <lemmas.tsv> [--min N] <sentences.txt>...
-               (Leipzig "-sentences.txt" files: id<TAB>sentence)
   deck-report  --jmdict <db> --deck <deck.jsonl>
   analyze      --jmdict <db> --deck <deck.jsonl> [--lists <dir>] [--threshold N]
                [--new-suspended-known] [--no-studied-suspended] <text file | ->
@@ -31,7 +29,6 @@ fun main(args: Array<String>) {
     if (args.isEmpty()) { print(USAGE); exitProcess(1) }
     when (args[0]) {
         "build-jmdict" -> buildJmdict(args.getOrNull(1), args.getOrNull(2))
-        "build-freq" -> buildFreq(Opts(args.drop(1)))
         "deck-report" -> deckReport(Opts(args.drop(1)))
         "analyze" -> analyze(Opts(args.drop(1)))
         else -> { print(USAGE); exitProcess(1) }
@@ -71,32 +68,6 @@ private fun buildJmdict(src: String?, out: String?) {
     System.err.println("\r$n entries in ${(System.currentTimeMillis() - t0) / 1000} s -> $out")
 }
 
-/** Counts the matcher's own lemmas over a corpus, so ranks line up exactly with what it looks up. */
-private fun buildFreq(o: Opts) {
-    val dict = Jmdict(JdbcSql(o.need("--jmdict")))
-    val matcher = Matcher(dict, DeckIndex(emptyList(), dict))
-    val counts = HashMap<String, Int>(200_000)
-    var n = 0
-    for (path in o.positional) {
-        File(path).useLines { lines ->
-            for (line in lines) {
-                val sentence = line.substringAfter('\t')
-                for (span in matcher.analyze(sentence).words()) counts.merge(span.lemma, 1, Int::plus)
-                if (++n % 20_000 == 0) System.err.print("\r$n sentences")
-            }
-        }
-    }
-    val min = o.named["--min"]?.toInt() ?: 3
-    val ranked = counts.entries.filter { it.value >= min }.sortedByDescending { it.value }
-    File(o.need("--out")).bufferedWriter().use { w ->
-        w.write("# lemma<TAB>count, most frequent first. Built by `cli build-freq` from the Leipzig Corpora Collection\n")
-        w.write("# (jpn_newscrawl_2019_300K, jpn_news_2011_300K, jpn_news_2010_300K; CC BY 4.0, https://wortschatz.uni-leipzig.de),\n")
-        w.write("# lemmatised with Kuromoji IPADIC and JMdict (EDRDG, CC BY-SA 4.0).\n")
-        for (e in ranked) w.write("${e.key}\t${e.value}\n")
-    }
-    System.err.println("\r$n sentences, ${counts.size} lemmas, ${ranked.size} kept (count >= $min)")
-}
-
 private fun load(o: Opts): Triple<Jmdict, DeckIndex, List<com.cramtale.core.match.DeckWord>> {
     val dict = Jmdict(JdbcSql(o.need("--jmdict")))
     val notes = File(o.need("--deck")).useLines { DeckExport.parse(it) }
@@ -105,7 +76,7 @@ private fun load(o: Opts): Triple<Jmdict, DeckIndex, List<com.cramtale.core.matc
 }
 
 private val frequency by lazy {
-    FrequencyList.bundled().also { if (it == null) System.err.println("(no bundled frequency list: JMdict priority ranks only)") }
+    FrequencyList.bundled().also { if (it == null) System.err.println("(no bundled jpdb list: JMdict priority ranks only)") }
 }
 
 private fun deckReport(o: Opts) {
