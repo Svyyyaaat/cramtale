@@ -98,6 +98,19 @@ class Shots {
 
     @Test fun a8_key() = shot { KeyStepContent("sk-ant-api03-xxxx", {}, {}, {}) }
 
+    @Test fun a8b_claude_code() = shot {
+        val registry = object : androidx.activity.result.ActivityResultRegistry() {
+            override fun <I, O> onLaunch(requestCode: Int, contract: androidx.activity.result.contract.ActivityResultContract<I, O>, input: I,
+                                         options: androidx.core.app.ActivityOptionsCompat?) {}
+        }
+        val owner = object : androidx.activity.result.ActivityResultRegistryOwner { override val activityResultRegistry = registry }
+        val ctx = androidx.compose.ui.platform.LocalContext.current
+        androidx.compose.runtime.CompositionLocalProvider(androidx.activity.compose.LocalActivityResultRegistryOwner provides owner) {
+            KeyStepContent("", {}, {}, {}, claudeCode = true,
+                claudeCodeSetup = { com.cramtale.app.ui.ClaudeCodeSetup(com.cramtale.app.AppState(ctx), intro = false) })
+        }
+    }
+
     @Test fun a9_story_setup() = shot { StoryStepContent("", {}, null, null, {}, {}) }
 
     @Test fun b1_styles() = shot {

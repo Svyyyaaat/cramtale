@@ -79,6 +79,12 @@ class AppState(val context: Context) {
 
     fun chooseMaterialYou(on: Boolean) { materialYou = on; prefs.edit().putBoolean("materialYou", on).apply() }
 
+    /** Which Claude runs the story: false = the API with the user's key, true = Claude Code in Termux (their subscription). */
+    var claudeCode by androidx.compose.runtime.mutableStateOf(prefs.getBoolean("claudeCode", false))
+        private set
+
+    fun chooseClaudeCode(on: Boolean) { claudeCode = on; prefs.edit().putBoolean("claudeCode", on).apply(); story.settingsChanged() }
+
     /** Reading text size, as a multiple of the default. */
     var textScale: Float
         get() = prefs.getFloat("textScale", 1f)

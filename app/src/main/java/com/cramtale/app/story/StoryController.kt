@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import com.cramtale.app.AppState
 import com.cramtale.app.anki.AnkiReader
 import com.cramtale.core.llm.AnthropicLlm
+import com.cramtale.core.llm.ClaudeCodeLlm
 import com.cramtale.core.llm.CostLog
 import com.cramtale.core.llm.Prices
 import com.cramtale.core.match.Analysis
@@ -137,6 +138,16 @@ class StoryController(
     fun launch(block: suspend StoryController.() -> Unit) { scope.launch { block() } }
 
     fun hasKey() = (fixedKey ?: keys.load()) != null
+    /** Claude is set up: a key, or Claude Code in Termux (its login can only be checked by a call: [testClaudeCode]). */
+    fun canCallClaude() = if (app.claudeCode && fixedKey == null) Termux.ready(context) else hasKey()
+
+    private fun claudeCodeLlm() = ClaudeCodeLlm { request, onText -> Termux.run(context, request, onText) }
+
+    /** A tiny Haiku call through Termux: null when it answered, else what went wrong. Blocking: call off the main thread. */
+    fun testClaudeCode(): String? = runCatching {
+        claudeCodeLlm().call(com.cramtale.core.llm.LlmRequest("test", com.cramtale.core.llm.Models.CHECKS, emptyList(),
+            listOf(com.cramtale.core.llm.Msg(com.cramtale.core.llm.Role.USER, "Reply with the single word OK."))))
+    }.fold({ r -> if (r.text.isBlank()) "Claude Code answered with nothing" else null }, { it.message ?: it.toString() })
     fun saveKey(k: String) { keys.save(k); engine = null }
 
     /** The saved key, shortened for display ("sk-ant-…a1b2"). */
@@ -173,7 +184,8 @@ class StoryController(
 
     private fun engine(): StoryEngine {
         engine?.let { return it }
-        val key = fixedKey ?: keys.load() ?: error("Add your Claude API key first")
+        val llm = if (app.claudeCode && fixedKey == null) claudeCodeLlm()
+            else llmFor(fixedKey ?: keys.load() ?: error("Add your Claude API key first"))
         val unknown = UnknownWords { text ->
             val m = app.matcher() ?: return@UnknownWords 0 to emptyList()
             val a = m.analyze(text)
@@ -185,7 +197,7 @@ class StoryController(
             }
             counted.size to unknown.map { it.lemma }
         }
-        return StoryEngine(dir, llmFor(key), costs, session, unknown,
+        return StoryEngine(dir, llm, costs, session, unknown,
             settings = StoryEngine.Settings(firmStyleRules = app.firmStyleRules, length = app.passageLength.text, aimWords = app.passageLength.aim)).also { e ->
             engine = e
             e.onCall = { purpose -> if (isWorking) STEP_LABELS[purpose]?.let { busy = it } }

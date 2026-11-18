@@ -73,7 +73,8 @@ class CostLog(private val file: File?, private val prices: Map<String, Price> = 
 
     @Synchronized
     fun record(session: String, req: LlmRequest, resp: LlmResponse): Entry {
-        val price = prices[resp.model] ?: prices[req.model]
+        // calls paid by a subscription (Claude Code) have no list price
+        val price = if (resp.model.startsWith(ClaudeCodeLlm.PREFIX)) null else prices[resp.model] ?: prices[req.model]
         val e = Entry(Instant.now(), session, req.purpose, resp.model, resp.usage, price?.cost(resp.usage) ?: 0.0)
         entries += e
         file?.let { f ->

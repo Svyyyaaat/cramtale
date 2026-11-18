@@ -38,6 +38,8 @@ data class SettingsValues(
     val styleLine: String? = null,
     val theme: com.cramtale.app.AppState.ThemeMode = com.cramtale.app.AppState.ThemeMode.SYSTEM,
     val materialYou: Boolean = true,
+    /** Claude Code in Termux instead of the API. */
+    val claudeCode: Boolean = false,
 )
 
 val TEXT_SCALES = listOf(0.85f to "Small", 1f to "Normal", 1.15f to "Large", 1.3f to "Larger")
@@ -46,7 +48,7 @@ val TEXT_SCALES = listOf(0.85f to "Small", 1f to "Normal", 1.15f to "Large", 1.3
 fun SettingsScreen(state: AppState, onNewStory: () -> Unit, onScale: (Float) -> Unit, onPickStyle: () -> Unit) {
     var v by remember {
         mutableStateOf(SettingsValues(state.textScale, state.passageLength, state.twoReads, state.firmStyleRules, state.story.keyHint(),
-            state.story.styleLine(), state.themeMode, state.materialYou))
+            state.story.styleLine(), state.themeMode, state.materialYou, state.claudeCode))
     }
     SettingsContent(v,
         onScale = { state.textScale = it; onScale(it); v = v.copy(textScale = it) },
@@ -58,6 +60,8 @@ fun SettingsScreen(state: AppState, onNewStory: () -> Unit, onScale: (Float) -> 
         onPickStyle = onPickStyle,
         onTheme = { state.setTheme(it); v = v.copy(theme = it) },
         onColors = { state.chooseMaterialYou(it); v = v.copy(materialYou = it) },
+        onBackend = { state.chooseClaudeCode(it); v = v.copy(claudeCode = it) },
+        claudeCodeSetup = { ClaudeCodeSetup(state) },
     )
 }
 
@@ -67,6 +71,8 @@ fun SettingsContent(
     onFirm: (Boolean) -> Unit, onKey: (String) -> Unit, onNewStory: () -> Unit, onPickStyle: () -> Unit = {},
     onTheme: (com.cramtale.app.AppState.ThemeMode) -> Unit = {},
     onColors: (Boolean) -> Unit = {},
+    onBackend: (Boolean) -> Unit = {},
+    claudeCodeSetup: @Composable () -> Unit = {},
 ) {
     var keyInput by remember { mutableStateOf<String?>(null) }
     var confirmNew by remember { mutableStateOf(false) }
@@ -116,7 +122,9 @@ fun SettingsContent(
 
         SectionTitle("Claude")
         PaperCard {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Segmented(listOf("API key", "Claude Code"), if (v.claudeCode) 1 else 0) { onBackend(it == 1) }
+            if (v.claudeCode) claudeCodeSetup()
+            else Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("API key", style = MaterialTheme.typography.titleSmall)
                     Hint(v.keyHint?.let { "Saved on this phone, encrypted: $it" } ?: "No key yet")
@@ -149,7 +157,7 @@ fun SettingsContent(
 }
 
 @Composable
-private fun Segmented(labels: List<String>, selected: Int, onSelect: (Int) -> Unit) {
+internal fun Segmented(labels: List<String>, selected: Int, onSelect: (Int) -> Unit) {
     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
         labels.forEachIndexed { i, l ->
             SegmentedButton(i == selected, { onSelect(i) }, SegmentedButtonDefaults.itemShape(i, labels.size)) { Text(l) }

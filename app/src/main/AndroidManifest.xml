@@ -17,7 +17,11 @@
     <uses-permission android:name="com.ichi2.anki.d.permission.READ_WRITE_DATABASE" />
     <uses-permission android:name="com.ichi2.anki.e.permission.READ_WRITE_DATABASE" />
 
+    <!-- the Claude Code backend: commands in Termux (RUN_COMMAND) -->
+    <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
+
     <queries>
+        <package android:name="com.termux" />
         <package android:name="com.ichi2.anki" />
         <package android:name="com.ichi2.anki.a" />
         <package android:name="com.ichi2.anki.b" />
@@ -52,5 +56,8 @@
             android:name=".story.TurnService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+        <receiver
+            android:name=".story.TermuxResultReceiver"
+            android:exported="false" />
     </application>
 </manifest>

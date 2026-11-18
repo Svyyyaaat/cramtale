@@ -192,10 +192,18 @@ fun VocabIntroContent(cutoff: Int, onStart: () -> Unit, onSkip: () -> Unit, onBa
 }
 
 @Composable
-fun KeyStepContent(key: String, onKey: (String) -> Unit, onNext: () -> Unit, onBack: () -> Unit) {
-    StepFrame(onBack, footer = { StepFooter("Save key", onNext, enabled = key.trim().startsWith("sk-ant-")) }) {
-        StepHeader(5, SETUP_STEPS, "Your Claude API key",
-            "Opus writes, Haiku checks. Paid from your Anthropic account: about 5–6¢ a turn.")
+fun KeyStepContent(key: String, onKey: (String) -> Unit, onNext: () -> Unit, onBack: () -> Unit,
+                   claudeCode: Boolean = false, onBackend: (Boolean) -> Unit = {}, claudeCodeReady: Boolean = false,
+                   claudeCodeSetup: @Composable () -> Unit = {}) {
+    StepFrame(onBack, footer = {
+        if (claudeCode) StepFooter("Next", onNext, enabled = claudeCodeReady)
+        else StepFooter("Save key", onNext, enabled = key.trim().startsWith("sk-ant-"))
+    }) {
+        StepHeader(5, SETUP_STEPS, "Connect Claude",
+            if (claudeCode) "Opus writes, Haiku checks, on your Claude subscription through Claude Code in Termux."
+            else "Opus writes, Haiku checks. Paid from your Anthropic account: about 5–6¢ a turn.")
+        Segmented(listOf("API key", "Claude Code"), if (claudeCode) 1 else 0) { onBackend(it == 1) }
+        if (claudeCode) { PaperCard { claudeCodeSetup() }; return@StepFrame }
         OutlinedTextField(key, onKey, Modifier.fillMaxWidth(), label = { Text("API key") }, placeholder = { Text("sk-ant-…") },
             singleLine = true, visualTransformation = PasswordVisualTransformation(), shape = MaterialTheme.shapes.medium)
         Text("Stored only on this phone, encrypted with a key from the Android Keystore. Every call's cost is logged.",
@@ -332,9 +340,12 @@ fun OnboardingFlow(state: AppState, onFinished: () -> Unit) {
             }
         }
         5 -> {
-            if (state.story.hasKey()) { LaunchedEffect(Unit) { go(6) }; return }
+            if (state.story.canCallClaude()) { LaunchedEffect(Unit) { go(6) }; return }
             var key by remember { mutableStateOf("") }
-            KeyStepContent(key, { key = it }, onNext = { state.story.saveKey(key.trim()); go(6) }, onBack = back)
+            var tested by remember { mutableStateOf(false) }
+            KeyStepContent(key, { key = it }, onNext = { if (!state.claudeCode) state.story.saveKey(key.trim()); go(6) }, onBack = back,
+                claudeCode = state.claudeCode, onBackend = { state.chooseClaudeCode(it) }, claudeCodeReady = tested,
+                claudeCodeSetup = { ClaudeCodeSetup(state, onReady = { tested = true }, intro = false) })
         }
         6 -> {
             if (state.story.isSetUp()) { LaunchedEffect(Unit) { go(7) }; return }
