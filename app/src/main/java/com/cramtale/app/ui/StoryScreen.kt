@@ -267,6 +267,8 @@ fun StoryContent(
     onListen: ((String) -> Unit)? = null,
     /** The passage streaming in while it's written: (phase, text). */
     draft: Pair<String, String>? = null,
+    /** The message just sent, shown as a bubble while its turn is written. */
+    sending: String? = null,
     /** Anki cards to answer while waiting, and what to do with an answer. */
     study: List<DueCard> = emptyList(),
     onAnswer: (DueCard, Boolean) -> Unit = { _, _ -> },
@@ -311,10 +313,16 @@ fun StoryContent(
                     else PassageText(current.passage, true, isTapped, statusOf, tapVersion) { onTap(it, current.passage) }
                     PassageTools(current.passage, busy == null, onReroll, onEdit, onGrammar, onVersion, listening,
                         onListen?.let { l -> { l(current.passage.text) } })
+                    // sent while this passage is still being recorded: the bubble shows already
+                    if (busy != null && sending != null) PlayerBubble(sending, emptyList())
                 }
             } else if (busy != null) item {
-                if (draft != null) DraftPassage(busy, draft.second)
-                else WaitPanel(busy, study, onAnswer, onTriage)
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    // your message, at once, above what's being written for it
+                    sending?.let { PlayerBubble(it, emptyList()) }
+                    if (draft != null) DraftPassage(busy, draft.second)
+                    else WaitPanel(busy, study, onAnswer, onTriage)
+                }
             }
             if (error != null) item { ErrorNote(error, onRetry) }
             items(proposals) { p -> ProposalCard(p) { onDecide(p.key, it) } }
@@ -444,7 +452,7 @@ fun StoryScreen(state: AppState, onBack: () -> Unit) {
         onGrammar = { grammar = it },
         onReroll = { story.launch { reroll() } },
         onEdit = { editing = story.current?.passage?.text },
-        onSend = { m -> story.launch { send(m) } },
+        onSend = { m -> story.submit(m) },
         onDecide = story::decideProposal,
         reply = story.replyDraft, onReply = { story.replyDraft = it }, onRetry = story.retry,
         onVersion = { story.selectVersion(it); tapVersion++ },
@@ -452,7 +460,7 @@ fun StoryScreen(state: AppState, onBack: () -> Unit) {
         intro = role, onInfo = { infoWanted = true },
         notice = state.speaker.problem() ?: story.ankiNote,
         listening = state.speaker.speaking,
-        draft = story.draft, study = story.study,
+        draft = story.draft, study = story.study, sending = story.sending,
         onAnswer = { c, good -> story.answerFlashcard(c, good) }, onTriage = { c, known -> story.triageNew(c, known) },
         onListen = { text -> if (state.speaker.speaking) state.speaker.stop() else state.speaker.say(text) },
     )

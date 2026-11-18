@@ -364,6 +364,24 @@ class StoryController(
     }
 
     /** Your reply: the current passage is graded (read-only: logged), then the next one is written. */
+    /** Your message as a bubble at once, while its turn is being written. */
+    var sending by mutableStateOf<String?>(null)
+        private set
+
+    /**
+     * Send from the reply box: the message shows as a bubble right away and leaves the box; if the turn
+     * fails, it goes back into the box (Try again sends it as before).
+     */
+    fun submit(message: String) {
+        if (isWorking) return
+        if (message.isNotBlank()) { sending = message; replyDraft = "" }
+        launch {
+            send(message)
+            sending?.let { m -> if (error != null && replyDraft.isBlank()) replyDraft = m }
+            sending = null
+        }
+    }
+
     suspend fun send(message: String): Unit? = work("Sending…", again = { send(message) }) {
         val e = engine()
         // decided (and saved) before this turn touches the clock, so a failed plan is retried, not skipped
@@ -380,6 +398,8 @@ class StoryController(
     }
 
     private fun afterTurn(t: PendingTurn) {
+        // the passage arrives with your message (and its corrections): the temporary bubble goes
+        sending = null
         // the outbox goes only once this turn answered it (a passage restored as it was hasn't)
         val waiting = outbox.takeIf { it.exists() }?.readText()
         if (waiting == null || waiting.isBlank() || waiting.trim() == t.player?.trim()) outbox.delete()

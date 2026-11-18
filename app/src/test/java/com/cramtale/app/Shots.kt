@@ -187,7 +187,8 @@ class Shots {
         StoryContent("狐火堂", 0.21, history = emptyList(), current = null, busy = "Writing…", error = null, proposals = emptyList(),
             tapVersion = 0, isTapped = { false }, statusOf = { Status.DECK }, onBack = {}, onTap = { _, _ -> }, onGrammar = {},
             onReroll = {}, onEdit = {}, onSend = {}, onDecide = { _, _ -> },
-            draft = "writing" to "榊さんは書類を受け取らなかった。「サインは、お祭りのあとでもいいですよ」\nコガネが尻尾を")
+            draft = "writing" to "榊さんは書類を受け取らなかった。「サインは、お祭りのあとでもいいですよ」\nコガネが尻尾を",
+            sending = "マナを隠すようにする。音もしない。")
     }
 
     @Test fun d8_story_waiting_flashcard() = shot {

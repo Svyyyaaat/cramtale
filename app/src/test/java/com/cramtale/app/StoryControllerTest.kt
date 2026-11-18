@@ -208,4 +208,26 @@ class StoryControllerTest {
         c.undoAlreadyKnow(43)
         assertTrue("許可" in app.lists.known)
     }
+
+    @Test
+    fun `a sent message shows as a bubble at once and comes back to the box if the turn fails`() = runBlocking {
+        val c = controller()
+        c.setup("")
+        c.start()
+        failing += "writer"
+        c.replyDraft = "音もしない。"
+        c.submit("音もしない。")
+        assertEquals("音もしない。", c.sending)
+        assertEquals("", c.replyDraft)
+        settle(c)
+        assertNull(c.sending)
+        assertEquals("the text is back in the box", "音もしない。", c.replyDraft)
+
+        failing.clear()
+        c.submit(c.replyDraft)
+        settle(c)
+        assertNull(c.sending)
+        assertEquals("音もしない。", c.current!!.player)
+        assertEquals("", c.replyDraft)
+    }
 }
