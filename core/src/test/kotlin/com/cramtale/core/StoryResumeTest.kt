@@ -30,6 +30,7 @@ class StoryResumeTest {
         "offscreen" to """{"ops":[{"op":"chronicle","a":"銀行が電話した","b":"","list":["佐伯"],"n":0}]}""",
         "mistakes" to """{"errors":[],"correct_keys":[]}""",
         "adjudicator" to """{"roll":true,"action":"lie to Saeki","difficulty":2,"stakes":"Saeki stops trusting the player"}""",
+        "intent" to """{"notices":"the player","wants":"the key","does":"asks again"}""",
         "judge" to """{"violations":[]}""", "leak" to """{"guesses":["?"]}""",
         "scribe" to """{"ops":[]}""", "summary" to "Summary.",
         "writer" to """{"passage":"佐伯は帳簿を閉じた。","used":[{"word":"帳簿","form":"帳簿"}],"grammar":[]}""",
@@ -201,5 +202,36 @@ class StoryResumeTest {
         e.commit()
         val last = fake.sent("scribe").last().messages.joinToString { it.text }
         assertTrue("北村は笑った。" in last)
+    }
+
+    @Test
+    fun `each person present decides from their own knowledge only, and the writer follows it`() {
+        val e = ready()
+        File(dir, "state/player.md").writeText("A demon hiding in the cellar.\n")
+        File(dir, "state/player_public.md").writeText("A thin young shop assistant.\n")
+        e.playerTurn("こんにちは。", pool)
+        val intents = fake.sent("intent")
+        assertEquals(1, intents.size, "one call per person present (佐伯)")
+        val asked = intents.single().messages.joinToString { it.text }
+        assertTrue("A thin young shop assistant." in asked)
+        assertFalse("demon" in asked, "the hidden side never reaches them")
+        assertTrue("Key." in asked, "their own file is there")
+        val packet = fake.sent("writer").last().messages.last().text
+        assertTrue("does: asks again" in packet, packet)
+        // decided once: a restart or a reroll doesn't ask again
+        val again = engine()
+        again.reroll()
+        assertEquals(1, fake.sent("intent").size)
+    }
+
+    @Test
+    fun `only someone present can learn something on screen`() {
+        val e = ready()
+        val ops = e.state.apply(com.cramtale.core.story.StateOp.parse(
+            """{"ops":[{"op":"learns","a":"佐伯","b":"the cellar door was open","list":[],"n":0},
+                       {"op":"learns","a":"北村","b":"the cellar door was open","list":[],"n":0}]}"""))
+        assertTrue(ops.any { it.startsWith("佐伯 learned") }, ops.toString())
+        assertTrue(ops.any { it.startsWith("refused: 北村") }, ops.toString())
+        assertTrue("## Learned" in e.state.character("佐伯")!!)
     }
 }

@@ -251,6 +251,18 @@ class StoryState(val dir: File) {
                     if (old == null) "refused: no character ${op.name}"
                     else { writeCharacter(op.name, old.trimEnd() + "\n- (turn ${scene.turn}) ${op.note}\n"); "${op.name}: ${op.note}" }
                 }
+                is StateOp.Learns -> {
+                    val old = character(op.name)
+                    when {
+                        old == null -> "refused: no character ${op.name}"
+                        // knowledge travels through the scene: only someone there can learn it there
+                        !offscreen && op.name !in scene.present -> "refused: ${op.name} wasn't there to learn that"
+                        else -> {
+                            val body = if ("## Learned" in old) old.trimEnd() else old.trimEnd() + "\n\n## Learned"
+                            writeCharacter(op.name, body + "\n- (turn ${scene.turn}) ${op.fact}\n"); "${op.name} learned: ${op.fact}"
+                        }
+                    }
+                }
                 is StateOp.BeatDone -> {
                     scene.beats.firstOrNull { !it.done }?.done = true; "beat done"
                 }
@@ -280,6 +292,8 @@ sealed interface StateOp {
     data class NewClock(val name: String, val size: Int, val whenFull: String) : StateOp
     data class Move(val place: String, val present: List<String>) : StateOp
     data class Character(val name: String, val note: String) : StateOp
+    /** Someone present saw, heard or was told something: it goes into what they know. */
+    data class Learns(val name: String, val fact: String) : StateOp
     data object BeatDone : StateOp
 
     companion object {
@@ -313,6 +327,7 @@ sealed interface StateOp {
                         "new_clock" -> NewClock(x, if (n > 0) n else 6, y)
                         "move" -> Move(x, list)
                         "character" -> Character(x, y)
+                        "learns" -> Learns(x, y)
                         "beat_done" -> BeatDone
                         else -> null
                     }
@@ -326,7 +341,7 @@ sealed interface StateOp {
         val SCHEMA = """
         {"type":"object","additionalProperties":false,"required":["ops"],"properties":{"ops":{"type":"array","items":{
           "type":"object","additionalProperties":false,"required":["op","a","b","list","n"],"properties":{
-            "op":{"type":"string","enum":["chronicle","drop","reveal","new_secret","consequence","resolve","clock","new_clock","move","character","beat_done"]},
+            "op":{"type":"string","enum":["chronicle","drop","reveal","new_secret","consequence","resolve","clock","new_clock","move","character","learns","beat_done"]},
             "a":{"type":"string"},"b":{"type":"string"},"list":{"type":"array","items":{"type":"string"}},"n":{"type":"integer"}}}}}}
         """.trimIndent()
     }

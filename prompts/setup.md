@@ -8,8 +8,9 @@ Make a small, grounded world: one town or neighbourhood, present day unless the 
 
 Return JSON:
 - `world`: markdown, under 250 words: the place, the institutions and money that matter, what is going wrong.
-- `player`: two sentences: who the player character is, what they have, what they owe.
-- `characters`: three or four people, each `name` (Japanese), `file` (markdown, under 150 words, with sections Goals, Limits, Secrets, Wants from the player, Attitude: each person wants something that conflicts with someone else, is slow to agree and hard to impress).
+- `player`: two sentences: who the player character really is, what they have, what they owe, including anything hidden.
+- `player_public`: one or two sentences: only what other people can see or have heard about the player character (looks, role, reputation). Anything hidden stays out.
+- `characters`: three or four people, each `name` (Japanese), `file` (markdown, under 170 words, with sections Goals, Busy with, Limits, Secrets, Knows, Attitude). Each person has a life that doesn't revolve around the player: `Busy with` is their own errands, work and worries right now. `Knows` lists what they actually know, including what they know and don't know about the player character (usually only the public side). Each person wants something that conflicts with someone else, is slow to agree and hard to impress.
 - `secrets`: `text` and `knows` (names).
 - `clocks`: two or three off-screen threats, `name` (Japanese), `size` 4–8, `when_full`.
 - `complications`: ten grounded complications for this world, each one line, optionally starting with a place tag in brackets.

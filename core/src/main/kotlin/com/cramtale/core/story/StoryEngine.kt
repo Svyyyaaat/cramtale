@@ -53,6 +53,8 @@ class PendingTurn(
     var mistakesRecorded = false
     /** Known mistake keys the player's message got right (for "fixed" tracking), kept with the turn. */
     var correctKeys: List<String> = emptyList()
+    /** What each person present does next, decided from what they know (one call each); null until decided. */
+    var intents: String? = null
     val draft get() = drafts[current]
     /** Written yet? A turn whose writer call failed has no drafts and resumes from here. */
     val ready get() = drafts.isNotEmpty()
@@ -73,7 +75,7 @@ class PendingTurn(
             .put("grammar", JSONArray(d.grammar)).put("rewritten", d.rewritten)
             .put("checks", JSONArray(d.checks.map { JSONObject().put("name", it.name).put("passed", it.passed).put("detail", it.detail) })) }))
         .put("tapped", JSONArray(synchronized(tapped) { tapped.toList() })).put("mistakesRecorded", mistakesRecorded)
-        .put("correctKeys", JSONArray(correctKeys))
+        .put("correctKeys", JSONArray(correctKeys)).put("intents", intents ?: JSONObject.NULL)
 
     companion object {
         private fun JSONArray?.objects() = if (this == null) emptyList() else (0 until length()).map { getJSONObject(it) }
@@ -107,6 +109,7 @@ class PendingTurn(
             t.current = o.optInt("current").coerceIn(0, (t.drafts.size - 1).coerceAtLeast(0))
             t.packet = o.str("packet")
             t.mistakesRecorded = o.optBoolean("mistakesRecorded")
+            t.intents = o.str("intents")
             t.correctKeys = o.optJSONArray("correctKeys")?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty()
             o.optJSONArray("tapped")?.let { a -> (0 until a.length()).forEach { t.tapped += a.getLong(it) } }
             return t
@@ -217,6 +220,13 @@ class StoryEngine(
     // calls that don't depend on each other run side by side
     private val workers = java.util.concurrent.Executors.newCachedThreadPool { r -> Thread(r, "story-call").apply { isDaemon = true } }
 
+    /** Several independent calls at once, results in order. */
+    private fun <T> all(tasks: List<() -> T>): List<T> {
+        val fs = tasks.drop(1).map { workers.submit(java.util.concurrent.Callable { it() }) }
+        val first = tasks.firstOrNull()?.let { t -> try { t() } catch (e: Throwable) { fs.forEach { it.cancel(true) }; throw e } }
+        return listOfNotNull(first) + fs.map { f -> try { f.get() } catch (e: java.util.concurrent.ExecutionException) { throw e.cause ?: e } }
+    }
+
     private fun <A, B> both(a: () -> A, b: () -> B): Pair<A, B> {
         val fb = workers.submit(java.util.concurrent.Callable { b() })
         val ra = try { a() } catch (e: Throwable) { fb.cancel(true); throw e }
@@ -309,6 +319,7 @@ class StoryEngine(
                 "- ${c.getString("name")}: 0/${c.optInt("size", 6)} — when full: ${c.optString("when_full")}"
             } + "\n")
         File(stateDir, "player.md").writeAtomic(o.optString("player") + "\n")
+        File(stateDir, "player_public.md").writeAtomic(o.optString("player_public").ifBlank { o.optString("player") } + "\n")
         val chars = o.getJSONArray("characters")
         for (i in 0 until chars.length()) chars.getJSONObject(i).let { state.writeCharacter(it.getString("name"), it.getString("file")) }
         val secrets = o.optJSONArray("secrets")
@@ -455,6 +466,8 @@ class StoryEngine(
     fun resume(): PendingTurn {
         val t = pending ?: error("no pending turn")
         if (!t.ready) {
+            // who does what, decided per person from what they know, before the writer sees anything
+            if (t.intents == null) { t.intents = decideIntents(t); savePending() }
             val d = write(t)
             synchronized(this) { t.drafts += d; t.current = 0 }
             savePending()
@@ -611,7 +624,8 @@ class StoryEngine(
             (state.characterNames() - names).map { n -> "- $n (not here)" }
         val tags = names + s.place
         return Prompts.fill(prompts.prompt("turn"), mapOf(
-            "player" to playerText(),
+            "player" to playerText(), "player_public" to playerPublic(),
+            "intents" to (t.intents ?: "not decided"),
             "place" to s.place, "present" to s.present.joinToString().ifEmpty { "nobody but the player" },
             "turn" to s.turn.toString(), "chapter" to s.chapter.toString(),
             "beat" to (beat?.let { "${it.goal} Pressure: ${it.pressure}" } ?: "Let the scene breathe; follow what the player does."),
@@ -717,7 +731,9 @@ class StoryEngine(
         val (leaked, judged) = both(
             { leaks(d, t) },
             { json(call("judge", Models.CHECKS, Prompts.fill(prompts.prompt("judge"), mapOf(
-                "player" to playerText(),
+                "player" to playerText(), "player_public" to playerPublic(),
+                "people" to state.scene().present.mapNotNull { n -> state.character(n)?.let { "### $n\n$it" } }.joinToString("\n\n")
+                    .ifEmpty { "nobody but the player" } + "\n\nWhat they were meant to do:\n" + (t.intents ?: "not decided"),
                 "message" to (t.player ?: "(none: the scene continues)"), "passage" to d.passage,
             )), listOf(Msg(Role.USER, "Check.")), schema = JUDGE_SCHEMA, maxTokens = 800)) },
         )
@@ -776,12 +792,42 @@ class StoryEngine(
             .filter { it.wrong.isNotBlank() && it.wrong in message && it.wrong != it.right && it.key.isNotBlank() }
     }
 
+    /**
+     * What each person present does next. One cheap call per person that sees only their own file, the
+     * place, the player's public side and what just happened in front of them: what the narrator and the
+     * player know can't leak into what they do (code-level separation, not a "don't know this" line).
+     */
+    private fun decideIntents(t: PendingTurn): String {
+        val s = state.scene()
+        val cast = state.characterNames().toSet()
+        val people = s.present.filter { it in cast }
+        if (people.isEmpty()) return "nobody but the player"
+        val last = turnsInChapter(s.chapter).lastOrNull()?.optString("passage").orEmpty()
+        val recent = (if (last.isBlank()) "(the scene is just starting)" else "Last moments:\n$last") +
+            (t.player?.let { "\n\nThe player's character, just now (what they said and did, as anyone present saw it): $it" } ?: "")
+        val attempt = t.rollNote?.let { "How the player's attempt went (decided by dice): $it" } ?: ""
+        val replies = all(people.map { name -> {
+            val o = runCatching { json(call("intent", Models.CHECKS, Prompts.fill(prompts.prompt("intent"), mapOf(
+                "name" to name, "file" to state.character(name).orEmpty(), "place" to s.place,
+                "present" to s.present.joinToString().ifEmpty { "nobody else" }, "player_public" to playerPublic(),
+                "recent" to recent, "attempt" to attempt,
+            )), listOf(Msg(Role.USER, "What does $name do next?")), schema = INTENT_SCHEMA, maxTokens = 400)) }.getOrNull()
+            // a failed call leaves that person to the writer's judgement rather than failing the turn
+            if (o == null) "- $name: (undecided)" else
+                "- $name: notices: ${o.optString("notices")}; wants: ${o.optString("wants")}; does: ${o.optString("does")}"
+        } })
+        return replies.joinToString("\n")
+    }
+
     /** The popup's one-line meaning of a word in its sentence. */
     fun meaning(word: String, sentence: String, onText: ((String) -> Unit)? = null): String =
         call("meaning", Models.CHECKS, Prompts.fill(prompts.prompt("meaning"), mapOf("word" to word, "sentence" to sentence)),
             listOf(Msg(Role.USER, "Meaning?")), maxTokens = 80, quiet = true, onText = onText).trim()
 
     // ------------------------------------------------------------------ helpers
+
+    /** What other people can see of the player's character (falls back to the full text for older stories). */
+    private fun playerPublic() = File(dir, "state/player_public.md").takeIf { it.exists() }?.readText()?.trim().orEmpty().ifEmpty { playerText() }
 
     private fun playerText() = File(dir, "state/player.md").takeIf { it.exists() }?.readText()?.trim().orEmpty().ifEmpty { "the protagonist" }
 
@@ -821,7 +867,9 @@ class StoryEngine(
             "roll":{"type":"boolean"},"action":{"type":"string"},"difficulty":{"type":"integer"},"stakes":{"type":"string"}}}"""
         val JUDGE_SCHEMA = """{"type":"object","additionalProperties":false,"required":["violations"],"properties":{"violations":{"type":"array","items":{
             "type":"object","additionalProperties":false,"required":["rule","quote","fix"],"properties":{
-            "rule":{"type":"string","enum":["player_voice","echo","explains","no_handoff"]},"quote":{"type":"string"},"fix":{"type":"string"}}}}}}"""
+            "rule":{"type":"string","enum":["player_voice","echo","explains","no_handoff","npc_knowledge","motive"]},"quote":{"type":"string"},"fix":{"type":"string"}}}}}}"""
+        val INTENT_SCHEMA = """{"type":"object","additionalProperties":false,"required":["notices","wants","does"],"properties":{
+            "notices":{"type":"string"},"wants":{"type":"string"},"does":{"type":"string"}}}"""
         val LEAK_SCHEMA = """{"type":"object","additionalProperties":false,"required":["guesses"],"properties":{"guesses":{"type":"array","items":{"type":"string"}}}}"""
         val DIRECTOR_SCHEMA = """{"type":"object","additionalProperties":false,"required":["beats","opening"],"properties":{
             "beats":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["goal","place","characters","pressure"],"properties":{
@@ -830,8 +878,8 @@ class StoryEngine(
         val STYLES_SCHEMA = """{"type":"object","additionalProperties":false,"required":["styles"],"properties":{"styles":{"type":"array","items":{
             "type":"object","additionalProperties":false,"required":["name","line","passage"],"properties":{
             "name":{"type":"string"},"line":{"type":"string"},"passage":{"type":"string"}}}}}}"""
-        val SETUP_SCHEMA = """{"type":"object","additionalProperties":false,"required":["world","player","characters","secrets","clocks","complications","opening"],"properties":{
-            "world":{"type":"string"},"player":{"type":"string"},
+        val SETUP_SCHEMA = """{"type":"object","additionalProperties":false,"required":["world","player","player_public","characters","secrets","clocks","complications","opening"],"properties":{
+            "world":{"type":"string"},"player":{"type":"string"},"player_public":{"type":"string"},
             "characters":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["name","file"],"properties":{"name":{"type":"string"},"file":{"type":"string"}}}},
             "secrets":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["text","knows"],"properties":{"text":{"type":"string"},"knows":{"type":"array","items":{"type":"string"}}}}},
             "clocks":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["name","size","when_full"],"properties":{"name":{"type":"string"},"size":{"type":"integer"},"when_full":{"type":"string"}}}},

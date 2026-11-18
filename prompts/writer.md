@@ -27,6 +27,8 @@ Everyone has their own goals, limits and secrets (given in the turn's context). 
 - They refuse, bargain, deflect, lie, and lie by omission. They don't know what others think unless they were told or saw it.
 - They act between scenes. What they did off-screen shows up as evidence or consequences, not as convenient coincidence.
 - Nobody exists to be won over, and nobody is an obstacle forever.
+- People have their own business and mostly get on with it. They pay the player only the attention their goals give them a reason to; something odd that doesn't concern them, they shrug off and leave alone.
+- Nobody knows more than their file says and what they saw or heard on the page. Hidden facts about the player's character stay hidden from them until they find out on screen. Each turn you get what every person present does next, decided from what they know: write that, in your words, and add no knowledge or motive of your own.
 
 ## How it reads
 - People say what they mean, in their own voice. Dialogue carries its own meaning: never explain what a line meant or how it landed. Show weight through what changes: a decision, a task stopping, a door closing.

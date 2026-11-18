@@ -38,6 +38,7 @@ class StoryControllerTest {
         "offscreen" to """{"ops":[]}""",
         "mistakes" to """{"errors":[],"correct_keys":[]}""",
         "adjudicator" to """{"roll":true,"action":"calm Mina","difficulty":0,"stakes":"Mina leaves"}""",
+        "intent" to """{"notices":"the player","wants":"the key","does":"asks again"}""",
         "judge" to """{"violations":[]}""", "leak" to """{"guesses":["?"]}""",
         "scribe" to """{"ops":[]}""", "summary" to "Summary.",
         "writer" to """{"passage":"ミナは瓶を見た。「これ、高いの？」","used":[],"grammar":[]}""",

@@ -53,6 +53,7 @@ class OnAndroidTest {
         "offscreen" to """{"ops":[]}""",
         "mistakes" to """{"errors":[{"wrong":"行くます","right":"行きます","type":"conjugation","reason":"stem","key":"masu after the stem"}]}""",
         "adjudicator" to """{"roll":true,"action":"calm Mina","difficulty":0,"stakes":"Mina leaves"}""",
+        "intent" to """{"notices":"the player","wants":"the key","does":"asks again"}""",
         "judge" to """{"violations":[]}""",
         "leak" to """{"guesses":["?"]}""",
         "scribe" to """{"ops":[{"op":"chronicle","a":"薬の話","b":"","list":["ミナ"],"n":0}]}""",

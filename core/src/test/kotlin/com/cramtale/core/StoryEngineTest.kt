@@ -41,6 +41,7 @@ class StoryEngineTest {
             {"goal":"北村 offers a deal","place":"店","characters":["北村"],"pressure":"rent"},{"goal":"quiet","place":"店","characters":[],"pressure":""}],"opening":""}""",
         "mistakes" to """{"errors":[{"wrong":"渡すます","right":"渡します","type":"conjugation","reason":"masu attaches to the stem","key":"masu after the stem"}]}""",
         "adjudicator" to """{"roll":true,"action":"stall Saeki","difficulty":2,"stakes":"Saeki stops trusting the player"}""",
+        "intent" to """{"notices":"the player","wants":"the key","does":"asks again"}""",
         "judge" to """{"violations":[]}""",
         "leak" to """{"guesses":["?"]}""",
         "scribe" to """{"ops":[{"op":"chronicle","a":"鍵の話が出た","b":"","list":["倉庫","佐伯"],"n":0},{"op":"reveal","a":"S1","b":"北村","list":[],"n":0}]}""",

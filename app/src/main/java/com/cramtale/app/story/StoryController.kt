@@ -689,6 +689,7 @@ class StoryController(
         val STEP_LABELS = mapOf(
             "mistakes" to "Checking your Japanese…", "adjudicator" to "Deciding what's at stake…",
             "offscreen" to "The world moves while you were away…", "director" to "Planning this session…",
+            "intent" to "Deciding what people do…",
             "writer" to "Writing…", "rewrite" to "Fixing the passage…", "judge" to "Checking the passage…",
             "leak" to "Checking the review words…", "scribe" to "Recording what changed…",
             "summary" to "Closing the chapter…", "setup" to "Building the world…", "style_picker" to "Writing four styles…",

@@ -1,5 +1,7 @@
 ## This turn (facts the game has decided)
-The player's character: {{player}} (they say and decide nothing in your passage)
+The player's character, as others see them: {{player_public}}
+Hidden from everyone who hasn't learned it: {{player}}
+(They say and decide nothing in your passage.)
 Place: {{place}}
 Present: {{present}}
 Turn {{turn}}, chapter {{chapter}}.
@@ -15,6 +17,9 @@ Turn {{turn}}, chapter {{chapter}}.
 
 ### People here
 {{characters}}
+
+### What each of them does now (decided from what they know: follow it)
+{{intents}}
 
 ### What they know that the player doesn't (game master only; reveal only through what people do or what can be found)
 {{secrets}}
