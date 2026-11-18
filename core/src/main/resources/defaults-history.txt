@@ -1,3 +1,4 @@
+config/ambience.md	7568d2c88eaddf35
 config/banned.txt	0c39bdcece86c84b
 config/complications.md	6d117f1cda6f87bb
 config/plot.md	69843df2f81218ed
@@ -5,9 +6,11 @@ config/style_line.txt	e3b0c44298fc1c14
 config/style_rules_firm.md	19a9e39d73c34ee5
 config/style_rules_positive.md	9719b4623bb7c55d
 config/style_sample.md	e3b0c44298fc1c14
+prompts/adjudicator.md	644134dd57ef42db
 prompts/adjudicator.md	eaa03b721a29271c
 prompts/director.md	7cbf277c440278ee
 prompts/intent.md	158b4d4d5d66a141
+prompts/intent.md	a50f457560911fff
 prompts/intent.md	cadddffd46fdca6d
 prompts/judge.md	498cd6fea0496203
 prompts/judge.md	61391e1a2edc5aa3
@@ -28,6 +31,7 @@ prompts/scribe.md	09c38873d4cccd49
 prompts/scribe.md	5312d3d3253abe29
 prompts/scribe.md	9719735796c43d77
 prompts/scribe.md	fbcd14e8632c9542
+prompts/setup.md	0acb34b3488eed22
 prompts/setup.md	57ac7e661147ec14
 prompts/setup.md	d85539029951c09b
 prompts/style_picker.md	9cca079d4411fee2

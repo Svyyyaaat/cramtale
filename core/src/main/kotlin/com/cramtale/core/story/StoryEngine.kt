@@ -55,6 +55,8 @@ class PendingTurn(
     var correctKeys: List<String> = emptyList()
     /** What each person present does next, decided from what they know (one call each); null until decided. */
     var intents: String? = null
+    /** What others could notice of the player's message (the referee's neutral line); "" if nothing. */
+    var observable: String = ""
     val draft get() = drafts[current]
     /** Written yet? A turn whose writer call failed has no drafts and resumes from here. */
     val ready get() = drafts.isNotEmpty()
@@ -75,7 +77,7 @@ class PendingTurn(
             .put("grammar", JSONArray(d.grammar)).put("rewritten", d.rewritten)
             .put("checks", JSONArray(d.checks.map { JSONObject().put("name", it.name).put("passed", it.passed).put("detail", it.detail) })) }))
         .put("tapped", JSONArray(synchronized(tapped) { tapped.toList() })).put("mistakesRecorded", mistakesRecorded)
-        .put("correctKeys", JSONArray(correctKeys)).put("intents", intents ?: JSONObject.NULL)
+        .put("correctKeys", JSONArray(correctKeys)).put("intents", intents ?: JSONObject.NULL).put("observable", observable)
 
     companion object {
         private fun JSONArray?.objects() = if (this == null) emptyList() else (0 until length()).map { getJSONObject(it) }
@@ -110,6 +112,7 @@ class PendingTurn(
             t.packet = o.str("packet")
             t.mistakesRecorded = o.optBoolean("mistakesRecorded")
             t.intents = o.str("intents")
+            t.observable = o.optString("observable")
             t.correctKeys = o.optJSONArray("correctKeys")?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty()
             o.optJSONArray("tapped")?.let { a -> (0 until a.length()).forEach { t.tapped += a.getLong(it) } }
             return t
@@ -331,6 +334,10 @@ class StoryEngine(
             val f = File(dir, "config/complications.md")
             f.appendText((0 until a.length()).joinToString("") { "- ${a.getString(it).removePrefix("- ")}\n" })
         }
+        o.optJSONArray("ambience")?.let { a ->
+            val f = File(dir, "config/ambience.md")
+            f.appendText((0 until a.length()).joinToString("") { "- ${a.getString(it).removePrefix("- ")}\n" })
+        }
         val opening = o.getJSONObject("opening")
         state.save(state.scene().apply {
             place = opening.getString("place")
@@ -454,6 +461,7 @@ class StoryEngine(
         }
         val turn = PendingTurn(s.turn, message, corrections, roll, rollNote, s.complication, pool)
         turn.correctKeys = correctKeys
+        turn.observable = adjudication?.optString("observable").orEmpty()
         // saved before the writer runs: if that call fails, the roll and its consequence are already
         // decided and a retry resumes this turn instead of rolling again
         pending = turn
@@ -803,20 +811,29 @@ class StoryEngine(
         val people = s.present.filter { it in cast }
         if (people.isEmpty()) return "nobody but the player"
         val last = turnsInChapter(s.chapter).lastOrNull()?.optString("passage").orEmpty()
-        val recent = (if (last.isBlank()) "(the scene is just starting)" else "Last moments:\n$last") +
-            (t.player?.let { "\n\nWhat the player's character just tried to say or do (perceive only what you could, from where you are): $it" } ?: "")
-        val attempt = t.rollNote?.let { "How the player's attempt went (decided by dice): $it" } ?: ""
+        val recent = if (last.isBlank()) "(the scene is just starting)" else last
+        // background happenings, so what the player does is one thing among several, not the only stimulus
+        val pool = Complications.parse(prompts.config("ambience.md").orEmpty(), dice.random)
+        val background = ArrayList<String>()
+        repeat(3) { pool.draw(s.place, background)?.let { if (it !in background) background += it } }
+        // the player's message never reaches them as such: only what an onlooker could notice of it, unlabelled
+        val around = (background + listOfNotNull(t.observable.takeIf { it.isNotBlank() })).shuffled(dice.random)
+        val effect = t.roll?.let {
+            "If something just said or done around you was meant to fool, persuade or slip past someone here, the dice say it was a " +
+                "${it.outcome.label} (success: it works on whoever it was aimed at; failure: they see through it or notice)."
+        } ?: ""
         val replies = all(people.map { name -> {
             val o = runCatching { json(call("intent", Models.CHECKS, Prompts.fill(prompts.prompt("intent"), mapOf(
                 "name" to name, "file" to state.character(name).orEmpty(), "place" to s.place,
                 "present" to s.present.joinToString().ifEmpty { "nobody else" },
-                "recent" to recent, "attempt" to attempt,
+                "recent" to recent, "around" to around.joinToString("\n") { "- $it" }.ifEmpty { "- nothing in particular" },
+                "attempt" to effect,
             )), listOf(Msg(Role.USER, "What does $name do next?")), schema = INTENT_SCHEMA, maxTokens = 400)) }.getOrNull()
             // a failed call leaves that person to the writer's judgement rather than failing the turn
             if (o == null) "- $name: (undecided)" else
                 "- $name: notices: ${o.optString("notices")}; wants: ${o.optString("wants")}; does: ${o.optString("does")}"
         } })
-        return replies.joinToString("\n")
+        return (if (background.isEmpty()) "" else "Going on around them (use what fits): ${background.joinToString(" / ")}\n") + replies.joinToString("\n")
     }
 
     /** The popup's one-line meaning of a word in its sentence. */
@@ -863,8 +880,8 @@ class StoryEngine(
             "wrong":{"type":"string"},"right":{"type":"string"},
             "type":{"type":"string","enum":["conjugation","particle","word choice","grammar pattern","spelling","other"]},
             "reason":{"type":"string"},"key":{"type":"string"}}}}}}"""
-        val ADJUDICATOR_SCHEMA = """{"type":"object","additionalProperties":false,"required":["roll","action","difficulty","stakes"],"properties":{
-            "roll":{"type":"boolean"},"action":{"type":"string"},"difficulty":{"type":"integer"},"stakes":{"type":"string"}}}"""
+        val ADJUDICATOR_SCHEMA = """{"type":"object","additionalProperties":false,"required":["roll","action","difficulty","stakes","observable"],"properties":{
+            "roll":{"type":"boolean"},"action":{"type":"string"},"difficulty":{"type":"integer"},"stakes":{"type":"string"},"observable":{"type":"string"}}}"""
         val JUDGE_SCHEMA = """{"type":"object","additionalProperties":false,"required":["violations"],"properties":{"violations":{"type":"array","items":{
             "type":"object","additionalProperties":false,"required":["rule","quote","fix"],"properties":{
             "rule":{"type":"string","enum":["player_voice","echo","explains","no_handoff","npc_knowledge","motive"]},"quote":{"type":"string"},"fix":{"type":"string"}}}}}}"""
@@ -878,12 +895,13 @@ class StoryEngine(
         val STYLES_SCHEMA = """{"type":"object","additionalProperties":false,"required":["styles"],"properties":{"styles":{"type":"array","items":{
             "type":"object","additionalProperties":false,"required":["name","line","passage"],"properties":{
             "name":{"type":"string"},"line":{"type":"string"},"passage":{"type":"string"}}}}}}"""
-        val SETUP_SCHEMA = """{"type":"object","additionalProperties":false,"required":["world","player","player_public","characters","secrets","clocks","complications","opening"],"properties":{
+        val SETUP_SCHEMA = """{"type":"object","additionalProperties":false,"required":["world","player","player_public","characters","secrets","clocks","complications","ambience","opening"],"properties":{
             "world":{"type":"string"},"player":{"type":"string"},"player_public":{"type":"string"},
             "characters":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["name","file"],"properties":{"name":{"type":"string"},"file":{"type":"string"}}}},
             "secrets":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["text","knows"],"properties":{"text":{"type":"string"},"knows":{"type":"array","items":{"type":"string"}}}}},
             "clocks":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["name","size","when_full"],"properties":{"name":{"type":"string"},"size":{"type":"integer"},"when_full":{"type":"string"}}}},
             "complications":{"type":"array","items":{"type":"string"}},
+            "ambience":{"type":"array","items":{"type":"string"}},
             "opening":{"type":"object","additionalProperties":false,"required":["place","present","situation"],"properties":{"place":{"type":"string"},"present":{"type":"array","items":{"type":"string"}},"situation":{"type":"string"}}}}}"""
     }
 }

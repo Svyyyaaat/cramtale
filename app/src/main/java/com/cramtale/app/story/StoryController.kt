@@ -161,7 +161,7 @@ class StoryController(
         // your taste, picked style and prompt edits are yours, not the story's; the complication table is
         // filled in per story by setup, so it starts fresh
         for (sub in listOf("prompts", "config")) File(archive, sub).listFiles { f -> f.isFile }.orEmpty()
-            .filter { it.name != "complications.md" }
+            .filter { it.name != "complications.md" && it.name != "ambience.md" }
             .forEach { f -> File(dir, "$sub/${f.name}").also { it.parentFile?.mkdirs() }.writeBytes(f.readBytes()) }
         engine = null
         history.clear(); current = null; error = null; retry = null; proposals.clear(); replyDraft = ""; ankiNote = null

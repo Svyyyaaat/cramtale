@@ -209,13 +209,18 @@ class StoryResumeTest {
         val e = ready()
         File(dir, "state/player.md").writeText("A demon hiding in the cellar.\n")
         File(dir, "state/player_public.md").writeText("A thin young shop assistant.\n")
-        e.playerTurn("こんにちは。", pool)
+        fake.queue("adjudicator", """{"roll":false,"action":"","difficulty":0,"stakes":"","observable":"a muffled yowl from under the floor"}""")
+        e.playerTurn("猫の真似をする。にゃー。", pool)
         val intents = fake.sent("intent")
         assertEquals(1, intents.size, "one call per person present (佐伯)")
         val asked = intents.single().messages.joinToString { it.text }
         assertFalse("A thin young shop assistant." in asked, "no description handed to someone who may never have seen them")
         assertFalse("demon" in asked, "the hidden side never reaches them")
         assertTrue("Key." in asked, "their own file is there")
+        assertFalse("猫の真似" in asked, "the player's message never reaches them as such")
+        assertTrue("a muffled yowl from under the floor" in asked, "only what an onlooker could notice")
+        val around = asked.substringAfter("most of it is background)").substringBefore("Decide from")
+        assertTrue(around.lines().count { it.startsWith("- ") } >= 3, "background noise around it: $around")
         val packet = fake.sent("writer").last().messages.last().text
         assertTrue("does: asks again" in packet, packet)
         // decided once: a restart or a reroll doesn't ask again

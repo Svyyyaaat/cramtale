@@ -50,7 +50,7 @@ class Prompts(private val dir: File?) {
         val PROMPTS = listOf("writer", "turn", "director", "adjudicator", "mistakes", "scribe", "offscreen", "judge",
             "leak", "rewrite", "summary", "meaning", "style_picker", "setup", "intent").map { "prompts/$it.md" }
         val CONFIG = listOf("plot.md", "banned.txt", "complications.md", "style_rules_positive.md", "style_rules_firm.md",
-            "style_sample.md", "style_line.txt").map { "config/$it" }
+            "style_sample.md", "style_line.txt", "ambience.md").map { "config/$it" }
 
         // every brace escaped: Android's regex engine (ICU) rejects a bare "}" that desktop Java accepts
         private val placeholder = Regex("\\{\\{(\\w+)\\}\\}")

@@ -8,7 +8,7 @@ import kotlin.random.Random
  * 2d6 + modifier: 10+ success, 7–9 success at a cost, 6 or less failure. Failure is real:
  * the caller writes its consequence into the state before the writer sees the result.
  */
-class Dice(private val random: Random = Random.Default) {
+class Dice(val random: Random = Random.Default) {
     enum class Outcome(val label: String, val instruction: String) {
         SUCCESS("success", "The action works as intended."),
         COST("success at a cost", "The action works, but something is lost, spent, noticed or made worse. Choose a cost that fits the scene and keep it."),

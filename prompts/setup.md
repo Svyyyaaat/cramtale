@@ -14,4 +14,5 @@ Return JSON:
 - `secrets`: `text` and `knows` (names).
 - `clocks`: two or three off-screen threats, `name` (Japanese), `size` 4–8, `when_full`.
 - `complications`: ten grounded complications for this world, each one line, optionally starting with a place tag in brackets.
+- `ambience`: fifteen small background happenings in this world's places (sounds, weather, animals, people passing, work going on nearby), each one line in English, optionally starting with a place tag in brackets. Ordinary things, nothing that drives the plot.
 - `opening`: `place`, `present` (names), and one sentence on the situation the first passage starts in.
