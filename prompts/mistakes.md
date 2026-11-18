@@ -28,6 +28,10 @@ Also list in `correct_keys` every known key below whose correct form the message
 
 Return only the JSON. No errors: `{"errors": [], "correct_keys": []}`.
 
+## The learner's character and the scene (judge naturalness for this speaker, here)
+{{player}}
+{{setting}}
+
 ## Story so far (context only, never check it)
 {{context}}
 

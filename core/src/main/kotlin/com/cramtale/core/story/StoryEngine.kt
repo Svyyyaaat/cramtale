@@ -763,6 +763,8 @@ class StoryEngine(
         val context = turnsInChapter(s.chapter).lastOrNull()?.optString("passage").orEmpty()
         val o = json(call("mistakes", Models.CHECKS, Prompts.fill(prompts.prompt("mistakes"), mapOf(
             "context" to context.ifBlank { "(start of the story)" }, "known_keys" to knownKeys.joinToString("\n").ifBlank { "(none yet)" },
+            // who is speaking, to whom and where: what sounds natural depends on it
+            "player" to playerText(), "setting" to "Place: ${s.place}. Present: ${s.present.joinToString().ifEmpty { "nobody else" }}.",
             "message" to message,
         )), listOf(Msg(Role.USER, "Check the message.")), schema = MISTAKES_SCHEMA, maxTokens = 1200))
         lastCorrectKeys = o.optJSONArray("correct_keys")?.let { k -> (0 until k.length()).map { k.getString(it) } }.orEmpty()
