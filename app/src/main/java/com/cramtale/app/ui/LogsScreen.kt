@@ -83,7 +83,7 @@ fun LogsScreen(state: AppState) {
 @Composable
 fun LogsContent(d: LogsData, onUndoKnown: (Long) -> Unit) {
     val cs = MaterialTheme.colorScheme
-    val amber = LocalAccents.current.amber
+    val amber = cs.outline
     Page {
         SectionTitle("Would-be answers vs what you pressed")
         val r = d.report

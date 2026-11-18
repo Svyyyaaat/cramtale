@@ -147,7 +147,8 @@ fun StoryHero(info: HomeInfo, onOpen: () -> Unit) {
         }
         Spacer(Modifier.height(4.dp))
         Button(onOpen, Modifier.heightIn(min = 48.dp), shape = RoundedCornerShape(24.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = a.amber, contentColor = Color(0xFF231700))) {
+            // white on the dark card, the card's colour for the text
+            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = a.heroEnd)) {
             Icon(Icons.AutoMirrored.Filled.MenuBook, null, Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
             Text(if (info.turn == 0) "Begin" else "Continue", style = MaterialTheme.typography.labelLarge)

@@ -66,10 +66,10 @@ data class Accents(
     val onAccentContainer: Color,
 )
 
-// Dusk: aubergine with peach highlights (taps, the hero's button, the accent), moss for right/known
-private val LightAccents = Accents(Color(0xFFFBDCCB), Color(0xFF43200C), Color(0xFFF0A47A), Color(0xFF7A4772), Color(0xFF4A2846),
+// Dusk: aubergine (tapped words in its soft tint), a peach accent used sparingly, moss for right/known
+private val LightAccents = Accents(Color(0xFFF2DDEC), Color(0xFF2C0F27), Color(0xFFF0A47A), Color(0xFF7A4772), Color(0xFF4A2846),
     Color(0xFFB8613A), Color.White, Color(0xFFFBDCCB), Color(0xFF43200C))
-private val DarkAccents = Accents(Color(0xFF6A3A22), Color(0xFFFFDCC8), Color(0xFFF0A47A), Color(0xFF5E3157), Color(0xFF2E1A2B),
+private val DarkAccents = Accents(Color(0xFF5E3157), Color(0xFFFFD7F3), Color(0xFFF0A47A), Color(0xFF5E3157), Color(0xFF2E1A2B),
     Color(0xFFF4B08A), Color(0xFF4A1E05), Color(0xFF6A3A22), Color(0xFFFFDCC8))
 
 // the accent reads like a theme colour: MaterialTheme.colorScheme.accent
@@ -122,7 +122,7 @@ fun CramtaleTheme(dark: Boolean = isSystemInDarkTheme(), materialYou: Boolean = 
 
 /** With Material You, the extra colours come from the wallpaper scheme too (secondary for taps, tertiary for the accent). */
 private fun accentsFrom(s: androidx.compose.material3.ColorScheme) = Accents(
-    tapped = s.secondaryContainer, onTapped = s.onSecondaryContainer, amber = s.secondaryContainer,
+    tapped = s.primaryContainer, onTapped = s.onPrimaryContainer, amber = s.primaryContainer,
     heroStart = s.primary, heroEnd = s.primary.copy(alpha = 1f).let { androidx.compose.ui.graphics.lerp(it, Color.Black, 0.35f) },
     accent = s.tertiary, onAccent = s.onTertiary, accentContainer = s.tertiaryContainer, onAccentContainer = s.onTertiaryContainer,
 )
