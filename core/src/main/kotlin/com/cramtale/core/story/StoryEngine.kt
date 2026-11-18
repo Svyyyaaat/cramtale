@@ -804,12 +804,12 @@ class StoryEngine(
         if (people.isEmpty()) return "nobody but the player"
         val last = turnsInChapter(s.chapter).lastOrNull()?.optString("passage").orEmpty()
         val recent = (if (last.isBlank()) "(the scene is just starting)" else "Last moments:\n$last") +
-            (t.player?.let { "\n\nThe player's character, just now (what they said and did, as anyone present saw it): $it" } ?: "")
+            (t.player?.let { "\n\nWhat the player's character just tried to say or do (perceive only what you could, from where you are): $it" } ?: "")
         val attempt = t.rollNote?.let { "How the player's attempt went (decided by dice): $it" } ?: ""
         val replies = all(people.map { name -> {
             val o = runCatching { json(call("intent", Models.CHECKS, Prompts.fill(prompts.prompt("intent"), mapOf(
                 "name" to name, "file" to state.character(name).orEmpty(), "place" to s.place,
-                "present" to s.present.joinToString().ifEmpty { "nobody else" }, "player_public" to playerPublic(),
+                "present" to s.present.joinToString().ifEmpty { "nobody else" },
                 "recent" to recent, "attempt" to attempt,
             )), listOf(Msg(Role.USER, "What does $name do next?")), schema = INTENT_SCHEMA, maxTokens = 400)) }.getOrNull()
             // a failed call leaves that person to the writer's judgement rather than failing the turn

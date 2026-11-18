@@ -213,7 +213,7 @@ class StoryResumeTest {
         val intents = fake.sent("intent")
         assertEquals(1, intents.size, "one call per person present (佐伯)")
         val asked = intents.single().messages.joinToString { it.text }
-        assertTrue("A thin young shop assistant." in asked)
+        assertFalse("A thin young shop assistant." in asked, "no description handed to someone who may never have seen them")
         assertFalse("demon" in asked, "the hidden side never reaches them")
         assertTrue("Key." in asked, "their own file is there")
         val packet = fake.sent("writer").last().messages.last().text

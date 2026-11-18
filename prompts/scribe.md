@@ -10,7 +10,7 @@ Each change is an object with the fields `op`, `a`, `b`, `list`, `n` (always all
 - `clock`: an off-screen clock advanced because of what happened here. `a` = clock name, `n` = 1.
 - `move`: the scene moved or the people present changed. `a` = place, `list` = people now present.
 - `character`: a lasting change in how someone stands toward the player or what they want. `a` = name, `b` = one line in English.
-- `learns`: someone present saw, heard or was told something on the page that they didn't know. `a` = name, `b` = what they now know (one line). Only what they could actually perceive; never what only the narrator or the player knows.
+- `learns`: someone present saw, heard or was told something on the page that they didn't know. `a` = name, `b` = what they now know (one line). Only what they could actually perceive; never what only the narrator or the player knows. Someone seeing the player's character for the first time learns what they saw (how they looked, what they did).
 - `beat_done`: the current beat has played out.
 
 Record only what the passage shows happened. Return JSON `{"ops": [...]}`; no changes is `{"ops": []}`.
