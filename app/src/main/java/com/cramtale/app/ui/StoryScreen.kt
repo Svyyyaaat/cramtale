@@ -536,9 +536,13 @@ fun StoryInfoBody(info: StoryController.StoryInfo) {
     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp).padding(bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("The story so far", style = MaterialTheme.typography.titleLarge)
-        info.role?.let {
+        info.role?.let { sheet ->
             Text("You", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.accent)
-            Text(it, style = MaterialTheme.typography.bodyLarge)
+            // the sheet's own headings (What you know, Established in the story) as small labels
+            sheet.lines().filter { it.isNotBlank() }.forEach { l ->
+                if (l.startsWith("## ")) Text(l.removePrefix("## "), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 6.dp))
+                else Text(l, style = MaterialTheme.typography.bodyLarge)
+            }
         }
         if (info.met.isNotEmpty()) {
             Text("People you've met", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.accent)

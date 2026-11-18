@@ -697,10 +697,14 @@ class StoryController(
         val today: List<Pair<String, Boolean>> = emptyList(),
     )
 
-    fun role(): String? = File(dir, "state/player.md").takeIf { it.exists() }?.readText()?.trim()?.ifEmpty { null }
+    /** Your character in short (the card above the first passage). */
+    fun role(): String? = playerSheet()?.substringBefore("\n## ")?.trim()?.ifEmpty { null }
+
+    /** Your character's whole sheet: who they are, what they know, what the story has established about them. */
+    fun playerSheet(): String? = File(dir, "state/player.md").takeIf { it.exists() }?.readText()?.trim()?.ifEmpty { null }
 
     fun storyInfo(): StoryInfo {
-        val role = role()
+        val role = playerSheet()
         val text = File(dir, "log/turns.jsonl").jsonLines().joinToString("\n") { it.optString("passage") } + "\n" + (current?.passage?.text ?: "")
         val cast = runCatching { com.cramtale.core.story.StoryState(dir).characterNames() }.getOrDefault(emptyList())
         // met = named in a passage you've read (by full name or any part of it)

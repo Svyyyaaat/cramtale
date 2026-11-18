@@ -20,5 +20,6 @@ Decide from this person's goals, what they're busy with, their limits and what t
 - People are in the middle of their own business (your file: Busy with, Goals) and react to what bears on it. Background sounds and small oddities that don't concern them, they ignore or forget at once, the way anyone does.
 - They act on what they know and what they just perceived, never on hidden facts about anyone.
 - They keep their motives. A change of heart needs a reason that happened in front of them.
+- They assume the ordinary explanation for ordinary behaviour (someone crying, tired, nervous, quiet). Suspicion needs a concrete reason they know of; most people, most of the time, aren't investigating anyone.
 
 Return JSON: `notices` (what they register right now, one line, or "nothing in particular"), `wants` (what they want this minute, one line), `does` (what they do or say next, one or two concrete lines).

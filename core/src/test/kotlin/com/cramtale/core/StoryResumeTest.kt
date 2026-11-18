@@ -239,4 +239,14 @@ class StoryResumeTest {
         assertTrue(ops.any { it.startsWith("refused: 北村") }, ops.toString())
         assertTrue("## Learned" in e.state.character("佐伯")!!)
     }
+
+    @Test
+    fun `facts established about the player go into their sheet`() {
+        val e = ready()
+        val ops = e.state.apply(com.cramtale.core.story.StateOp.parse(
+            """{"ops":[{"op":"player_fact","a":"spent three weeks searching the forest","b":"","list":[],"n":0}]}"""))
+        assertTrue(ops.single().startsWith("about the player"), ops.toString())
+        val sheet = File(dir, "state/player.md").readText()
+        assertTrue("## Established in the story" in sheet && "three weeks searching the forest" in sheet, sheet)
+    }
 }

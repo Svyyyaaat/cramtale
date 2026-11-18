@@ -263,6 +263,12 @@ class StoryState(val dir: File) {
                         }
                     }
                 }
+                is StateOp.PlayerFact -> {
+                    val f = java.io.File(stateDir, "player.md")
+                    val old = if (f.exists()) f.readText().trimEnd() else ""
+                    val body = if ("## Established in the story" in old) old else "$old\n\n## Established in the story"
+                    f.writeAtomic("$body\n- (turn ${scene.turn}) ${op.fact}\n"); "about the player: ${op.fact}"
+                }
                 is StateOp.BeatDone -> {
                     scene.beats.firstOrNull { !it.done }?.done = true; "beat done"
                 }
@@ -294,6 +300,8 @@ sealed interface StateOp {
     data class Character(val name: String, val note: String) : StateOp
     /** Someone present saw, heard or was told something: it goes into what they know. */
     data class Learns(val name: String, val fact: String) : StateOp
+    /** Something established about the player's character: it goes into their sheet, so later passages agree with it. */
+    data class PlayerFact(val fact: String) : StateOp
     data object BeatDone : StateOp
 
     companion object {
@@ -328,6 +336,7 @@ sealed interface StateOp {
                         "move" -> Move(x, list)
                         "character" -> Character(x, y)
                         "learns" -> Learns(x, y)
+                        "player_fact" -> PlayerFact(x)
                         "beat_done" -> BeatDone
                         else -> null
                     }
@@ -341,7 +350,7 @@ sealed interface StateOp {
         val SCHEMA = """
         {"type":"object","additionalProperties":false,"required":["ops"],"properties":{"ops":{"type":"array","items":{
           "type":"object","additionalProperties":false,"required":["op","a","b","list","n"],"properties":{
-            "op":{"type":"string","enum":["chronicle","drop","reveal","new_secret","consequence","resolve","clock","new_clock","move","character","learns","beat_done"]},
+            "op":{"type":"string","enum":["chronicle","drop","reveal","new_secret","consequence","resolve","clock","new_clock","move","character","learns","player_fact","beat_done"]},
             "a":{"type":"string"},"b":{"type":"string"},"list":{"type":"array","items":{"type":"string"}},"n":{"type":"integer"}}}}}}
         """.trimIndent()
     }

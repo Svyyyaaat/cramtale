@@ -321,7 +321,7 @@ class StoryEngine(
                 val c = clocks!!.getJSONObject(i)
                 "- ${c.getString("name")}: 0/${c.optInt("size", 6)} — when full: ${c.optString("when_full")}"
             } + "\n")
-        File(stateDir, "player.md").writeAtomic(o.optString("player") + "\n")
+        File(stateDir, "player.md").writeAtomic(o.optString("player").trim() + "\n\n## What you know\n" + o.optString("player_knows").trim() + "\n")
         File(stateDir, "player_public.md").writeAtomic(o.optString("player_public").ifBlank { o.optString("player") } + "\n")
         val chars = o.getJSONArray("characters")
         for (i in 0 until chars.length()) chars.getJSONObject(i).let { state.writeCharacter(it.getString("name"), it.getString("file")) }
@@ -884,7 +884,7 @@ class StoryEngine(
             "roll":{"type":"boolean"},"action":{"type":"string"},"difficulty":{"type":"integer"},"stakes":{"type":"string"},"observable":{"type":"string"}}}"""
         val JUDGE_SCHEMA = """{"type":"object","additionalProperties":false,"required":["violations"],"properties":{"violations":{"type":"array","items":{
             "type":"object","additionalProperties":false,"required":["rule","quote","fix"],"properties":{
-            "rule":{"type":"string","enum":["player_voice","echo","explains","no_handoff","npc_knowledge","motive"]},"quote":{"type":"string"},"fix":{"type":"string"}}}}}}"""
+            "rule":{"type":"string","enum":["player_voice","echo","explains","no_handoff","npc_knowledge","motive","contradiction"]},"quote":{"type":"string"},"fix":{"type":"string"}}}}}}"""
         val INTENT_SCHEMA = """{"type":"object","additionalProperties":false,"required":["notices","wants","does"],"properties":{
             "notices":{"type":"string"},"wants":{"type":"string"},"does":{"type":"string"}}}"""
         val LEAK_SCHEMA = """{"type":"object","additionalProperties":false,"required":["guesses"],"properties":{"guesses":{"type":"array","items":{"type":"string"}}}}"""
@@ -895,8 +895,8 @@ class StoryEngine(
         val STYLES_SCHEMA = """{"type":"object","additionalProperties":false,"required":["styles"],"properties":{"styles":{"type":"array","items":{
             "type":"object","additionalProperties":false,"required":["name","line","passage"],"properties":{
             "name":{"type":"string"},"line":{"type":"string"},"passage":{"type":"string"}}}}}}"""
-        val SETUP_SCHEMA = """{"type":"object","additionalProperties":false,"required":["world","player","player_public","characters","secrets","clocks","complications","ambience","opening"],"properties":{
-            "world":{"type":"string"},"player":{"type":"string"},"player_public":{"type":"string"},
+        val SETUP_SCHEMA = """{"type":"object","additionalProperties":false,"required":["world","player","player_knows","player_public","characters","secrets","clocks","complications","ambience","opening"],"properties":{
+            "world":{"type":"string"},"player":{"type":"string"},"player_knows":{"type":"string"},"player_public":{"type":"string"},
             "characters":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["name","file"],"properties":{"name":{"type":"string"},"file":{"type":"string"}}}},
             "secrets":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["text","knows"],"properties":{"text":{"type":"string"},"knows":{"type":"array","items":{"type":"string"}}}}},
             "clocks":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["name","size","when_full"],"properties":{"name":{"type":"string"},"size":{"type":"integer"},"when_full":{"type":"string"}}}},

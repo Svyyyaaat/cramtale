@@ -11,6 +11,7 @@ Each change is an object with the fields `op`, `a`, `b`, `list`, `n` (always all
 - `move`: the scene moved or the people present changed. `a` = place, `list` = people now present.
 - `character`: a lasting change in how someone stands toward the player or what they want. `a` = name, `b` = one line in English.
 - `learns`: someone present saw, heard or was told something on the page that they didn't know. `a` = name, `b` = what they now know (one line). Only what they could actually perceive; never what only the narrator or the player knows. Someone seeing the player's character for the first time learns what they saw (how they looked, what they did).
+- `player_fact`: a concrete fact about the player's character's life or past that the passage established (someone said it and nobody disputed it, or it happened): `a` = the fact, one line ("spent three weeks searching the forest after the others vanished"). Not their feelings or choices.
 - `beat_done`: the current beat has played out.
 
 Record only what the passage shows happened. Return JSON `{"ops": [...]}`; no changes is `{"ops": []}`.

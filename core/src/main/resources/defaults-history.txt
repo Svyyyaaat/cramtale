@@ -12,6 +12,8 @@ prompts/director.md	7cbf277c440278ee
 prompts/intent.md	158b4d4d5d66a141
 prompts/intent.md	a50f457560911fff
 prompts/intent.md	cadddffd46fdca6d
+prompts/intent.md	d58caecd0af48e15
+prompts/judge.md	416a0b7a21907934
 prompts/judge.md	498cd6fea0496203
 prompts/judge.md	61391e1a2edc5aa3
 prompts/judge.md	d668aae3e84e2435
@@ -30,8 +32,10 @@ prompts/rewrite.md	d0230c2a7f4b7475
 prompts/scribe.md	09c38873d4cccd49
 prompts/scribe.md	5312d3d3253abe29
 prompts/scribe.md	9719735796c43d77
+prompts/scribe.md	c8be64b012c9bf86
 prompts/scribe.md	fbcd14e8632c9542
 prompts/setup.md	0acb34b3488eed22
+prompts/setup.md	3fb2525e5db1b74d
 prompts/setup.md	57ac7e661147ec14
 prompts/setup.md	d85539029951c09b
 prompts/style_picker.md	9cca079d4411fee2
@@ -41,6 +45,7 @@ prompts/turn.md	46c3c0e37a23ed0e
 prompts/turn.md	4efea58c4847f4bf
 prompts/turn.md	8f22df2d56a5c6b8
 prompts/turn.md	97c0bf7181ec4d96
+prompts/writer.md	9f283afdead0baad
 prompts/writer.md	aaeaf03b32c0a7f5
 prompts/writer.md	afe2f481646c5413
 prompts/writer.md	b62276f500f4b051
