@@ -3,5 +3,5 @@
         <!-- the app's paper colour from the first frame (no flash before Compose draws) -->
         <item name="android:windowBackground">@color/paper</item>
     </style>
-    <color name="paper">#FFF6F2EA</color>
+    <color name="paper">#FFF6F0EE</color>
 </resources>

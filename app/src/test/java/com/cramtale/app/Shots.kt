@@ -212,9 +212,9 @@ class Shots {
                 androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher_foreground), null, Modifier.size(small))
             }
             androidx.compose.foundation.layout.Box(Modifier.size(180.dp).clip(androidx.compose.foundation.shape.CircleShape)
-                .background(androidx.compose.ui.graphics.Color(0xFF2B3A55))) {
+                .background(androidx.compose.ui.graphics.Color(0xFF3E3540))) {
                 androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher_monochrome), null, Modifier.size(180.dp),
-                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(androidx.compose.ui.graphics.Color(0xFFD6E3FF)))
+                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(androidx.compose.ui.graphics.Color(0xFFF2DDEC)))
             }
         }
     }

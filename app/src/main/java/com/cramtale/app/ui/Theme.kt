@@ -15,37 +15,38 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/** 藍 indigo, 朱 vermilion, 若竹 green on paper; ink-dark at night (the original palette). */
+/** Dusk: aubergine, peach and moss on blush paper; plum-dark at night. */
 private val Light = lightColorScheme(
-    primary = Color(0xFF2B4570), onPrimary = Color.White,
-    primaryContainer = Color(0xFFDCE4F2), onPrimaryContainer = Color(0xFF0F2445),
-    secondary = Color(0xFFB5482E), onSecondary = Color.White,
-    secondaryContainer = Color(0xFFF6DED5), onSecondaryContainer = Color(0xFF4A1508),
-    tertiary = Color(0xFF4F7A5A), onTertiary = Color.White,
-    tertiaryContainer = Color(0xFFD9EBDC), onTertiaryContainer = Color(0xFF13301B),
-    background = Color(0xFFF6F2EA), onBackground = Color(0xFF1F1D1A),
-    surface = Color(0xFFFBF8F2), onSurface = Color(0xFF1F1D1A),
-    surfaceVariant = Color(0xFFECE5D8), onSurfaceVariant = Color(0xFF5E574D),
-    surfaceContainerLowest = Color(0xFFFFFDF9), surfaceContainerLow = Color(0xFFF8F4EC),
-    surfaceContainer = Color(0xFFF2EDE3), surfaceContainerHigh = Color(0xFFEDE7DB), surfaceContainerHighest = Color(0xFFE7E0D3),
-    outline = Color(0xFFBDB3A3), outlineVariant = Color(0xFFDDD5C7),
-    error = Color(0xFFA8322A), onError = Color.White, errorContainer = Color(0xFFF8DAD5), onErrorContainer = Color(0xFF410E0A),
+    primary = Color(0xFF6B3F63), onPrimary = Color.White,
+    primaryContainer = Color(0xFFF2DDEC), onPrimaryContainer = Color(0xFF2C0F27),
+    // Material's tonal parts (tonal buttons, selected segments): a quiet mauve
+    secondary = Color(0xFF6F5A69), onSecondary = Color.White,
+    secondaryContainer = Color(0xFFEEDFE9), onSecondaryContainer = Color(0xFF281A24),
+    tertiary = Color(0xFF5E7F5A), onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFDCE9D6), onTertiaryContainer = Color(0xFF172B14),
+    background = Color(0xFFF6F0EE), onBackground = Color(0xFF261D24),
+    surface = Color(0xFFFBF7F5), onSurface = Color(0xFF261D24),
+    surfaceVariant = Color(0xFFEDE3E3), onSurfaceVariant = Color(0xFF615259),
+    surfaceContainerLowest = Color(0xFFFFFCFB), surfaceContainerLow = Color(0xFFF9F3F1),
+    surfaceContainer = Color(0xFFF2EAE8), surfaceContainerHigh = Color(0xFFEDE4E2), surfaceContainerHighest = Color(0xFFE7DDDB),
+    outline = Color(0xFFB7A7AD), outlineVariant = Color(0xFFE3D7D8),
+    error = Color(0xFFB3261E), onError = Color.White, errorContainer = Color(0xFFF9DEDC), onErrorContainer = Color(0xFF410E0B),
 )
 
 private val Dark = darkColorScheme(
-    primary = Color(0xFFAFC6EE), onPrimary = Color(0xFF0F2445),
-    primaryContainer = Color(0xFF253B60), onPrimaryContainer = Color(0xFFDCE4F2),
-    secondary = Color(0xFFF2A88F), onSecondary = Color(0xFF4A1508),
-    secondaryContainer = Color(0xFF6B2A19), onSecondaryContainer = Color(0xFFF6DED5),
-    tertiary = Color(0xFFA6D1AF), onTertiary = Color(0xFF13301B),
-    tertiaryContainer = Color(0xFF2F4C37), onTertiaryContainer = Color(0xFFD9EBDC),
-    background = Color(0xFF15171B), onBackground = Color(0xFFE9E4DA),
-    surface = Color(0xFF1A1D22), onSurface = Color(0xFFE9E4DA),
-    surfaceVariant = Color(0xFF2A2E35), onSurfaceVariant = Color(0xFFBDB6AA),
-    surfaceContainerLowest = Color(0xFF111316), surfaceContainerLow = Color(0xFF1C1F24),
-    surfaceContainer = Color(0xFF20242A), surfaceContainerHigh = Color(0xFF272B32), surfaceContainerHighest = Color(0xFF30353D),
-    outline = Color(0xFF6E685E), outlineVariant = Color(0xFF3A3F47),
-    error = Color(0xFFF0A49A), onError = Color(0xFF410E0A), errorContainer = Color(0xFF7A2A22), onErrorContainer = Color(0xFFF8DAD5),
+    primary = Color(0xFFE5B4D9), onPrimary = Color(0xFF46193F),
+    primaryContainer = Color(0xFF5E3157), onPrimaryContainer = Color(0xFFFFD7F3),
+    secondary = Color(0xFFD9C0D1), onSecondary = Color(0xFF3E2C39),
+    secondaryContainer = Color(0xFF56424F), onSecondaryContainer = Color(0xFFF6DCEE),
+    tertiary = Color(0xFFB8CFAE), onTertiary = Color(0xFF243620),
+    tertiaryContainer = Color(0xFF3A4E35), onTertiaryContainer = Color(0xFFD4EBC9),
+    background = Color(0xFF1B1519), onBackground = Color(0xFFEDE0E5),
+    surface = Color(0xFF211A1F), onSurface = Color(0xFFEDE0E5),
+    surfaceVariant = Color(0xFF4D434A), onSurfaceVariant = Color(0xFFD0C2C9),
+    surfaceContainerLowest = Color(0xFF161115), surfaceContainerLow = Color(0xFF241D22),
+    surfaceContainer = Color(0xFF2A2228), surfaceContainerHigh = Color(0xFF342C32), surfaceContainerHighest = Color(0xFF3F363D),
+    outline = Color(0xFF998D95), outlineVariant = Color(0xFF4D434A),
+    error = Color(0xFFF2B8B5), onError = Color(0xFF601410), errorContainer = Color(0xFF8C1D18), onErrorContainer = Color(0xFFF9DEDC),
 )
 
 /** Colours outside Material's slots. */
@@ -65,10 +66,11 @@ data class Accents(
     val onAccentContainer: Color,
 )
 
-private val LightAccents = Accents(Color(0xFFF6DED5), Color(0xFF4A1508), Color(0xFFE2A93B), Color(0xFF34548A), Color(0xFF1E3356),
-    Color(0xFFB5482E), Color.White, Color(0xFFF6DED5), Color(0xFF4A1508))
-private val DarkAccents = Accents(Color(0xFF6B2A19), Color(0xFFF6DED5), Color(0xFFE8B865), Color(0xFF2E4A78), Color(0xFF1A2940),
-    Color(0xFFF2A88F), Color(0xFF4A1508), Color(0xFF6B2A19), Color(0xFFF6DED5))
+// Dusk: aubergine with peach highlights (taps, the hero's button, the accent), moss for right/known
+private val LightAccents = Accents(Color(0xFFFBDCCB), Color(0xFF43200C), Color(0xFFF0A47A), Color(0xFF7A4772), Color(0xFF4A2846),
+    Color(0xFFB8613A), Color.White, Color(0xFFFBDCCB), Color(0xFF43200C))
+private val DarkAccents = Accents(Color(0xFF6A3A22), Color(0xFFFFDCC8), Color(0xFFF0A47A), Color(0xFF5E3157), Color(0xFF2E1A2B),
+    Color(0xFFF4B08A), Color(0xFF4A1E05), Color(0xFF6A3A22), Color(0xFFFFDCC8))
 
 // the accent reads like a theme colour: MaterialTheme.colorScheme.accent
 val androidx.compose.material3.ColorScheme.accent: Color @Composable @androidx.compose.runtime.ReadOnlyComposable get() = LocalAccents.current.accent
@@ -118,11 +120,11 @@ fun CramtaleTheme(dark: Boolean = isSystemInDarkTheme(), materialYou: Boolean = 
     }
 }
 
-/** With Material You, the extra colours come from the wallpaper scheme too (tertiary for taps, error tones for the accent). */
+/** With Material You, the extra colours come from the wallpaper scheme too (secondary for taps, tertiary for the accent). */
 private fun accentsFrom(s: androidx.compose.material3.ColorScheme) = Accents(
-    tapped = s.tertiaryContainer, onTapped = s.onTertiaryContainer, amber = s.tertiary,
+    tapped = s.secondaryContainer, onTapped = s.onSecondaryContainer, amber = s.secondaryContainer,
     heroStart = s.primary, heroEnd = s.primary.copy(alpha = 1f).let { androidx.compose.ui.graphics.lerp(it, Color.Black, 0.35f) },
-    accent = s.error, onAccent = s.onError, accentContainer = s.errorContainer, onAccentContainer = s.onErrorContainer,
+    accent = s.tertiary, onAccent = s.onTertiary, accentContainer = s.tertiaryContainer, onAccentContainer = s.onTertiaryContainer,
 )
 
 /** The reader's text size setting (Settings → Reading), as a multiple of [ReadingText]. */

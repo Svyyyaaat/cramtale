@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- An open book with a speech bubble above its spine: a story you answer. One hue: cream book, pale indigo bubble. Flat, centred, inside the 66dp safe zone. -->
+<!-- An open book with a speech bubble above its spine: a story you answer. Dusk: pale peach book, peach bubble on aubergine. Flat, centred, inside the 66dp safe zone. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#FFF6F2EA" android:pathData="M53,49Q42,43 26,46L26,78Q42,74 53,81Z" />
-    <path android:fillColor="#FFF6F2EA" android:pathData="M55,49Q66,43 82,46L82,78Q66,74 55,81Z" />
-    <path android:fillColor="#FFAFC6EE" android:pathData="M45.0,22h18a6,6 0,0 1,6,6v5a6,6 0,0 1,-6,6h-5.5l-3.5,5.6000000000000005l-3.5,-5.6000000000000005h-5.5a6,6 0,0 1,-6,-6v-5a6,6 0,0 1,6,-6z" />
+    <path android:fillColor="#FFFBE3D3" android:pathData="M53,49Q42,43 26,46L26,78Q42,74 53,81Z" />
+    <path android:fillColor="#FFFBE3D3" android:pathData="M55,49Q66,43 82,46L82,78Q66,74 55,81Z" />
+    <path android:fillColor="#FFF0A47A" android:pathData="M45.0,22h18a6,6 0,0 1,6,6v5a6,6 0,0 1,-6,6h-5.5l-3.5,5.6000000000000005l-3.5,-5.6000000000000005h-5.5a6,6 0,0 1,-6,-6v-5a6,6 0,0 1,6,-6z" />
 </vector>
