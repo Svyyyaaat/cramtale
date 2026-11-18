@@ -10,8 +10,7 @@ Each change is an object with the fields `op`, `a`, `b`, `list`, `n` (always all
 - `clock`: an off-screen clock advanced because of what happened here. `a` = clock name, `n` = 1.
 - `move`: the scene moved or the people present changed. `a` = place, `list` = people now present.
 - `character`: a lasting change in how someone stands toward the player or what they want. `a` = name, `b` = one line in English.
-- `learns`: someone present saw, heard or was told something on the page that they didn't know. `a` = name, `b` = what they now know (one line). Only what they could actually perceive; never what only the narrator or the player knows. Someone seeing the player's character for the first time learns what they saw (how they looked, what they did).
-- `player_fact`: a concrete fact about the player's character's life or past that the passage established (someone said it and nobody disputed it, or it happened): `a` = the fact, one line ("spent three weeks searching the forest after the others vanished"). Not their feelings or choices.
+- `event`: the record. One for each thing that happened on the page that will matter later: `a` = what happened, one concrete line (include any fact it established, like something said about someone's past that nobody disputed), `list` = who perceived it: the people present who saw or heard it, and "PLAYER" if the player's character did. Someone hidden or out of earshot didn't perceive it. Someone seeing the player's character for the first time: an event of what they saw. Everyone's memory is built from these, so be concrete and leave out nothing that matters.
 - `beat_done`: the current beat has played out.
 
 Record only what the passage shows happened. Return JSON `{"ops": [...]}`; no changes is `{"ops": []}`.

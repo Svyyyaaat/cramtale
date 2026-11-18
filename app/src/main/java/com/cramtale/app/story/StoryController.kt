@@ -695,6 +695,8 @@ class StoryController(
         val role: String?, val met: List<String>, val chapters: List<Pair<Int, String>>,
         /** Today's reads (Anki's day): word and would-be grade (true = Good), latest first. */
         val today: List<Pair<String, Boolean>> = emptyList(),
+        /** What your character remembers: every event they perceived, from the record (newest first). */
+        val remembers: List<String> = emptyList(),
     )
 
     /** Your character in short (the card above the first passage). */
@@ -712,11 +714,15 @@ class StoryController(
         val met = cast.filter { n -> n in text || n.split(' ', '　', '・', '(', ')', '（', '）').any { it.length >= 2 && it in text } }
         val chapters = File(dir, "state/chapters").listFiles { f -> f.extension == "md" }.orEmpty()
             .mapNotNull { f -> f.nameWithoutExtension.toIntOrNull()?.let { it to f.readText().trim() } }.sortedBy { it.first }
+        val remembers = runCatching {
+            com.cramtale.core.story.StoryState(dir).events().filter { com.cramtale.core.story.StoryState.PLAYER in it.witnesses }
+                .reversed().map { e -> (if (e.turn < 0) "Before the story: " else "") + e.text }
+        }.getOrDefault(emptyList())
         val start = GradeLog.ankiDayStart()
         val today = gradeLog.snapshot().filter { it.optLong("at") >= start }
             .associateBy { "${it.optLong("noteId")}/${it.optInt("ord")}" }.values
             .sortedByDescending { it.optLong("at") }.map { it.optString("word") to (it.optInt("ease") == 3) }
-        return StoryInfo(role, met, chapters, today)
+        return StoryInfo(role, met, chapters, today, remembers)
     }
 
     /** Every session's costs, from the log file. */

@@ -321,7 +321,14 @@ class StoryEngine(
                 val c = clocks!!.getJSONObject(i)
                 "- ${c.getString("name")}: 0/${c.optInt("size", 6)} — when full: ${c.optString("when_full")}"
             } + "\n")
-        File(stateDir, "player.md").writeAtomic(o.optString("player").trim() + "\n\n## What you know\n" + o.optString("player_knows").trim() + "\n")
+        File(stateDir, "player.md").writeAtomic(o.optString("player").trim() + "\n")
+        // the backstory goes into the record as witnessed events: everyone's memory, the player's included, starts here
+        o.optJSONArray("history")?.let { h ->
+            for (i in 0 until h.length()) h.getJSONObject(i).let { e ->
+                val w = e.optJSONArray("witnesses")?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty().toSet()
+                if (e.optString("text").isNotBlank() && w.isNotEmpty()) state.addEvent(-1, "before the story", e.getString("text"), w)
+            }
+        }
         File(stateDir, "player_public.md").writeAtomic(o.optString("player_public").ifBlank { o.optString("player") } + "\n")
         val chars = o.getJSONArray("characters")
         for (i in 0 until chars.length()) chars.getJSONObject(i).let { state.writeCharacter(it.getString("name"), it.getString("file")) }
@@ -634,6 +641,7 @@ class StoryEngine(
         return Prompts.fill(prompts.prompt("turn"), mapOf(
             "player" to playerText(), "player_public" to playerPublic(),
             "intents" to (t.intents ?: "not decided"),
+            "record" to sceneRecord(s),
             "place" to s.place, "present" to s.present.joinToString().ifEmpty { "nobody but the player" },
             "turn" to s.turn.toString(), "chapter" to s.chapter.toString(),
             "beat" to (beat?.let { "${it.goal} Pressure: ${it.pressure}" } ?: "Let the scene breathe; follow what the player does."),
@@ -739,7 +747,7 @@ class StoryEngine(
         val (leaked, judged) = both(
             { leaks(d, t) },
             { json(call("judge", Models.CHECKS, Prompts.fill(prompts.prompt("judge"), mapOf(
-                "player" to playerText(), "player_public" to playerPublic(),
+                "player" to playerText(), "player_public" to playerPublic(), "record" to sceneRecord(state.scene()),
                 "people" to state.scene().present.mapNotNull { n -> state.character(n)?.let { "### $n\n$it" } }.joinToString("\n\n")
                     .ifEmpty { "nobody but the player" } + "\n\nWhat they were meant to do:\n" + (t.intents ?: "not decided"),
                 "message" to (t.player ?: "(none: the scene continues)"), "passage" to d.passage,
@@ -826,6 +834,7 @@ class StoryEngine(
             val o = runCatching { json(call("intent", Models.CHECKS, Prompts.fill(prompts.prompt("intent"), mapOf(
                 "name" to name, "file" to state.character(name).orEmpty(), "place" to s.place,
                 "present" to s.present.joinToString().ifEmpty { "nobody else" },
+                "memory" to state.memoryOf(name, s.present + s.place).joinToString("\n") { memoryLine(it) }.ifEmpty { "nothing yet" },
                 "recent" to recent, "around" to around.joinToString("\n") { "- $it" }.ifEmpty { "- nothing in particular" },
                 "attempt" to effect,
             )), listOf(Msg(Role.USER, "What does $name do next?")), schema = INTENT_SCHEMA, maxTokens = 400)) }.getOrNull()
@@ -842,6 +851,15 @@ class StoryEngine(
             listOf(Msg(Role.USER, "Meaning?")), maxTokens = 80, quiet = true, onText = onText).trim()
 
     // ------------------------------------------------------------------ helpers
+
+    private fun memoryLine(e: StoryState.Event) =
+        "- " + (if (e.turn < 0) "(before the story) " else "(turn ${e.turn}, ${e.place}) ") + e.text
+
+    /** The record for the people in a scene and the player: what any of them perceived (writer and checker). */
+    private fun sceneRecord(s: StoryState.Scene) =
+        state.recordFor(s.present + StoryState.PLAYER, s.present + s.place).joinToString("\n") { e ->
+            memoryLine(e) + "  [perceived by: ${e.witnesses.joinToString { if (it == StoryState.PLAYER) "the player" else it }}]"
+        }.ifEmpty { "nothing yet" }
 
     /** What other people can see of the player's character (falls back to the full text for older stories). */
     private fun playerPublic() = File(dir, "state/player_public.md").takeIf { it.exists() }?.readText()?.trim().orEmpty().ifEmpty { playerText() }
@@ -895,8 +913,8 @@ class StoryEngine(
         val STYLES_SCHEMA = """{"type":"object","additionalProperties":false,"required":["styles"],"properties":{"styles":{"type":"array","items":{
             "type":"object","additionalProperties":false,"required":["name","line","passage"],"properties":{
             "name":{"type":"string"},"line":{"type":"string"},"passage":{"type":"string"}}}}}}"""
-        val SETUP_SCHEMA = """{"type":"object","additionalProperties":false,"required":["world","player","player_knows","player_public","characters","secrets","clocks","complications","ambience","opening"],"properties":{
-            "world":{"type":"string"},"player":{"type":"string"},"player_knows":{"type":"string"},"player_public":{"type":"string"},
+        val SETUP_SCHEMA = """{"type":"object","additionalProperties":false,"required":["world","player","history","player_public","characters","secrets","clocks","complications","ambience","opening"],"properties":{
+            "world":{"type":"string"},"player":{"type":"string"},"history":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["text","witnesses"],"properties":{"text":{"type":"string"},"witnesses":{"type":"array","items":{"type":"string"}}}}},"player_public":{"type":"string"},
             "characters":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["name","file"],"properties":{"name":{"type":"string"},"file":{"type":"string"}}}},
             "secrets":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["text","knows"],"properties":{"text":{"type":"string"},"knows":{"type":"array","items":{"type":"string"}}}}},
             "clocks":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["name","size","when_full"],"properties":{"name":{"type":"string"},"size":{"type":"integer"},"when_full":{"type":"string"}}}},

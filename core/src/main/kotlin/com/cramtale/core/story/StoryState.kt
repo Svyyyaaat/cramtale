@@ -145,6 +145,49 @@ class StoryState(val dir: File) {
 
     private val sceneFile get() = File(stateDir, "scene.json")
 
+    // ---------- the event log: the single record of what happened, and who perceived it ----------
+
+    /**
+     * One thing that happened. [witnesses] are who perceived it (saw, heard, were told it right there);
+     * [PLAYER] stands for the player's character. Prose is never the record: this is.
+     */
+    data class Event(val id: String, val turn: Int, val place: String, val text: String, val witnesses: Set<String>)
+
+    private val eventsFile get() = File(stateDir, "events.jsonl")
+
+    fun events(): List<Event> = if (!eventsFile.exists()) emptyList() else eventsFile.readLines().filter { it.isNotBlank() }.mapNotNull { l ->
+        runCatching {
+            val o = JSONObject(l)
+            Event(o.getString("id"), o.optInt("turn"), o.optString("place"), o.getString("text"), o.optJSONArray("witnesses").strings().toSet())
+        }.getOrNull()
+    }
+
+    fun addEvent(turn: Int, place: String, text: String, witnesses: Set<String>): Event {
+        stateDir.mkdirs()
+        val id = "E${events().size + 1}"
+        val e = Event(id, turn, place, text.trim(), witnesses)
+        eventsFile.appendText(JSONObject().put("id", id).put("turn", turn).put("place", place).put("text", e.text)
+            .put("witnesses", JSONArray(witnesses.toList())).toString() + "\n")
+        return e
+    }
+
+    /**
+     * What [who] remembers, computed from the log (never written freehand): the events they perceived, the
+     * latest [recent] of them, plus older ones that bear on [focus] (people present, the place, names just
+     * mentioned), oldest first.
+     */
+    fun memoryOf(who: String, focus: Collection<String> = emptyList(), recent: Int = 12, related: Int = 8): List<Event> {
+        val mine = events().filter { who in it.witnesses }
+        val latest = mine.takeLast(recent)
+        val keys = focus.filter { it.length >= 2 }
+        val older = mine.dropLast(recent).filter { e -> keys.any { k -> k in e.text || k == e.place } || e.turn < 0 }.takeLast(related)
+        return (older + latest).distinctBy { it.id }.sortedBy { it.id.drop(1).toIntOrNull() ?: 0 }
+    }
+
+    /** Events anyone in [people] perceived (the writer and the checker's view of the scene's record). */
+    fun recordFor(people: Collection<String>, focus: Collection<String> = emptyList(), recent: Int = 15): List<Event> =
+        people.flatMap { memoryOf(it, focus, recent, 6) }.distinctBy { it.id }.sortedBy { it.id.drop(1).toIntOrNull() ?: 0 }
+
     fun scene(): Scene {
         if (!sceneFile.exists()) return Scene()
         val o = JSONObject(sceneFile.readText())
@@ -259,15 +302,26 @@ class StoryState(val dir: File) {
                         !offscreen && op.name !in scene.present -> "refused: ${op.name} wasn't there to learn that"
                         else -> {
                             val body = if ("## Learned" in old) old.trimEnd() else old.trimEnd() + "\n\n## Learned"
-                            writeCharacter(op.name, body + "\n- (turn ${scene.turn}) ${op.fact}\n"); "${op.name} learned: ${op.fact}"
+                            writeCharacter(op.name, body + "\n- (turn ${scene.turn}) ${op.fact}\n")
+                            addEvent(scene.turn, scene.place, op.fact, setOf(op.name)); "${op.name} learned: ${op.fact}"
                         }
+                    }
+                }
+                is StateOp.Happened -> {
+                    // perception is checked in code: in the scene, only those present (and the player) can have perceived it
+                    val ok = op.witnesses.filter { offscreen || it == PLAYER || it in scene.present }.toSet()
+                    val dropped = op.witnesses.toSet() - ok
+                    if (op.text.isBlank() || ok.isEmpty()) "refused event (no witness in the scene): ${op.text}"
+                    else addEvent(scene.turn, scene.place, op.text, ok).let { e ->
+                        "${e.id}: ${e.text} [${ok.joinToString()}]" + if (dropped.isEmpty()) "" else " (not there: ${dropped.joinToString()})"
                     }
                 }
                 is StateOp.PlayerFact -> {
                     val f = java.io.File(stateDir, "player.md")
                     val old = if (f.exists()) f.readText().trimEnd() else ""
                     val body = if ("## Established in the story" in old) old else "$old\n\n## Established in the story"
-                    f.writeAtomic("$body\n- (turn ${scene.turn}) ${op.fact}\n"); "about the player: ${op.fact}"
+                    f.writeAtomic("$body\n- (turn ${scene.turn}) ${op.fact}\n")
+                    addEvent(scene.turn, scene.place, op.fact, scene.present.toSet() + PLAYER); "about the player: ${op.fact}"
                 }
                 is StateOp.BeatDone -> {
                     scene.beats.firstOrNull { !it.done }?.done = true; "beat done"
@@ -282,6 +336,9 @@ class StoryState(val dir: File) {
     }
 
     companion object {
+        /** The player's character in the event log's witness lists. */
+        const val PLAYER = "PLAYER"
+
         internal fun JSONArray?.strings(): List<String> = if (this == null) emptyList() else (0 until length()).map { getString(it) }
     }
 }
@@ -302,9 +359,14 @@ sealed interface StateOp {
     data class Learns(val name: String, val fact: String) : StateOp
     /** Something established about the player's character: it goes into their sheet, so later passages agree with it. */
     data class PlayerFact(val fact: String) : StateOp
+    /** Something that happened, with who perceived it: the record everyone's memory is computed from. */
+    data class Happened(val text: String, val witnesses: List<String>) : StateOp
     data object BeatDone : StateOp
 
     companion object {
+        /** The player's character in witness lists. */
+        const val PLAYER = StoryState.PLAYER
+
         /**
          * The JSON the scribe and off-screen prompts return: {"ops": [{"op", "a", "b", "list", "n"}]},
          * every field present (structured output rejects a schema with many optional fields):
@@ -337,6 +399,7 @@ sealed interface StateOp {
                         "character" -> Character(x, y)
                         "learns" -> Learns(x, y)
                         "player_fact" -> PlayerFact(x)
+                        "event" -> Happened(x, list)
                         "beat_done" -> BeatDone
                         else -> null
                     }
@@ -350,7 +413,7 @@ sealed interface StateOp {
         val SCHEMA = """
         {"type":"object","additionalProperties":false,"required":["ops"],"properties":{"ops":{"type":"array","items":{
           "type":"object","additionalProperties":false,"required":["op","a","b","list","n"],"properties":{
-            "op":{"type":"string","enum":["chronicle","drop","reveal","new_secret","consequence","resolve","clock","new_clock","move","character","learns","player_fact","beat_done"]},
+            "op":{"type":"string","enum":["chronicle","drop","reveal","new_secret","consequence","resolve","clock","new_clock","move","character","learns","player_fact","event","beat_done"]},
             "a":{"type":"string"},"b":{"type":"string"},"list":{"type":"array","items":{"type":"string"}},"n":{"type":"integer"}}}}}}
         """.trimIndent()
     }

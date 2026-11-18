@@ -544,6 +544,10 @@ fun StoryInfoBody(info: StoryController.StoryInfo) {
                 else Text(l, style = MaterialTheme.typography.bodyLarge)
             }
         }
+        if (info.remembers.isNotEmpty()) {
+            Text("What you remember", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.accent)
+            info.remembers.take(30).forEach { Text("· $it", style = MaterialTheme.typography.bodyMedium) }
+        }
         if (info.met.isNotEmpty()) {
             Text("People you've met", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.accent)
             Text(info.met.joinToString("、"), style = readingStyle().copy(fontSize = 18.sp, lineHeight = 28.sp))

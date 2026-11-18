@@ -30,6 +30,9 @@ Turn {{turn}}, chapter {{chapter}}.
 ### Owed and due
 {{consequences}}
 
+### The record (what these people and the player perceived; never contradict it, and nobody knows what they didn't perceive)
+{{record}}
+
 ### Earlier outcomes that still matter here
 {{chronicle}}
 

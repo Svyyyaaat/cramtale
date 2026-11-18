@@ -6,6 +6,7 @@ Return JSON `{"ops": [...]}`. Each change has the fields `op`, `a`, `b`, `list`,
 - `consequence`: what is now coming for the player. `a` = what, `n` = turns until due (0 if no date).
 - `reveal`: someone found something out. `a` = secret id, `b` = who.
 - `character`: someone's position changed. `a` = name, `b` = one line.
+- `event`: something that happened off-screen, for the record. `a` = one concrete line, `list` = who took part or saw it (never "PLAYER": the player wasn't there). Only they will know of it until it comes up on the page.
 Two to five changes; fewer is fine if little would happen.
 
 ## World

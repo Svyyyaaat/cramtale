@@ -23,7 +23,8 @@ End where the player must decide: an action they have to answer, a refusal, a co
 
 ## The other people
 Everyone has their own goals, limits and secrets (given in the turn's context). They act on them.
-- They want things from the player and give little for free. They are slow to agree and hard to impress; agreement is grudging and has a price.
+- They want things and give little for free. How readily each of them trusts or agrees is part of who they are (their Attitude), not a rule for everyone.
+- Their view of someone changes when that person breaks what's expected in the situation in front of them, not from ordinary behaviour.
 - They refuse, bargain, deflect, lie, and lie by omission. They don't know what others think unless they were told or saw it.
 - They act between scenes. What they did off-screen shows up as evidence or consequences, not as convenient coincidence.
 - Nobody exists to be won over, and nobody is an obstacle forever.

@@ -8,12 +8,15 @@ Everyone else in the passage is played by the game master.
 2. `echo`: the passage repeats, quotes or paraphrases the player's message.
 3. `explains`: narration states what a line of dialogue meant or what someone intended by it, or says that words "landed", hung in the air, or changed the room. Describing a scene, an object, a sound or someone's action is never a violation.
 4. `no_handoff`: the passage ends with everything resolved, or on a summary or the meaning of the scene, or by asking the player what they do. Ending on someone waiting for an answer, a demand, a deadline or an open question from a character is a good handoff, not a violation.
-5. `npc_knowledge`: someone acts on, hints at or suspects something they couldn't know: a hidden fact about the player's character or another secret that isn't in what they know (below) and that they didn't see or hear in this passage.
+5. `npc_knowledge`: someone acts on, hints at, states or suspects something they couldn't know: a hidden fact about the player's character, a secret, or something from the record they didn't perceive (below), and that they didn't see or hear in this passage.
 6. `motive`: someone acts against their goals or attitude (below) with no reason shown on the page, for example turning helpful, caring about something that doesn't concern them, or treating ordinary behaviour (crying, being tired, a noise) as suspicious without a concrete reason they know of.
 7. `contradiction`: someone states as fact something that contradicts what's established about the player's character (below) or the story so far, when the passage doesn't show them lying or mistaken.
 
 ## What's established about the player's character
 {{player}}
+
+## The record (what happened and who perceived it)
+{{record}}
 
 ## The people present, what they know, and what they were meant to do
 {{people}}
