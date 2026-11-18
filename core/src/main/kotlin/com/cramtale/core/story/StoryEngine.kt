@@ -543,6 +543,7 @@ class StoryEngine(
         logFile.appendText(JSONObject()
             .put("turn", t.turn).put("at", System.currentTimeMillis()).put("chapter", s.chapter).put("player", t.player ?: "")
             .put("passage", t.draft.passage).put("roll", t.roll?.toString() ?: "")
+            .put("place", s.place).put("present", JSONArray(s.present)).put("observable", t.observable)
             .put("packet", t.packet ?: "").put("sentAs", sentAs(t, turnsInChapter(s.chapter).isEmpty()))
             .put("corrections", JSONArray(t.corrections.map { JSONObject().put("wrong", it.wrong).put("right", it.right).put("key", it.key) }))
             .put("checks", JSONArray(t.draft.checks.map { "${it.name}: ${if (it.passed) "ok" else it.detail}" }))
@@ -560,12 +561,12 @@ class StoryEngine(
 
     private fun scribe(t: PendingTurn, passage: String, quiet: Boolean): String {
         val s = state.scene()
-        return call("scribe", Models.CHECKS, Prompts.fill(prompts.prompt("scribe"), records() + mapOf(
+        return call("scribe", Models.CHARACTERS, Prompts.fill(prompts.prompt("scribe"), records() + mapOf(
             "present" to s.present.joinToString(), "place" to s.place,
             "beat" to (s.beats.firstOrNull { !it.done }?.goal ?: "none"),
             "clocks" to state.clocks().joinToString("; ") { "${it.name} ${it.filled}/${it.size}" },
             "message" to (t.player ?: "(the player let the scene continue)"), "passage" to passage,
-        )), listOf(Msg(Role.USER, "List the changes.")), schema = StateOp.SCHEMA, maxTokens = 1500, quiet = quiet)
+        )), listOf(Msg(Role.USER, "List the changes.")), schema = StateOp.SCHEMA, maxTokens = 4000, quiet = quiet)
     }
 
     @Volatile private var scribeAhead: Pair<String, java.util.concurrent.Future<String>>? = null
@@ -818,8 +819,7 @@ class StoryEngine(
         val cast = state.characterNames().toSet()
         val people = s.present.filter { it in cast }
         if (people.isEmpty()) return "nobody but the player"
-        val last = turnsInChapter(s.chapter).lastOrNull()?.optString("passage").orEmpty()
-        val recent = if (last.isBlank()) "(the scene is just starting)" else last
+        val turns = turnsInChapter(s.chapter)
         // background happenings, so what the player does is one thing among several, not the only stimulus
         val pool = Complications.parse(prompts.config("ambience.md").orEmpty(), dice.random)
         val background = ArrayList<String>()
@@ -831,18 +831,36 @@ class StoryEngine(
                 "${it.outcome.label} (success: it works on whoever it was aimed at; failure: they see through it or notice)."
         } ?: ""
         val replies = all(people.map { name -> {
-            val o = runCatching { json(call("intent", Models.CHECKS, Prompts.fill(prompts.prompt("intent"), mapOf(
+            val o = runCatching { json(call("intent", Models.CHARACTERS, Prompts.fill(prompts.prompt("intent"), mapOf(
                 "name" to name, "file" to state.character(name).orEmpty(), "place" to s.place,
                 "present" to s.present.joinToString().ifEmpty { "nobody else" },
                 "memory" to state.memoryOf(name, s.present + s.place).joinToString("\n") { memoryLine(it) }.ifEmpty { "nothing yet" },
-                "recent" to recent, "around" to around.joinToString("\n") { "- $it" }.ifEmpty { "- nothing in particular" },
+                "recent" to sceneSoFar(turns, name, s.place), "around" to around.joinToString("\n") { "- $it" }.ifEmpty { "- nothing in particular" },
                 "attempt" to effect,
-            )), listOf(Msg(Role.USER, "What does $name do next?")), schema = INTENT_SCHEMA, maxTokens = 400)) }.getOrNull()
+            )), listOf(Msg(Role.USER, "What does $name do next?")), schema = INTENT_SCHEMA, maxTokens = 3000)) }.getOrNull()
             // a failed call leaves that person to the writer's judgement rather than failing the turn
             if (o == null) "- $name: (undecided)" else
                 "- $name: notices: ${o.optString("notices")}; wants: ${o.optString("wants")}; does: ${o.optString("does")}"
         } })
         return (if (background.isEmpty()) "" else "Going on around them (use what fits): ${background.joinToString(" / ")}\n") + replies.joinToString("\n")
+    }
+
+    /**
+     * What [name] saw and heard of this chapter, word for word: the passages they were there for, each led by
+     * what could be seen or heard of the player's character that turn (never the raw message). Without this a
+     * character only has the record's one-line summaries and forgets what was said two turns ago.
+     */
+    private fun sceneSoFar(turns: List<JSONObject>, name: String, place: String, keep: Int = 10): String {
+        val mine = turns.filter { t ->
+            val present = t.optJSONArray("present")
+            // turns logged before presence was kept: those at this place
+            if (present == null) t.optString("place", place) == place else (0 until present.length()).any { present.optString(it) == name }
+        }.takeLast(keep)
+        if (mine.isEmpty()) return "(the scene is just starting)"
+        return mine.joinToString("\n\n") { t ->
+            val seen = t.optString("observable")
+            (if (seen.isBlank()) "" else "[the player's character: $seen]\n") + t.optString("passage")
+        }
     }
 
     /** The popup's one-line meaning of a word in its sentence. */

@@ -7,6 +7,8 @@ import java.time.Instant
 object Models {
     const val WRITER = "claude-opus-5-5"
     const val CHECKS = "claude-haiku-5-5"
+    /** What the characters decide and what the record keeps: reasoning about people, so the strong model. */
+    const val CHARACTERS = WRITER
 }
 
 enum class Role { USER, ASSISTANT, SYSTEM }

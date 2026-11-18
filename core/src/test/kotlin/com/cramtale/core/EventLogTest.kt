@@ -66,6 +66,7 @@ class EventLogTest {
                 "opening":{"place":"mill","present":["Konrad","Mia"],"situation":"Konrad asks questions."}}""",
             "director" to """{"beats":[{"goal":"questions","place":"mill","characters":["Konrad"],"pressure":"time"}],"opening":""}""",
             "intent" to """{"notices":"x","wants":"y","does":"z"}""",
+            "mistakes" to """{"errors":[],"correct_keys":[]}""", "adjudicator" to """{"roll":false,"action":"","difficulty":0,"stakes":"","observable":"Lenz says he was in the forest for three weeks."}""",
             "judge" to """{"violations":[]}""", "leak" to """{"guesses":[]}""", "scribe" to """{"ops":[]}""",
             "writer" to """{"passage":"Konradは黙った。","used":[],"grammar":[]}""",
         ))
@@ -79,6 +80,12 @@ class EventLogTest {
         assertFalse("three weeks" in asked["Mia"]!!, "Mia never perceived it")
         assertFalse("debts" in asked["Konrad"]!!, "Konrad never perceived it")
         assertTrue("debts" in asked["Mia"]!!)
+        e.commit()
+        e.playerTurn("「三週間、森にいた」と言う", DuePool())
+        val second = fake.sent("intent").takeLast(2).map { r -> r.messages.joinToString { it.text } }
+        assertTrue(second.all { "Konradは黙った。" in it }, "they remember the earlier passage word for word")
+        assertTrue(second.none { "三週間、森にいた」と言う" in it }, "never the raw message")
+        assertTrue(fake.sent("intent").all { it.model == com.cramtale.core.llm.Models.CHARACTERS })
         val packet = fake.sent("writer").last().messages.last().text
         assertTrue("three weeks" in packet && "perceived by" in packet, "the writer gets the record")
     }
