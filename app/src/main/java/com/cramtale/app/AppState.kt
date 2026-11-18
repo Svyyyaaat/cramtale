@@ -98,8 +98,11 @@ class AppState(val context: Context) {
         set(v) { field = v; KnownListsStore.save(listsDir, v) }
 
     private var dict: Jmdict? = null
-    private var deckWords: List<DeckWord>? = null
-    private var matcher: Matcher? = null
+    @Volatile private var deckWords: List<DeckWord>? = null
+    @Volatile private var matcher: Matcher? = null
+    // building the matcher takes seconds (indexing thousands of words): its own lock, so nothing that
+    // only needs the deck (the home screen) waits behind it
+    private val matcherLock = Any()
     val frequency: FrequencyList? by lazy { FrequencyList.bundled() }
 
     private val dictLock = Any()
@@ -117,8 +120,20 @@ class AppState(val context: Context) {
     fun deck(): List<DeckWord> {
         deckWords?.let { return it }
         val notes = if (deckFile.exists()) deckFile.useLines { DeckExport.parse(it) } else emptyList()
-        return DeckReader.words(notes).also { deckWords = it }
+        return DeckReader.words(notes).also { w ->
+            deckWords = w
+            prefs.edit().putInt("deckCount", w.size).putString("deckNames", w.map { it.deck }.toSet().joinToString("\u001f")).apply()
+        }
     }
+
+    /** Word count and deck names, instantly (saved when the deck was last read): enough for the home screen. */
+    fun deckSummary(): Pair<Int, Set<String>> = deckWords?.let { w -> w.size to w.map { it.deck }.toSet() }
+        ?: (prefs.getInt("deckCount", -1).takeIf { it >= 0 }?.let { n ->
+            n to prefs.getString("deckNames", "").orEmpty().split('\u001f').filter { it.isNotBlank() }.toSet()
+        } ?: deck().let { w -> w.size to w.map { it.deck }.toSet() })
+
+    /** The matcher if it's built already, without waiting for it. */
+    fun matcherIfReady(): Matcher? = matcher
 
     val deckSnapshotTime: Long? get() = deckFile.takeIf { it.exists() }?.lastModified()
 
@@ -159,10 +174,13 @@ class AppState(val context: Context) {
         return fresh.map { it.noteId }.toSet()
     }
 
-    @Synchronized
     fun matcher(): Matcher? {
         matcher?.let { return it }
-        val d = jmdict() ?: return null
-        return Matcher(d, DeckIndex(deck(), d), frequency).also { matcher = it }
+        return synchronized(matcherLock) {
+            matcher ?: run {
+                val d = jmdict() ?: return@run null
+                Matcher(d, DeckIndex(deck(), d), frequency).also { matcher = it }
+            }
+        }
     }
 }

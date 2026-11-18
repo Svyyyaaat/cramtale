@@ -139,6 +139,18 @@ class AnkiReader(private val context: Context, val target: AnkiTarget) : AnkiSou
         return null
     }
 
+    /** Card states read four at a time: a due pile of a few hundred took seconds one by one. */
+    override fun cards(refs: List<CardRef>): Map<CardRef, CardInfo?> {
+        if (refs.size < 8) return refs.associateWith { card(it) }
+        val pool = java.util.concurrent.Executors.newFixedThreadPool(4)
+        try {
+            val fs = refs.map { r -> r to pool.submit(java.util.concurrent.Callable { card(r) }) }
+            return fs.associate { (r, f) -> r to runCatching { f.get() }.getOrNull() }
+        } finally {
+            pool.shutdown()
+        }
+    }
+
     fun <T> query(uri: Uri, projection: Array<String>?, selection: String?, args: Array<String>? = null, row: (Cursor) -> T): List<T> {
         val out = ArrayList<T>()
         resolver.query(uri, projection, selection, args, null)?.use { c -> while (c.moveToNext()) out += row(c) }

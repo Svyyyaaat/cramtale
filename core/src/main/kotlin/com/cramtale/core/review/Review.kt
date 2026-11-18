@@ -26,6 +26,8 @@ interface AnkiSource {
     /** The scheduler's queue for a deck (Anki applies its own limits). */
     fun queue(deckId: Long, limit: Int): List<CardRef>
     fun card(ref: CardRef): CardInfo?
+    /** Several cards; a source that can read them in parallel overrides this. */
+    fun cards(refs: List<CardRef>): Map<CardRef, CardInfo?> = refs.associateWith { card(it) }
     fun nowSeconds(): Long = System.currentTimeMillis() / 1000
 }
 
@@ -62,10 +64,16 @@ class DueSnapshot(
             val now = source.nowSeconds()
             val out = LinkedHashMap<String, DueCard>()
             val unknown = LinkedHashSet<Long>()
+            val wanted = LinkedHashMap<String, Pair<CardRef, DeckWord>>()
             for (deck in deckIds) for (ref in source.queue(deck, QUEUE_LIMIT)) {
                 val w = byNote[ref.noteId] ?: run { unknown += ref.noteId; null } ?: continue
                 if (w.cards.none { it.ord == ref.ord }) continue // not a recognition card
-                val info = source.card(ref) ?: continue
+                wanted.putIfAbsent(ref.key, ref to w)
+            }
+            // the card states in one go (the app reads them in parallel: one query per card adds up)
+            val infos = source.cards(wanted.values.map { it.first })
+            for ((ref, w) in wanted.values) {
+                val info = infos[ref] ?: continue
                 if (info.suspendedOrBuried) continue
                 if (info.queue == 1 && info.due > now) continue // learning step not over yet
                 out.putIfAbsent(ref.key, DueCard(ref, w, info))

@@ -116,11 +116,11 @@ fun App(state: AppState) {
 fun homeInfo(state: AppState): HomeInfo {
     val s = state.story
     val t = state.target
-    val words = state.deck()
+    // the saved summary, not the deck itself: parsing thousands of notes isn't needed to draw this screen
+    val (wordCount, names) = state.deckSummary()
     val due = runCatching {
         val reader = com.cramtale.app.anki.AnkiReader(state.context, t!!)
         if (!reader.hasPermission()) return@runCatching null
-        val names = words.map { it.deck }.toSet()
         // a parent deck's counts include its children: count only the top-most of the vocabulary decks
         val top = names.filter { n -> names.none { it != n && n.startsWith("$it::") } }.toSet()
         reader.decks().filter { it.name in top }.let { ds -> DueCounts(ds.sumOf { it.review }, ds.sumOf { it.learn }, ds.sumOf { it.new }) }
@@ -130,7 +130,7 @@ fun homeInfo(state: AppState): HomeInfo {
         due = due, perPassage = s.cardsPerPassage() ?: state.passageLength.estimate, readToday = today.cards, goodToday = today.good, againToday = today.again,
         place = s.place(), turn = s.turn(), chapter = s.chapter(), lastLines = s.lastLines(), totalCost = s.totalCost(),
         collection = t?.let { (if (it.isReal) "Real collection" else "Copy") + " · " + it.packageName } ?: "Not connected",
-        collectionIsReal = t?.isReal == true, connected = t != null && words.isNotEmpty(),
-        deckWords = words.size, cutoff = state.policy.frequencyThreshold,
+        collectionIsReal = t?.isReal == true, connected = t != null && wordCount > 0,
+        deckWords = wordCount, cutoff = state.policy.frequencyThreshold,
     )
 }

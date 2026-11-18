@@ -351,9 +351,18 @@ class StoryController(
      * starts after a long break, not on every open.
      */
     suspend fun start(): Unit? = work("Opening the story…", again = { start() }) {
-        loadHistory()
         // the engine first: a waiting turn's review words must not be offered as flashcards
         val e = engine()
+        val waiting = e.pending
+        if (waiting != null && waiting.ready && outbox.takeIf { it.exists() }?.readText().isNullOrBlank()) {
+            // a passage is waiting: show it at once; word taps and Anki's queue fill in right after
+            loadHistory(quick = true)
+            restoreTaps(waiting)
+            show(waiting, quick = true)
+            finishOpening(waiting)
+            return@work
+        }
+        loadHistory()
         takeSnapshot()
         if (e.pending == null && e.needsNewSession()) e.startSession(pool)
         val message = outbox.takeIf { it.exists() }?.readText()?.ifBlank { null }
@@ -441,6 +450,8 @@ class StoryController(
         val t = e.pending ?: return
         val shown = current ?: return
         val m = app.matcher()
+        // opened quickly and sent before the queue was read: read it now, so the passage is still graded
+        if (snapshot == null && app.target != null) runCatching { takeSnapshot() }
         val snap = snapshot?.let(::withoutExcluded)
         // grades are decided first (Anki is asked now), but logged only once the turn is committed,
         // so a failed commit retried later doesn't log them twice
@@ -496,7 +507,30 @@ class StoryController(
     }
 
 
-    private fun show(t: PendingTurn) {
+    /**
+     * After a quick open: build the matcher (seconds, the first time), then show the passage with its words
+     * tappable and the history annotated, and read Anki's queue for the flashcards and new-card meanings.
+     * Skipped wherever the player has already moved on.
+     */
+    private fun finishOpening(t: PendingTurn) {
+        scope.launch(Dispatchers.IO) {
+            runCatching { app.matcher() }
+            if (isWorking || engine?.pending !== t) return@launch
+            show(t)
+            reannotateHistory()
+            if (snapshot == null) runCatching { takeSnapshot() }
+            if (!isWorking && engine?.pending === t) show(t)
+        }
+    }
+
+    private fun reannotateHistory() {
+        val m = app.matcher() ?: return
+        val fresh = history.map { h -> if (h.passage.spans.isNotEmpty()) h else
+            h.copy(passage = h.passage.copy(spans = withNames(m.analyze(h.passage.text)).spans)) }
+        history.clear(); history.addAll(fresh)
+    }
+
+    private fun show(t: PendingTurn, quick: Boolean = false) {
         title = place()
         val d = t.draft
         val player = t.player
@@ -505,7 +539,8 @@ class StoryController(
         val roll = t.roll?.toString()
         val complication = t.complication
         refreshCast()
-        val m = app.matcher()
+        // quick: whatever is ready now (no waiting on the matcher build); words become tappable a moment later
+        val m = if (quick) app.matcherIfReady() else app.matcher()
         val analysis = m?.analyze(d.passage)?.let(::withNames)
         val grammarFound = grammar?.find(com.cramtale.core.text.Tokenizer.tokenize(d.passage)).orEmpty()
         val newNotes = snapshot?.let(::withoutExcluded)?.cards?.filter { it.isNew }?.map { it.ref.noteId }?.toSet().orEmpty()
@@ -528,14 +563,14 @@ class StoryController(
         if (shownAt == 0L || current?.passage?.turn != turn) shownAt = System.currentTimeMillis()
     }
 
-    private fun loadHistory() {
+    private fun loadHistory(quick: Boolean = false) {
         if (history.isNotEmpty()) return
         val f = File(dir, "log/turns.jsonl")
         if (!f.exists()) return
         refreshCast()
         f.jsonLines().takeLast(20).forEach { o ->
             val text = o.getString("passage")
-            val a = app.matcher()?.analyze(text)?.let(::withNames)
+            val a = (if (quick) app.matcherIfReady() else app.matcher())?.analyze(text)?.let(::withNames)
             history += ShownTurn(o.optString("player").ifBlank { null }, emptyList(),
                 ShownPassage(o.getInt("turn"), text, a?.spans.orEmpty(), emptyList(), emptySet(), emptyMap(), emptyList(), emptyList()))
         }
