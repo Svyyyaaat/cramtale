@@ -38,6 +38,9 @@ class StoryState(val dir: File) {
         /** The beat the complication was drawn for; a new beat draws a new one. */
         var complicationFor: String? = null,
         var usedComplications: MutableList<String> = ArrayList(),
+        /** Background lines going on (text → last turn) and resting after they ended (text → turn they may return). */
+        var ambienceGoing: MutableMap<String, Int> = LinkedHashMap(),
+        var ambienceResting: MutableMap<String, Int> = LinkedHashMap(),
         /** Grammar or weak-point openings the director planned this session (at most one). */
         var openingsThisSession: Int = 0,
         /** When the player last did anything (ms): a long gap ends the session. */
@@ -204,6 +207,8 @@ class StoryState(val dir: File) {
             complication = o.optString("complication").ifEmpty { null },
             complicationFor = o.optString("complicationFor").ifEmpty { null },
             usedComplications = o.optJSONArray("usedComplications").strings().toMutableList(),
+            ambienceGoing = o.optJSONObject("ambienceGoing").intMap(),
+            ambienceResting = o.optJSONObject("ambienceResting").intMap(),
             openingsThisSession = o.optInt("openingsThisSession"),
             lastActive = o.optLong("lastActive"), movedForSession = o.optInt("movedForSession"),
             sessionDue = o.optBoolean("sessionDue"),
@@ -222,6 +227,7 @@ class StoryState(val dir: File) {
             .put("complication", s.complication ?: "")
             .put("complicationFor", s.complicationFor ?: "")
             .put("usedComplications", JSONArray(s.usedComplications))
+            .put("ambienceGoing", JSONObject(s.ambienceGoing as Map<*, *>)).put("ambienceResting", JSONObject(s.ambienceResting as Map<*, *>))
             .put("openingsThisSession", s.openingsThisSession)
             .put("lastActive", s.lastActive).put("movedForSession", s.movedForSession).put("sessionDue", s.sessionDue)
         sceneFile.writeAtomic(o.toString(2))
@@ -338,6 +344,9 @@ class StoryState(val dir: File) {
     companion object {
         /** The player's character in the event log's witness lists. */
         const val PLAYER = "PLAYER"
+
+        internal fun JSONObject?.intMap(): MutableMap<String, Int> =
+            LinkedHashMap<String, Int>().also { m -> this?.keys()?.forEach { k -> m[k] = optInt(k) } }
 
         internal fun JSONArray?.strings(): List<String> = if (this == null) emptyList() else (0 until length()).map { getString(it) }
     }

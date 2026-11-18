@@ -63,3 +63,64 @@ class Complications(private val lines: List<Pair<Set<String>, String>>, private 
             parse(if (file.exists()) file.readText() else "", random)
     }
 }
+
+/**
+ * config/ambience.md, the background going on around people, with SillyTavern-style timed effects. Options go in
+ * the brackets next to place tags: `- [street; sticky 4; group weather] Rain starts, light, on the roof.`
+ * - sticky N: once drawn, it keeps going for N more turns (rain doesn't stop the next turn);
+ * - cooldown N: not drawn again for N turns after it ends (default 6, so the dog doesn't bark every turn);
+ * - group G: only one line of a group is going on at a time (one kind of weather).
+ * The state (what is going on and what is resting) lives in the scene, so it survives restarts.
+ */
+class Ambience(private val lines: List<Line>, private val random: Random = Random.Default) {
+    data class Line(val text: String, val places: Set<String>, val sticky: Int, val cooldown: Int, val group: String?)
+
+    /** Draws [count] lines for [turn]. [going]: text → last turn it lasts; [resting]: text → first turn it may come back. */
+    fun draw(place: String, turn: Int, count: Int, going: MutableMap<String, Int>, resting: MutableMap<String, Int>): List<String> {
+        // ended effects start their cooldown
+        for ((text, until) in going.toList()) if (until < turn) {
+            going.remove(text)
+            resting[text] = turn + (lines.firstOrNull { it.text == text }?.cooldown ?: DEFAULT_COOLDOWN)
+        }
+        resting.entries.removeAll { it.value <= turn }
+        val ongoing = going.keys.toList()
+        val busyGroups = lines.filter { it.text in going }.mapNotNull { it.group }.toMutableSet()
+        val picked = ArrayList<String>()
+        var pool = lines.filter { it.text !in going && it.text !in resting && (it.group == null || it.group !in busyGroups) }
+        val fits = { l: Line -> l.places.isEmpty() || l.places.any { place.contains(it) } }
+        while (picked.size < count) {
+            val local = pool.filter(fits)
+            if (local.isEmpty()) break
+            val l = local.random(random)
+            picked += l.text
+            going[l.text] = turn + l.sticky
+            l.group?.let { g -> busyGroups += g; pool = pool.filter { it.group != g } }
+            pool = pool.filter { it !== l }
+        }
+        // what's still going on from earlier turns comes first, marked so it reads as continuing
+        return ongoing.map { "(still) $it" } + picked
+    }
+
+    companion object {
+        const val DEFAULT_COOLDOWN = 6
+        private val line = Regex("^-\\s*(?:\\[([^\\]]*)\\]\\s*)?(.+)$")
+
+        fun parse(text: String, random: Random = Random.Default) = Ambience(
+            text.lines().mapNotNull { l -> line.find(l.trim())?.let { m ->
+                var sticky = 0; var cooldown = DEFAULT_COOLDOWN; var group: String? = null
+                val places = HashSet<String>()
+                for (part in m.groupValues[1].split(';', ',').map { it.trim() }.filter { it.isNotEmpty() }) {
+                    val w = part.split(Regex("\\s+"), limit = 2)
+                    when (w[0].lowercase()) {
+                        "sticky" -> sticky = w.getOrNull(1)?.toIntOrNull() ?: sticky
+                        "cooldown" -> cooldown = w.getOrNull(1)?.toIntOrNull() ?: cooldown
+                        "group" -> group = w.getOrNull(1)?.trim()
+                        else -> places += part
+                    }
+                }
+                Line(m.groupValues[2].trim(), places, sticky, cooldown, group)
+            } },
+            random,
+        )
+    }
+}

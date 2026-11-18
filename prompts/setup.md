@@ -15,5 +15,5 @@ Return JSON:
 - `secrets`: `text` and `knows` (names).
 - `clocks`: two or three off-screen threats, `name` (Japanese), `size` 4–8, `when_full`.
 - `complications`: ten grounded complications for this world, each one line, optionally starting with a place tag in brackets.
-- `ambience`: fifteen small background happenings in this world's places (sounds, weather, animals, people passing, work going on nearby), each one line in English, optionally starting with a place tag in brackets. Ordinary things, nothing that drives the plot.
+- `ambience`: fifteen small background happenings in this world's places (sounds, weather, animals, people passing, work going on nearby), each one line in English, optionally starting with brackets holding place tags and options separated by ";": "sticky N" for something that goes on a few turns (weather, a festival, work next door), "group G" for things that exclude each other (weather). Example: "[market; sticky 3] A bell-ringer calls out the hour, again and again." Ordinary things, nothing that drives the plot.
 - `opening`: `place`, `present` (names), and one sentence on the situation the first passage starts in.

@@ -1,3 +1,4 @@
+config/ambience.md	426e37fa1952c50e
 config/ambience.md	7568d2c88eaddf35
 config/banned.txt	0c39bdcece86c84b
 config/complications.md	6d117f1cda6f87bb
@@ -40,12 +41,14 @@ prompts/scribe.md	c8be64b012c9bf86
 prompts/scribe.md	ca0113436efff64c
 prompts/scribe.md	fbcd14e8632c9542
 prompts/setup.md	0acb34b3488eed22
+prompts/setup.md	29b8272ec6d5035d
 prompts/setup.md	3fb2525e5db1b74d
 prompts/setup.md	4b2029e3676507da
 prompts/setup.md	57ac7e661147ec14
 prompts/setup.md	d85539029951c09b
 prompts/style_picker.md	9cca079d4411fee2
 prompts/summary.md	729ce6b9ae001da3
+prompts/turn.md	315eb5b2c66f62e3
 prompts/turn.md	351d8bbe2dea6db1
 prompts/turn.md	46c3c0e37a23ed0e
 prompts/turn.md	4efea58c4847f4bf

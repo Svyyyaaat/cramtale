@@ -663,11 +663,31 @@ class StoryEngine(
             "due_grammar" to (t.pool.grammar.map { "${it.id} (${it.meaning})" } +
                 t.pool.weakPoints.map { "correct form of: $it" }).joinToString("\n") { "- $it" }.ifEmpty { "none this turn" },
             "opening" to if (s.openingsThisSession > 0 && beat != null) "\n(This beat was planned so a practised point can come up naturally. Don't force it.)\n" else "",
-            "fixes" to "",
+            "fixes" to recentSlips(),
             "length" to settings.length,
             "style_rules" to prompts.config(if (settings.firmStyleRules) "style_rules_firm.md" else "style_rules_positive.md").orEmpty().trim(),
             "style_line" to (prompts.config("style_line.txt")?.trim()?.takeIf { it.isNotEmpty() } ?: "Plain, concrete prose."),
         ))
+    }
+
+    /**
+     * The rules the checks caught in the last few turns, restated at the very end of the packet (the end of the
+     * prompt is what the model weighs most, like SillyTavern's depth-0 injections). Only rules actually broken
+     * recently, most frequent first, so the reminder stays short and changes with what goes wrong.
+     */
+    internal fun recentSlips(turns: Int = 10, max: Int = 3): String {
+        val counts = HashMap<String, Int>()
+        for (o in logFile.jsonLines().takeLast(turns)) {
+            val a = o.optJSONArray("checks") ?: continue
+            val rules = (0 until a.length()).map { a.optString(it) }
+                .filter { !it.endsWith(": ok") && !it.endsWith(":ok") }
+                .map { it.substringBefore(':').trim().let { r -> if (r == "banned phrases") "banned phrase" else r } }
+                .filter { it in SLIPS }.toSet()
+            rules.forEach { counts[it] = (counts[it] ?: 0) + 1 }
+        }
+        if (counts.isEmpty()) return ""
+        return "\n### Slipped in recent turns: not again\n" + counts.entries.sortedByDescending { it.value }.take(max)
+            .joinToString("\n") { "- ${SLIPS.getValue(it.key)}" }
     }
 
     private fun write(t: PendingTurn): Draft {
@@ -821,9 +841,10 @@ class StoryEngine(
         if (people.isEmpty()) return "nobody but the player"
         val turns = turnsInChapter(s.chapter)
         // background happenings, so what the player does is one thing among several, not the only stimulus
-        val pool = Complications.parse(prompts.config("ambience.md").orEmpty(), dice.random)
-        val background = ArrayList<String>()
-        repeat(3) { pool.draw(s.place, background)?.let { if (it !in background) background += it } }
+        // three new background things a turn; some last a few turns (rain), and none comes back right away
+        val background = Ambience.parse(prompts.config("ambience.md").orEmpty(), dice.random)
+            .draw(s.place, s.turn, 3, s.ambienceGoing, s.ambienceResting)
+        state.save(s)
         // the player's message never reaches them as such: only what an onlooker could notice of it, unlabelled
         val around = (background + listOfNotNull(t.observable.takeIf { it.isNotBlank() })).shuffled(dice.random)
         val effect = t.roll?.let {
@@ -931,6 +952,20 @@ class StoryEngine(
         val STYLES_SCHEMA = """{"type":"object","additionalProperties":false,"required":["styles"],"properties":{"styles":{"type":"array","items":{
             "type":"object","additionalProperties":false,"required":["name","line","passage"],"properties":{
             "name":{"type":"string"},"line":{"type":"string"},"passage":{"type":"string"}}}}}}"""
+        /** What to say again at the end of the packet when a check caught this recently (rule → reminder). */
+        val SLIPS = mapOf(
+            "player_voice" to "The player's character says, thinks, decides and does only what the player wrote. No lines, nods or glances for them.",
+            "echo" to "Don't repeat or paraphrase the player's message; go on from it.",
+            "explains" to "Don't explain what a line meant or how it landed; show what people do next.",
+            "no_handoff" to "End on something the player has to answer: a question, a demand, a deadline, someone waiting.",
+            "npc_knowledge" to "People know only what they perceived (the record). No hints at hidden facts about the player's character.",
+            "motive" to "People keep their own goals and attitude; a change needs a reason shown on the page. Ordinary behaviour isn't suspicious.",
+            "contradiction" to "Nobody contradicts what's established about the player's character or the story so far.",
+            "banned phrase" to "Avoid stock phrases (see the style rules); say the plain concrete thing.",
+            "unknown words" to "Stay inside a 5,000-word vocabulary plus the review words; prefer the everyday word.",
+            "leak" to "Don't make review words guessable from the sentence around them.",
+        )
+
         val SETUP_SCHEMA = """{"type":"object","additionalProperties":false,"required":["world","player","history","player_public","characters","secrets","clocks","complications","ambience","opening"],"properties":{
             "world":{"type":"string"},"player":{"type":"string"},"history":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["text","witnesses"],"properties":{"text":{"type":"string"},"witnesses":{"type":"array","items":{"type":"string"}}}}},"player_public":{"type":"string"},
             "characters":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["name","file"],"properties":{"name":{"type":"string"},"file":{"type":"string"}}}},

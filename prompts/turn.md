@@ -43,9 +43,9 @@ Turn {{turn}}, chapter {{chapter}}.
 ### Review grammar (use where it fits naturally)
 {{due_grammar}}
 {{opening}}
-{{fixes}}
 ### Writing this passage
 - Length: {{length}}.
 - Only words a reader with about 5,000 words of Japanese knows, plus the review words. If a scene needs a rare word, use a plainer one. Keep normal kanji spelling (no kana in place of kanji); names exactly as in the cast.
 - {{style_rules}}
 - {{style_line}}
+{{fixes}}
