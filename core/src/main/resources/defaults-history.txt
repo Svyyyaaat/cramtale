@@ -24,7 +24,9 @@ prompts/setup.md	57ac7e661147ec14
 prompts/style_picker.md	9cca079d4411fee2
 prompts/summary.md	729ce6b9ae001da3
 prompts/turn.md	351d8bbe2dea6db1
+prompts/turn.md	46c3c0e37a23ed0e
 prompts/turn.md	4efea58c4847f4bf
 prompts/turn.md	8f22df2d56a5c6b8
+prompts/writer.md	aaeaf03b32c0a7f5
 prompts/writer.md	afe2f481646c5413
 prompts/writer.md	ceec01a55bdbbba8
