@@ -115,7 +115,7 @@ fun AppMark(size: androidx.compose.ui.unit.Dp) {
     Box(Modifier.size(size).clip(RoundedCornerShape(size * 0.28f))) {
         androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.cramtale.app.R.drawable.ic_launcher_background), null, Modifier.size(size))
         androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.cramtale.app.R.drawable.ic_launcher_foreground), null,
-            Modifier.size(size * 1.35f).offset(x = -size * 0.175f, y = -size * 0.175f))
+            Modifier.size(size * 1.15f).offset(x = -size * 0.075f, y = -size * 0.075f))
     }
 }
 
