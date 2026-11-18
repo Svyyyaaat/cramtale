@@ -101,6 +101,21 @@ class MistakeLog(private val file: File?) {
 
     fun decide(key: String, approved: Boolean) { keys[key]?.decided = if (approved) "approved" else "rejected"; save() }
 
+    /**
+     * "Not a mistake": the checker was wrong. The example goes, the key counts one less (gone at zero), and a
+     * card proposal it triggered is withdrawn if it no longer has two occurrences.
+     */
+    fun dismiss(message: String, c: Correction) {
+        val k = keys[c.key] ?: return
+        val i = k.examples.indexOfFirst { (m, e) -> m == message && e.wrong == c.wrong }
+        if (i < 0) return
+        k.examples.removeAt(i)
+        k.count--
+        if (k.count <= 0) keys.remove(c.key)
+        else if (k.count < 2 && k.proposed && k.decided == null) k.proposed = false
+        save()
+    }
+
     fun pending() = keys.values.filter { it.proposed && it.decided == null }
 
     private fun save() {

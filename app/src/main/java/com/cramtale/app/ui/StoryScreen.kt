@@ -97,7 +97,7 @@ import kotlinx.coroutines.launch
 // ---------------------------------------------------------------- stateless pieces
 
 @Composable
-fun PlayerBubble(text: String, corrections: List<Correction>) {
+fun PlayerBubble(text: String, corrections: List<Correction>, onNotAMistake: ((Correction) -> Unit)? = null) {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         // solid indigo by day; at night the deep container (a bright bubble would outshine the story)
         val night = MaterialTheme.colorScheme.background.luminance() < 0.5f
@@ -118,6 +118,9 @@ fun PlayerBubble(text: String, corrections: List<Correction>) {
                     withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.tertiary)) { append(c.right) }
                 }, style = MaterialTheme.typography.bodyLarge)
                 Text(c.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (onNotAMistake != null) TextButton({ onNotAMistake(c) }, contentPadding = PaddingValues(horizontal = 0.dp)) {
+                    Text("Not a mistake", style = MaterialTheme.typography.labelMedium)
+                }
             }
         }
     }
@@ -267,6 +270,9 @@ fun StoryContent(
     onListen: ((String) -> Unit)? = null,
     /** The passage streaming in while it's written: (phase, text). */
     draft: Pair<String, String>? = null,
+    /** A correction you marked as not a mistake (hidden). */
+    isDismissed: (String, Correction) -> Boolean = { _, _ -> false },
+    onNotAMistake: (String, Correction) -> Unit = { _, _ -> },
     /** The message just sent, shown as a bubble while its turn is written. */
     sending: String? = null,
     /** Anki cards to answer while waiting, and what to do with an answer. */
@@ -300,14 +306,14 @@ fun StoryContent(
             }
             items(history) { t ->
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    t.player?.let { PlayerBubble(it, t.corrections) }
+                    t.player?.let { m -> PlayerBubble(m, t.corrections.filter { !isDismissed(m, it) }) { c -> onNotAMistake(m, c) } }
                     PassageText(t.passage, true, { false }, statusOf, tapVersion) { onLookup(it, t.passage) }
                     Ornament()
                 }
             }
             if (current != null) item {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    current.player?.let { PlayerBubble(it, current.corrections) }
+                    current.player?.let { m -> PlayerBubble(m, current.corrections.filter { !isDismissed(m, it) }) { c -> onNotAMistake(m, c) } }
                     // a reroll streams its new version in place of the old one
                     if (busy != null && draft != null) DraftPassage(busy, draft.second)
                     else PassageText(current.passage, true, isTapped, statusOf, tapVersion) { onTap(it, current.passage) }
@@ -474,6 +480,7 @@ fun StoryScreen(state: AppState, onBack: () -> Unit) {
         notice = state.speaker.problem() ?: story.ankiNote,
         listening = state.speaker.speaking,
         draft = story.draft, study = story.study, sending = story.sending,
+        isDismissed = { m, c -> story.correctionId(m, c) in story.dismissed }, onNotAMistake = { m, c -> story.notAMistake(m, c) },
         onAnswer = { c, good -> story.answerFlashcard(c, good) }, onTriage = { c, known -> story.triageNew(c, known) },
         onListen = { text -> if (state.speaker.speaking) state.speaker.stop() else state.speaker.say(text) },
     )

@@ -612,6 +612,21 @@ class StoryController(
         }
     }
 
+    /** Corrections you said were wrong ("Not a mistake"): hidden, and taken out of the mistake log. */
+    private val dismissedFile = File(dir, "log/dismissed-corrections.txt")
+    var dismissed by mutableStateOf(dismissedFile.takeIf { it.exists() }?.readLines()?.filter { it.isNotBlank() }?.toSet().orEmpty())
+        private set
+
+    fun correctionId(message: String, c: Correction) = "$message\u0000${c.wrong}\u0000${c.right}".replace("\n", " ")
+
+    fun notAMistake(message: String, c: Correction) {
+        mistakes.dismiss(message, c)
+        if (mistakes.all.none { it.key == c.key && it.proposed }) proposals.removeAll { it.key == c.key }
+        dismissed = dismissed + correctionId(message, c)
+        dismissedFile.parentFile?.mkdirs()
+        dismissedFile.appendText(correctionId(message, c) + "\n")
+    }
+
     fun decideProposal(key: String, approved: Boolean) {
         mistakes.decide(key, approved)
         proposals.removeAll { it.key == key }
