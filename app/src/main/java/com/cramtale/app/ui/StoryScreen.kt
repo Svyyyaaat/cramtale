@@ -426,6 +426,19 @@ fun WordSheetBody(info: WordInfo, onKnow: () -> Unit, onClose: () -> Unit, onSay
 @Composable
 fun StoryScreen(state: AppState, onBack: () -> Unit) {
     val story = state.story
+    // once: the notification shown while a passage is written in the background (Android 13+ asks)
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val askNotify = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { }
+    LaunchedEffect(Unit) {
+        val prefs = context.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE)
+        if (android.os.Build.VERSION.SDK_INT >= 33 && !prefs.getBoolean("askedNotify", false) &&
+            androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            prefs.edit().putBoolean("askedNotify", true).apply()
+            askNotify.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
     var picked by remember { mutableStateOf<Pair<Span, ShownPassage>?>(null) }
     var lookupOnly by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf<StoryController.StoryInfo?>(null) }

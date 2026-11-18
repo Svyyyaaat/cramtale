@@ -204,6 +204,8 @@ class StoryController(
      */
     private suspend fun <T> work(label: String, again: (suspend () -> Unit)? = null, block: () -> T): T? {
         if (!running.compareAndSet(false, true)) return null
+        // keeps the app (and its connection to Claude) alive if you switch apps meanwhile
+        TurnService.start(context, label)
         return withContext(Dispatchers.IO) {
             busy = label
             error = null
@@ -219,6 +221,7 @@ class StoryController(
                 busy = null
                 draft = null
                 running.set(false)
+                TurnService.stop(context)
             }
         }
     }

@@ -230,4 +230,16 @@ class StoryControllerTest {
         assertEquals("音もしない。", c.current!!.player)
         assertEquals("", c.replyDraft)
     }
+
+    @Test
+    fun `a turn runs in a foreground service that stops when it's done`() = runBlocking {
+        val c = controller()
+        c.setup("")
+        val app = shadowOf(RuntimeEnvironment.getApplication())
+        while (app.nextStartedService != null) {}   // drop what setup started and stopped
+        c.start()
+        val started = generateSequence { app.nextStartedService }.toList()
+        assertTrue(started.toString(), started.any { it.component?.className == com.cramtale.app.story.TurnService::class.java.name && it.action == null })
+        assertEquals("stop", started.last().action)
+    }
 }
