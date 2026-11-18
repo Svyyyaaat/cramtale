@@ -9,6 +9,7 @@ Report only **definite errors**: forms a native speaker would call wrong in this
 
 Do **not** report:
 - Casual or rough speech, contractions (てる, ちゃう, じゃん), dropped particles that speakers drop, 俺 next to です/ます, or mixed politeness. The character's voice is theirs to choose.
+- Register and role language: forms that exist but suit a different kind of speaker, like 〜ますかな or 〜ですな (an old man's speech), 〜でございます, 〜じゃ, 〜わ. They are not errors, however odd they sound from this character.
 - Style: awkward but correct sentences, word order that works, a plainer word than you'd use.
 - Anything you aren't sure of. If a native speaker might write it, leave it out. Missing a doubtful error costs nothing; flagging a correct sentence teaches the learner something false.
 - The story content, the character's choices, or anything that isn't Japanese.
