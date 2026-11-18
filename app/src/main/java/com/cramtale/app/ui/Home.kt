@@ -139,16 +139,16 @@ fun StoryHero(info: HomeInfo, onOpen: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Text(if (info.turn == 0) "A new story" else "Chapter ${info.chapter} · turn ${info.turn}",
-            style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.7f))
-        Text(info.place ?: "Your story", style = MaterialTheme.typography.titleLarge, color = Color.White)
+            style = MaterialTheme.typography.labelLarge, color = a.onHero.copy(alpha = 0.7f))
+        Text(info.place ?: "Your story", style = MaterialTheme.typography.titleLarge, color = a.onHero)
         info.lastLines?.let {
-            Text(it, style = ReadingText.copy(fontSize = 16.sp, lineHeight = 28.sp), color = Color.White.copy(alpha = 0.85f),
+            Text(it, style = ReadingText.copy(fontSize = 16.sp, lineHeight = 28.sp), color = a.onHero.copy(alpha = 0.85f),
                 maxLines = 3, overflow = TextOverflow.Ellipsis)
         }
         Spacer(Modifier.height(4.dp))
         Button(onOpen, Modifier.heightIn(min = 48.dp), shape = RoundedCornerShape(24.dp),
             // white on the dark card, the card's colour for the text
-            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = a.heroEnd)) {
+            colors = ButtonDefaults.buttonColors(containerColor = a.heroButton, contentColor = a.onHeroButton)) {
             Icon(Icons.AutoMirrored.Filled.MenuBook, null, Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
             Text(if (info.turn == 0) "Begin" else "Continue", style = MaterialTheme.typography.labelLarge)

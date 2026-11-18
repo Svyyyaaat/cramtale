@@ -64,6 +64,10 @@ data class Accents(
     val onAccent: Color,
     val accentContainer: Color,
     val onAccentContainer: Color,
+    /** Text on the hero card, and its button. */
+    val onHero: Color = Color.White,
+    val heroButton: Color = Color.White,
+    val onHeroButton: Color = Color(0xFF4A2846),
 )
 
 // Dusk: aubergine (tapped words in its soft tint), a peach accent used sparingly, moss for right/known
@@ -123,7 +127,9 @@ fun CramtaleTheme(dark: Boolean = isSystemInDarkTheme(), materialYou: Boolean = 
 /** With Material You, the extra colours come from the wallpaper scheme too (secondary for taps, tertiary for the accent). */
 private fun accentsFrom(s: androidx.compose.material3.ColorScheme) = Accents(
     tapped = s.primaryContainer, onTapped = s.onPrimaryContainer, amber = s.primaryContainer,
-    heroStart = s.primary, heroEnd = s.primary.copy(alpha = 1f).let { androidx.compose.ui.graphics.lerp(it, Color.Black, 0.35f) },
+    // the wallpaper's own soft tones (a darkened primary turns muddy grey with pale wallpapers)
+    heroStart = s.primaryContainer, heroEnd = s.tertiaryContainer,
+    onHero = s.onPrimaryContainer, heroButton = s.primary, onHeroButton = s.onPrimary,
     accent = s.tertiary, onAccent = s.onTertiary, accentContainer = s.tertiaryContainer, onAccentContainer = s.onTertiaryContainer,
 )
 
