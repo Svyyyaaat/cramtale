@@ -57,9 +57,18 @@ class StoryState(val dir: File) {
     fun characterNames(): List<String> = characterFiles().keys.sorted()
 
     /** The cast's names as they appear in text: タム and グエン in "グエン・ヴァン・タム", 村井 in "村井 早苗 (clerk)". */
-    fun castNameParts(): Set<String> = characterNames()
-        .flatMap { n -> listOf(n) + n.split(' ', '　', '・', '(', ')', '（', '）') }
-        .map { it.trim() }.filter { it.length >= 2 }.toSet()
+    fun castNameParts(): Set<String> = characterNames().flatMap { n ->
+        val parts = n.split(' ', '　', '・', '(', ')', '（', '）').map { it.trim() }.filter { it.isNotEmpty() }
+        val whole = parts.joinToString("")
+        // the writer often spells a name in kana (榊 ともえ → さかきともえ): readings count too
+        val readings = parts.map(::kanaReading)
+        listOf(n, whole, readings.joinToString("")) + parts + readings
+    }.map { it.trim() }.filter { it.length >= 2 }.toSet()
+
+    /** A name's reading in hiragana (from the tokenizer); kana stays as it is. */
+    private fun kanaReading(s: String): String =
+        com.cramtale.core.text.Tokenizer.tokenize(s).joinToString("") { t -> t.reading.ifBlank { t.surface } }
+            .map { if (it in '\u30A1'..'\u30F6') it - 0x60 else it }.joinToString("")
 
     /** The character's file without its name line. */
     fun character(name: String): String? = characterFiles()[name]?.readLines()?.drop(1)?.joinToString("\n")?.trim()

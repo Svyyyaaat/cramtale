@@ -483,7 +483,7 @@ class StoryController(
         val complication = t.complication
         refreshCast()
         val m = app.matcher()
-        val analysis = m?.analyze(d.passage)
+        val analysis = m?.analyze(d.passage)?.let(::withNames)
         val grammarFound = grammar?.find(com.cramtale.core.text.Tokenizer.tokenize(d.passage)).orEmpty()
         val newNotes = snapshot?.let(::withoutExcluded)?.cards?.filter { it.isNew }?.map { it.ref.noteId }?.toSet().orEmpty()
         val glosses = HashMap<Long, String>()
@@ -509,9 +509,10 @@ class StoryController(
         if (history.isNotEmpty()) return
         val f = File(dir, "log/turns.jsonl")
         if (!f.exists()) return
-        f.readLines().filter { it.isNotBlank() }.takeLast(20).map(::JSONObject).forEach { o ->
+        refreshCast()
+        f.jsonLines().takeLast(20).forEach { o ->
             val text = o.getString("passage")
-            val a = app.matcher()?.analyze(text)
+            val a = app.matcher()?.analyze(text)?.let(::withNames)
             history += ShownTurn(o.optString("player").ifBlank { null }, emptyList(),
                 ShownPassage(o.getInt("turn"), text, a?.spans.orEmpty(), emptyList(), emptySet(), emptyMap(), emptyList(), emptyList()))
         }
@@ -529,6 +530,9 @@ class StoryController(
         private set
 
     fun refreshCast() { castNames = runCatching { com.cramtale.core.story.StoryState(dir).castNameParts() }.getOrDefault(emptySet()) }
+
+    /** The cast's names (kanji or kana) as single name spans, not their pieces (さかきともえ, not さ + かき + ともえ). */
+    private fun withNames(a: Analysis) = Analysis(a.text, com.cramtale.core.match.Names.merge(a.text, a.spans, castNames))
 
     /** A person's or place's name: from the tokenizer (固有名詞) or one of the story's characters. */
     fun isName(span: Span) = span.ignoredBecause == "name" || span.surface in castNames || span.lemma in castNames

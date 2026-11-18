@@ -777,7 +777,7 @@ class StoryEngine(
     /** The popup's one-line meaning of a word in its sentence. */
     fun meaning(word: String, sentence: String, onText: ((String) -> Unit)? = null): String =
         call("meaning", Models.CHECKS, Prompts.fill(prompts.prompt("meaning"), mapOf("word" to word, "sentence" to sentence)),
-            listOf(Msg(Role.USER, "Meaning?")), maxTokens = 120, quiet = true, onText = onText).trim()
+            listOf(Msg(Role.USER, "Meaning?")), maxTokens = 80, quiet = true, onText = onText).trim()
 
     // ------------------------------------------------------------------ helpers
 
