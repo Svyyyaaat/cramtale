@@ -197,8 +197,14 @@ fun ErrorNote(text: String, onRetry: (() -> Unit)? = null) {
             Icon(Icons.Filled.ErrorOutline, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.error)
             Text(headline, color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
         }
-        if (details.isNotBlank()) Text(details, color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f),
-            style = MaterialTheme.typography.bodySmall)
+        // the technical chain is for bug reports: there on request, not in the way
+        if (details.isNotBlank()) {
+            val openState = androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+            val open = openState.value
+            if (open) Text(details, color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f), style = MaterialTheme.typography.bodySmall)
+            Text(if (open) "Hide details" else "Details", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.clip(MaterialTheme.shapes.small).clickable { openState.value = !open }.padding(vertical = 4.dp))
+        }
         if (onRetry != null) Button(onRetry, colors = androidx.compose.material3.ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.accent, contentColor = MaterialTheme.colorScheme.onAccent)) {
             Icon(Icons.Filled.Refresh, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Try again")

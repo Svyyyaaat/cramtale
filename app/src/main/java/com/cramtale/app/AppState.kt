@@ -79,6 +79,12 @@ class AppState(val context: Context) {
 
     fun chooseMaterialYou(on: Boolean) { materialYou = on; prefs.edit().putBoolean("materialYou", on).apply() }
 
+    /** The story screen has shown how tapping works and the reader has tapped or dismissed it. */
+    var taughtTaps by androidx.compose.runtime.mutableStateOf(prefs.getBoolean("taughtTaps", false))
+        private set
+
+    fun markTaught() { if (!taughtTaps) { taughtTaps = true; prefs.edit().putBoolean("taughtTaps", true).apply() } }
+
     /** Which Claude runs the story: false = the API with the user's key, true = Claude Code in Termux (their subscription). */
     var claudeCode by androidx.compose.runtime.mutableStateOf(prefs.getBoolean("claudeCode", false))
         private set

@@ -91,8 +91,9 @@ fun HomeContent(info: HomeInfo, go: (Screen) -> Unit, onRestartSetup: () -> Unit
                 modifier = Modifier.weight(1f))
             when {
                 !info.connected -> StatusPill(Icons.Filled.LinkOff, "No Anki", MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.onSurfaceVariant)
-                info.collectionIsReal -> StatusPill(Icons.Filled.Lock, "Read-only", MaterialTheme.colorScheme.accentContainer, MaterialTheme.colorScheme.onAccentContainer)
-                else -> StatusPill(Icons.Filled.Lock, "Copy · read-only", MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer)
+                // a state, not a warning: neutral
+                info.collectionIsReal -> StatusPill(Icons.Filled.Lock, "Anki: read-only", MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.onSurfaceVariant)
+                else -> StatusPill(Icons.Filled.Lock, "Anki copy: read-only", MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
@@ -105,16 +106,13 @@ fun HomeContent(info: HomeInfo, go: (Screen) -> Unit, onRestartSetup: () -> Unit
         }
         TodayCard(info)
 
-        SectionTitle("Tools")
+        // what's used now and then; the rarely used (calibration, files, connection, setup) is in Settings
+        SectionTitle("More")
         TileGrid(listOf(
-            Tile(Icons.Filled.Quiz, "Vocab check", "cut-off %,d".format(info.cutoff)) { go(Screen.VOCAB) },
-            Tile(Icons.Filled.Spellcheck, "Calibrate", "on real text", Tint.JADE) { go(Screen.CALIBRATE) },
+            Tile(Icons.Filled.BarChart, "Review log", if (info.readToday > 0) "${info.readToday} read today" else "what you read") { go(Screen.LOGS) },
             Tile(Icons.Filled.Style, "Your decks", "%,d words".format(info.deckWords), Tint.VERMILION) { go(Screen.DECK) },
-            Tile(Icons.Filled.BarChart, "Review log", "$%.2f spent".format(info.totalCost)) { go(Screen.LOGS) },
-            Tile(Icons.Filled.Description, "Story files", "prompts, cast", Tint.JADE) { go(Screen.FILES) },
-            Tile(Icons.Filled.Link, "AnkiDroid", if (info.collectionIsReal) "real collection" else if (info.connected) "copy" else "connect", Tint.VERMILION) { go(Screen.TARGET) },
-            Tile(Icons.Filled.Settings, "Settings", "text, length, Claude") { go(Screen.SETTINGS) },
-            Tile(Icons.Filled.Tune, "Setup again", "the walk-through", Tint.NEUTRAL) { onRestartSetup() },
+            Tile(Icons.Filled.Quiz, "Vocab check", "what you already know", Tint.JADE) { go(Screen.VOCAB) },
+            Tile(Icons.Filled.Settings, "Settings", "reading, Claude, Anki", Tint.NEUTRAL) { go(Screen.SETTINGS) },
         ))
         Spacer(Modifier.height(12.dp))
     }
@@ -166,9 +164,9 @@ fun StoryHero(info: HomeInfo, onOpen: () -> Unit) {
             .clickable(onClick = onOpen).padding(22.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text(listOfNotNull(info.title, if (info.turn == 0) "a new story" else "chapter ${info.chapter} · turn ${info.turn}").joinToString(" · "),
-            style = MaterialTheme.typography.labelLarge, color = a.onHero.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(info.place ?: "Your story", style = MaterialTheme.typography.titleLarge, color = a.onHero)
+        Text(info.title ?: info.place ?: "Your story", style = ReadingText.copy(fontSize = 24.sp, lineHeight = 32.sp), color = a.onHero)
+        Text(if (info.turn == 0) "Not started yet" else listOfNotNull("Chapter ${info.chapter}, turn ${info.turn}", info.place?.takeIf { info.title != null }?.let { "in $it" }).joinToString(" "),
+            style = MaterialTheme.typography.bodyMedium, color = a.onHero.copy(alpha = 0.75f), maxLines = 1, overflow = TextOverflow.Ellipsis)
         info.lastLines?.let {
             Text(it, style = ReadingText.copy(fontSize = 16.sp, lineHeight = 28.sp), color = a.onHero.copy(alpha = 0.85f),
                 maxLines = 3, overflow = TextOverflow.Ellipsis)

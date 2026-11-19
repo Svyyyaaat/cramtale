@@ -771,6 +771,9 @@ class StoryController(
         val today: List<Pair<String, Boolean>> = emptyList(),
         /** What your character remembers: every event they perceived, from the record (newest first). */
         val remembers: List<String> = emptyList(),
+        /** Dollars on the API (0 with Claude Code): this session and all time. */
+        val spentSession: Double = 0.0,
+        val spent: Double = 0.0,
     )
 
     /** Your character in short (the card above the first passage). */
@@ -796,7 +799,7 @@ class StoryController(
         val today = gradeLog.snapshot().filter { it.optLong("at") >= start }
             .associateBy { "${it.optLong("noteId")}/${it.optInt("ord")}" }.values
             .sortedByDescending { it.optLong("at") }.map { it.optString("word") to (it.optInt("ease") == 3) }
-        return StoryInfo(role, met, chapters, today, remembers)
+        return StoryInfo(role, met, chapters, today, remembers, sessionCost(), totalCost())
     }
 
     /** Every session's costs, from the log file. */

@@ -101,7 +101,8 @@ fun App(state: AppState) {
                     Screen.FILES -> FilesScreen(state)
                     Screen.TARGET -> TargetScreen(state) { stack.add(Screen.PROBE) }
                     Screen.PROBE -> ProbeScreen(state)
-                    Screen.SETTINGS -> SettingsScreen(state, onScale = { scale = it }, onPickStyle = { stack.add(Screen.STYLE) }, onNewStory = newStory)
+                    Screen.SETTINGS -> SettingsScreen(state, onScale = { scale = it }, onPickStyle = { stack.add(Screen.STYLE) }, onNewStory = newStory,
+                        go = { s -> stack.add(s) }, onRestartSetup = { state.onboardingStep = 0; state.onboardingDone = false; onboarding = true })
                     Screen.STORIES -> StoriesScreen(state, onContinue = { stack.add(Screen.STORY) }, onNewStory = newStory,
                         onSwitched = { home = null; stack.clear(); stack.add(Screen.HOME); stack.add(Screen.STORY) })
                     Screen.STYLE -> StyleScreen(state)

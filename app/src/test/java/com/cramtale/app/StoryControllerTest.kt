@@ -221,6 +221,9 @@ class StoryControllerTest {
         assertEquals("音もしない。", c.sending)
         assertEquals("", c.replyDraft)
         settle(c)
+        // the failed turn hands the text back on the main thread: give it the moment it needs under load
+        val until = System.currentTimeMillis() + 5_000
+        while (c.sending != null && System.currentTimeMillis() < until) { shadowOf(Looper.getMainLooper()).idle(); Thread.sleep(20) }
         assertNull(c.sending)
         assertEquals("the text is back in the box", "音もしない。", c.replyDraft)
 

@@ -1,5 +1,10 @@
 package com.cramtale.app.ui
 
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -45,7 +50,8 @@ data class SettingsValues(
 val TEXT_SCALES = listOf(0.85f to "Small", 1f to "Normal", 1.15f to "Large", 1.3f to "Larger")
 
 @Composable
-fun SettingsScreen(state: AppState, onNewStory: () -> Unit, onScale: (Float) -> Unit, onPickStyle: () -> Unit) {
+fun SettingsScreen(state: AppState, onNewStory: () -> Unit, onScale: (Float) -> Unit, onPickStyle: () -> Unit,
+                   go: (Screen) -> Unit = {}, onRestartSetup: () -> Unit = {}) {
     var v by remember {
         mutableStateOf(SettingsValues(state.textScale, state.passageLength, state.twoReads, state.firmStyleRules, state.story.keyHint(),
             state.story.styleLine(), state.themeMode, state.materialYou, state.claudeCode))
@@ -62,6 +68,12 @@ fun SettingsScreen(state: AppState, onNewStory: () -> Unit, onScale: (Float) -> 
         onColors = { state.chooseMaterialYou(it); v = v.copy(materialYou = it) },
         onBackend = { state.chooseClaudeCode(it); v = v.copy(claudeCode = it) },
         claudeCodeSetup = { ClaudeCodeSetup(state) },
+        advanced = listOf(
+            Triple("Calibrate on real text", "Paste Japanese you read; it marks what you know") { go(Screen.CALIBRATE) },
+            Triple("AnkiDroid connection", "Which collection is read") { go(Screen.TARGET) },
+            Triple("Prompts and story files", "Everything Claude is told, editable") { go(Screen.FILES) },
+            Triple("Run setup again", "The first-run walk-through") { onRestartSetup() },
+        ),
     )
 }
 
@@ -73,9 +85,10 @@ fun SettingsContent(
     onColors: (Boolean) -> Unit = {},
     onBackend: (Boolean) -> Unit = {},
     claudeCodeSetup: @Composable () -> Unit = {},
+    /** Rarely used screens: (name, what it is, open). */
+    advanced: List<Triple<String, String, () -> Unit>> = emptyList(),
 ) {
     var keyInput by remember { mutableStateOf<String?>(null) }
-    var confirmNew by remember { mutableStateOf(false) }
     Page {
         SectionTitle("Look and reading")
         PaperCard {
@@ -84,8 +97,8 @@ fun SettingsContent(
             Segmented(modes.map { it.label }, v.theme.ordinal) { onTheme(modes[it]) }
             Hint("System follows your phone's light or dark setting.")
             Text("Colours", style = MaterialTheme.typography.titleSmall)
-            Segmented(listOf("Material You", "Cramtale"), if (v.materialYou) 0 else 1) { onColors(it == 0) }
-            Hint(if (android.os.Build.VERSION.SDK_INT >= 31) "Material You uses your wallpaper's palette." else "Material You needs Android 12; Cramtale's colours are used.")
+            Segmented(listOf("From wallpaper", "Cramtale"), if (v.materialYou) 0 else 1) { onColors(it == 0) }
+            Hint(if (android.os.Build.VERSION.SDK_INT >= 31) "Colours taken from your wallpaper (Material You)." else "Wallpaper colours need Android 12; Cramtale's colours are used.")
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Text("Text size", style = MaterialTheme.typography.titleSmall)
             Segmented(TEXT_SCALES.map { it.second }, TEXT_SCALES.indexOfFirst { it.first == v.textScale }.coerceAtLeast(1)) { onScale(TEXT_SCALES[it].first) }
@@ -112,7 +125,7 @@ fun SettingsContent(
                 TextButton(onPickStyle) { Text("Change") }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Toggle("Style rules as firm prohibitions", "Off: the style is described positively (\"short sentences\"). On: as rules (\"never…\").", v.firmStyle, onFirm)
+            Toggle("Stricter style", "Claude gets the style as rules (\"never…\") instead of a description. Try it if passages drift from the style.", v.firmStyle, onFirm)
         }
 
         SectionTitle("Reviews")
@@ -133,11 +146,20 @@ fun SettingsContent(
             }
         }
 
-        SectionTitle("Start over")
-        PaperCard {
-            Text("New story", style = MaterialTheme.typography.titleSmall)
-            Hint("This story is archived on the phone (nothing is deleted) and a new one is created. Your mistakes, review log and costs carry over.")
-            SecondaryButton("Start a new story", { confirmNew = true })
+        if (advanced.isNotEmpty()) {
+            SectionTitle("Advanced")
+            PaperCard {
+                advanced.forEachIndexed { i, (name, about, open) ->
+                    if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Row(Modifier.fillMaxWidth().clickable(onClick = open).padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(name, style = MaterialTheme.typography.titleSmall)
+                            Hint(about)
+                        }
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
         }
     }
 
@@ -150,10 +172,6 @@ fun SettingsContent(
             confirmButton = { TextButton({ onKey(k); keyInput = null }, enabled = k.trim().startsWith("sk-")) { Text("Save") } },
             dismissButton = { TextButton({ keyInput = null }) { Text("Cancel") } })
     }
-    if (confirmNew) AlertDialog(onDismissRequest = { confirmNew = false }, title = { Text("Start a new story?") },
-        text = { Text("The current story is moved to the archive on this phone. You'll describe the new one next.") },
-        confirmButton = { TextButton({ confirmNew = false; onNewStory() }) { Text("Start new story") } },
-        dismissButton = { TextButton({ confirmNew = false }) { Text("Keep this one") } })
 }
 
 @Composable

@@ -117,7 +117,16 @@ class Shots {
 
     @Test fun f1_stories() = shot {
         com.cramtale.app.ui.StoriesContent(listOf(summary("The Well Keeper", true, 14, "Light novel"),
-            summary("Demon in the Frost", false, 41, "Mostly dialogue"), summary("Night Bus", false, 3, null)), {}, {}, {})
+            summary("Demon in the Frost", false, 41, "Mostly dialogue"), summary("Night Bus", false, 3, null)), {}, {}, onSwitch = {})
+    }
+
+    @Test fun f1b_stories_first() = shot {
+        com.cramtale.app.ui.StoriesContent(listOf(summary("The Well Keeper", true, 0, "Light novel")), {}, {}, onSwitch = {})
+    }
+
+    @Test fun f1c_stories_dark() = shot(dark = true) {
+        com.cramtale.app.ui.StoriesContent(listOf(summary("The Well Keeper", true, 14, "Light novel"),
+            summary("Demon in the Frost", false, 41, "Mostly dialogue")), {}, {}, problem = "A passage is still being written. Switch once it's done.", onSwitch = {})
     }
 
     @Test fun f2_style() = shot {
@@ -195,7 +204,7 @@ class Shots {
             current = ShownTurn(null, emptyList(), ShownPassage(0, text, spans(text), emptyList(), emptySet(), emptyMap(), emptyList(), emptyList())),
             busy = null, error = null, proposals = emptyList(), tapVersion = 0, isTapped = { false }, statusOf = { Status.DECK },
             onBack = {}, onTap = { _, _ -> }, onGrammar = {}, onReroll = {}, onEdit = {}, onSend = {}, onDecide = { _, _ -> },
-            intro = "狐火堂という小さな菓子屋の二代目。父の借金が残っていて、春祭りまでに返さなければならない。", onInfo = {})
+            intro = "狐火堂という小さな菓子屋の二代目。父の借金が残っていて、春祭りまでに返さなければならない。", onInfo = {}, teach = true)
     }
 
     @Test fun d6_story_info() = shot {

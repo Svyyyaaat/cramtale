@@ -81,7 +81,7 @@ fun WelcomeContent(onStart: () -> Unit) {
             Feature(Icons.Filled.Lock, cs.surfaceContainerHigh, cs.onSurfaceVariant,
                 "Read-only for now", "Nothing in your collection changes.")
         }
-        StepFooter("Get started · about 5 minutes", onStart)
+        StepFooter("Get started (about 10 minutes)", onStart)
     }
 }
 
@@ -138,7 +138,7 @@ fun AnkiStepContent(installs: List<InstallUi>, selected: String?, onSelect: (Str
 fun DictionaryStepContent(status: String, busy: Boolean, ready: Boolean, onDownload: () -> Unit, onImport: () -> Unit, onNext: () -> Unit, onBack: () -> Unit) {
     StepFrame(onBack, footer = { StepFooter("Continue", onNext, enabled = ready) }) {
         StepHeader(2, SETUP_STEPS, "Get the dictionary",
-            "Readings, meanings and spelling variants (付属 / 附属). It ships with the app.")
+            "Readings and meanings for every word you tap in the story.")
         PaperCard {
             if (busy) Busy(status) else Text(status, style = MaterialTheme.typography.bodyLarge)
             if (!ready && !busy) {
@@ -181,13 +181,7 @@ fun DeckStepContent(rows: List<DeckRowUi>, status: String?, busy: Boolean, error
 fun VocabIntroContent(cutoff: Int, onStart: () -> Unit, onSkip: () -> Unit, onBack: () -> Unit) {
     StepFrame(onBack, footer = { StepFooter("Start (2 minutes)", onStart, secondary = "Skip for now", onSecondary = onSkip) }) {
         StepHeader(4, SETUP_STEPS, "How far does your vocabulary reach?",
-            "About 80 words outside your decks, common to rare. Back undoes a mis-tap.")
-        PaperCard {
-            Text("Why", style = MaterialTheme.typography.titleSmall)
-            Text("Passages are kept to under 3% words you don't know. Your decks cover most of what you know; this finds the frequency cut-off for the rest.",
-                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("Current cut-off: %,d".format(cutoff), style = MaterialTheme.typography.labelLarge)
-        }
+            "About 80 words, common to rare: say whether you know each one. The story then avoids words you'd not know.")
     }
 }
 
@@ -200,10 +194,15 @@ fun KeyStepContent(key: String, onKey: (String) -> Unit, onNext: () -> Unit, onB
         else StepFooter("Save key", onNext, enabled = key.trim().startsWith("sk-ant-"))
     }) {
         StepHeader(5, SETUP_STEPS, "Connect Claude",
-            if (claudeCode) "Opus writes, Haiku checks, on your Claude subscription through Claude Code in Termux."
-            else "Opus writes, Haiku checks. Paid from your Anthropic account: about 5–6¢ a turn.")
+            if (claudeCode) "Claude writes the story on your Claude subscription, through the Claude Code app in Termux."
+            else "Claude writes the story. Paid from your Anthropic account: about 5–6¢ a passage.")
         Segmented(listOf("API key", "Claude Code"), if (claudeCode) 1 else 0) { onBackend(it == 1) }
-        if (claudeCode) { PaperCard { claudeCodeSetup() }; return@StepFrame }
+        if (claudeCode) {
+            PaperCard { claudeCodeSetup() }
+            if (!claudeCodeReady) Text("Next unlocks when the test call works.", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            return@StepFrame
+        }
         OutlinedTextField(key, onKey, Modifier.fillMaxWidth(), label = { Text("API key") }, placeholder = { Text("sk-ant-…") },
             singleLine = true, visualTransformation = PasswordVisualTransformation(), shape = MaterialTheme.shapes.medium)
         Text("Stored only on this phone, encrypted with a key from the Android Keystore. Every call's cost is logged.",
@@ -217,11 +216,6 @@ fun StoryStepContent(seed: String, onSeed: (String) -> Unit, busy: String?, erro
     StepFrame(onBack, footer = { StepFooter("Create the story", onCreate, enabled = busy == null) }) {
         StepHeader(6, SETUP_STEPS, "Your story",
             "A place, a few people with their own goals and secrets, and trouble that moves while you're away.")
-        PaperCard {
-            Text("Your taste (config/plot.md)", style = MaterialTheme.typography.titleSmall)
-            Text(taste.ifBlank { "(empty: edit config/plot.md in Prompts and story files)" },
-                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
         OutlinedTextField(seed, onSeed, Modifier.fillMaxWidth().heightIn(min = 120.dp), shape = MaterialTheme.shapes.medium,
             label = { Text("What should it be about? (optional)") }, placeholder = { Text("e.g. a fishing town, a debt, a family business") })
         if (busy != null) wait?.invoke(busy) ?: Busy(busy)
