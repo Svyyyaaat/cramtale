@@ -89,4 +89,29 @@ class EventLogTest {
         val packet = fake.sent("writer").last().messages.last().text
         assertTrue("three weeks" in packet && "perceived by" in packet, "the writer gets the record")
     }
+
+    @Test
+    fun `a stance replaces the last one instead of piling up`() {
+        state.writeCharacter("ブルーノ", """
+            ## Goals
+            Get the guards paid double.
+            ## Attitude
+            Guarded and blunt.
+            - (turn 4) Openly suspects Kai over the goat bones.
+            - (turn 6) Now suspects the charm reacts to Kai.
+            ## Learned
+            - (turn 5) The guest has a charm.
+        """.trimIndent())
+        state.save(state.scene().also { it.turn = 9; it.present = mutableListOf("ブルーノ") })
+        state.apply(StateOp.parse("""{"ops":[{"op":"character","a":"ブルーノ","b":"Let the matter drop for tonight; still wary of Kai.","list":[],"n":0}]}"""))
+        val f = state.character("ブルーノ")!!
+        assertFalse("Openly suspects" in f || "Now suspects" in f, f)
+        assertTrue("(turn 9) Let the matter drop" in f, f)
+        assertTrue("- (turn 5) The guest has a charm." in f, "what they learned stays")
+        state.apply(StateOp.parse("""{"ops":[{"op":"character","a":"ブルーノ","b":"Owes Kai a favour.","list":[],"n":0}]}"""))
+        val g = state.character("ブルーノ")!!
+        assertEquals(1, Regex("## Now").findAll(g).count(), g)
+        assertFalse("Let the matter drop" in g)
+        assertTrue("Guarded and blunt." in g)
+    }
 }

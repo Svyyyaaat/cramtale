@@ -76,6 +76,25 @@ class StoryState(val dir: File) {
     /** The character's file without its name line. */
     fun character(name: String): String? = characterFiles()[name]?.readLines()?.drop(1)?.joinToString("\n")?.trim()
 
+    /**
+     * A person's stance as it is now, one line under "## Now", replacing the previous one. Appending a line per
+     * turn made a ratchet: "suspects Kai" was read back as who they are, so they pressed harder, which added
+     * another line. What happened stays in the record; the file holds only where they stand. Older files'
+     * appended "- (turn N)" lines outside "## Learned" are folded away the same way.
+     */
+    internal fun withStance(file: String, stance: String, turn: Int): String {
+        val kept = ArrayList<String>()
+        var section = ""
+        var skipNow = false
+        for (line in file.trimEnd().lines()) {
+            if (line.startsWith("## ")) { section = line.removePrefix("## ").trim(); skipNow = section == "Now"; if (skipNow) continue }
+            if (skipNow) continue
+            if (section != "Learned" && STANCE_LINE.matches(line.trim())) continue
+            kept += line
+        }
+        return kept.joinToString("\n").trimEnd() + "\n\n## Now\n(turn $turn) $stance\n"
+    }
+
     fun writeCharacter(name: String, text: String) {
         charDir.mkdirs()
         val f = characterFiles()[name] ?: File(charDir, "c${(charDir.list()?.size ?: 0) + 1}.md")
@@ -298,7 +317,7 @@ class StoryState(val dir: File) {
                 is StateOp.Character -> {
                     val old = character(op.name)
                     if (old == null) "refused: no character ${op.name}"
-                    else { writeCharacter(op.name, old.trimEnd() + "\n- (turn ${scene.turn}) ${op.note}\n"); "${op.name}: ${op.note}" }
+                    else { writeCharacter(op.name, withStance(old, op.note, scene.turn)); "${op.name} now: ${op.note}" }
                 }
                 is StateOp.Learns -> {
                     val old = character(op.name)
@@ -344,6 +363,8 @@ class StoryState(val dir: File) {
     companion object {
         /** The player's character in the event log's witness lists. */
         const val PLAYER = "PLAYER"
+
+        private val STANCE_LINE = Regex("^- \\(turn -?\\d+\\) .*")
 
         internal fun JSONObject?.intMap(): MutableMap<String, Int> =
             LinkedHashMap<String, Int>().also { m -> this?.keys()?.forEach { k -> m[k] = optInt(k) } }
