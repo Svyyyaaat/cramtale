@@ -333,6 +333,7 @@ class StoryEngine(
         File(stateDir, "player_public.md").writeAtomic(o.optString("player_public").ifBlank { o.optString("player") } + "\n")
         val chars = o.getJSONArray("characters")
         for (i in 0 until chars.length()) chars.getJSONObject(i).let { state.writeCharacter(it.getString("name"), it.getString("file")) }
+        checkKnows()
         val secrets = o.optJSONArray("secrets")
         File(stateDir, "secrets.md").writeAtomic("# Secrets (game master only)\n\n" + (0 until (secrets?.length() ?: 0)).joinToString("\n") { i ->
             val s = secrets!!.getJSONObject(i)
@@ -375,7 +376,30 @@ class StoryEngine(
     // ------------------------------------------------------------------ sessions
 
     /** Between sessions the world moves (off-screen), then the director plans three beats. */
+    /**
+     * Each character's Knows, checked once per story for the game master's knowledge leaking in ("doesn't know
+     * what he is"): whoever plays them reads every word, and a stated unknown makes the player a mystery to solve.
+     * Stories made before this check get it at their next session. A failed check leaves the file as it was.
+     */
+    fun checkKnows() {
+        val done = File(dir, "state/knows_checked")
+        if (done.exists()) return
+        all(state.characterNames().map { name -> {
+            runCatching {
+                val file = state.character(name) ?: return@runCatching
+                if ("## Knows" !in file) return@runCatching
+                val o = json(call("knows_check", Models.CHARACTERS, Prompts.fill(prompts.prompt("knows_check"), mapOf(
+                    "player" to playerText(), "player_public" to playerPublic(), "file" to file,
+                )), listOf(Msg(Role.USER, "Check the Knows section.")), schema = KNOWS_SCHEMA, maxTokens = 3000, quiet = true))
+                val knows = o.optString("knows").trim()
+                if (knows.isNotEmpty()) state.writeCharacter(name, StoryState.replaceSection(file, "Knows", knows))
+            }
+        } })
+        done.parentFile.mkdirs(); done.writeText("1\n")
+    }
+
     fun startSession(pool: DuePool): List<String> {
+        runCatching { checkKnows() }
         val scene = state.scene()
         val log = ArrayList<String>()
         if (scene.session > 0 && scene.turn > 0 && scene.movedForSession != scene.session + 1) {
@@ -832,6 +856,8 @@ class StoryEngine(
      * player know can't leak into what they do (code-level separation, not a "don't know this" line).
      */
     private fun decideIntents(t: PendingTurn): String {
+        // stories older than the Knows check get it here once, before anyone decides from a leaky file
+        runCatching { checkKnows() }
         val s = state.scene()
         val cast = state.characterNames().toSet()
         val people = s.present.filter { it in cast }
@@ -962,6 +988,8 @@ class StoryEngine(
             "unknown words" to "Stay inside a 5,000-word vocabulary plus the review words; prefer the everyday word.",
             "leak" to "Don't make review words guessable from the sentence around them.",
         )
+
+        val KNOWS_SCHEMA = """{"type":"object","additionalProperties":false,"required":["knows"],"properties":{"knows":{"type":"string"}}}"""
 
         val SETUP_SCHEMA = """{"type":"object","additionalProperties":false,"required":["title","world","player","history","player_public","characters","secrets","clocks","complications","ambience","opening"],"properties":{
             "title":{"type":"string"},

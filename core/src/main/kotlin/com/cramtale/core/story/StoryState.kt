@@ -364,6 +364,15 @@ class StoryState(val dir: File) {
         /** The player's character in the event log's witness lists. */
         const val PLAYER = "PLAYER"
 
+        /** [file] with the body of its "## [name]" section replaced (added at the end if missing). */
+        fun replaceSection(file: String, name: String, body: String): String {
+            val lines = file.trimEnd().lines()
+            val start = lines.indexOfFirst { it.trim() == "## $name" }
+            if (start < 0) return file.trimEnd() + "\n## $name\n" + body.trim() + "\n"
+            val end = (start + 1 until lines.size).firstOrNull { lines[it].startsWith("## ") } ?: lines.size
+            return (lines.subList(0, start + 1) + body.trim().lines() + lines.subList(end, lines.size)).joinToString("\n") + "\n"
+        }
+
         private val STANCE_LINE = Regex("^- \\(turn -?\\d+\\) .*")
 
         internal fun JSONObject?.intMap(): MutableMap<String, Int> =

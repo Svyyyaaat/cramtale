@@ -25,6 +25,7 @@ prompts/judge.md	600ed059d0a10e3e
 prompts/judge.md	61391e1a2edc5aa3
 prompts/judge.md	b541788cee6afdf2
 prompts/judge.md	d668aae3e84e2435
+prompts/knows_check.md	f682652a93422d24
 prompts/leak.md	573d779c8e2d50f4
 prompts/meaning.md	14da230f15873770
 prompts/meaning.md	4bb8d82d4bc262cb
@@ -48,6 +49,7 @@ prompts/scribe.md	fbcd14e8632c9542
 prompts/setup.md	0acb34b3488eed22
 prompts/setup.md	196314d1d41b6f57
 prompts/setup.md	29b8272ec6d5035d
+prompts/setup.md	3516944cc6d37b19
 prompts/setup.md	3fb2525e5db1b74d
 prompts/setup.md	4b2029e3676507da
 prompts/setup.md	57ac7e661147ec14

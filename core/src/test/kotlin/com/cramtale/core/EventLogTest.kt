@@ -114,4 +114,20 @@ class EventLogTest {
         assertFalse("Let the matter drop" in g)
         assertTrue("Guarded and blunt." in g)
     }
+
+    @Test
+    fun `knows is checked once for the game master's knowledge leaking in`() {
+        state.writeCharacter("ゲルダ", "## Goals\nSell the inn.\n## Knows\nKai is a refugee and reliable. She does not know what he is.\n## Attitude\nWarm.")
+        File(dir, "state/player.md").writeText("Kai, a demon in hiding.")
+        val fake = FakeLlm(mapOf("knows_check" to """{"knows":"Kai is a refugee who works hard and turns up on time."}"""))
+        val e = StoryEngine(dir, fake, CostLog(null), "s")
+        e.checkKnows()
+        val f = e.state.character("ゲルダ")!!
+        assertFalse("does not know what he is" in f, f)
+        assertTrue("turns up on time" in f && "## Goals\nSell the inn." in f && "## Attitude\nWarm." in f, f)
+        val sent = fake.sent("knows_check").single().messages.joinToString { it.text }
+        assertTrue("demon in hiding" in sent, "the checker sees the hidden truth so it can spot hints of it")
+        e.checkKnows()
+        assertEquals(1, fake.sent("knows_check").size, "once per story")
+    }
 }
