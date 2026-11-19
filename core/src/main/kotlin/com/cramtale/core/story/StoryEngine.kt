@@ -956,7 +956,7 @@ class StoryEngine(
             "explains" to "Don't explain what a line meant or how it landed; show what people do next.",
             "no_handoff" to "End on something the player has to answer: a question, a demand, a deadline, someone waiting.",
             "npc_knowledge" to "People know only what they perceived (the record). No hints at hidden facts about the player's character.",
-            "motive" to "People keep their own goals and attitude; a change needs a reason shown on the page. Ordinary behaviour isn't suspicious.",
+            "motive" to "People keep their own goals and attitude; a change needs a reason shown on the page. Ordinary behaviour isn't suspicious, and an answer given is taken as given.",
             "contradiction" to "Nobody contradicts what's established about the player's character or the story so far.",
             "banned phrase" to "Avoid stock phrases (see the style rules); say the plain concrete thing.",
             "unknown words" to "Stay inside a 5,000-word vocabulary plus the review words; prefer the everyday word.",

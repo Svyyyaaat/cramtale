@@ -6,7 +6,7 @@ Place: {{place}}
 Present: {{present}}
 Turn {{turn}}, chapter {{chapter}}.
 
-### Current beat
+### Current beat (direction, not a script: bring it in where it fits what the player does; drop it if the player has settled it)
 {{beat}}
 
 ### Roll
