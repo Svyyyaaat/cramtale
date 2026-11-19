@@ -12,11 +12,14 @@ Each change is an object with the fields `op`, `a`, `b`, `list`, `n` (always all
 - `character`: how someone stands toward the player or what they want, as it is at the end of this passage, when the passage changed it. It replaces their previous line, so write the whole current stance ("let the matter drop, still wary"), not the step. Record easing as well as hardening, and only what the person showed, not what the narration implied. `a` = name, `b` = one line in English.
 - `event`: the record. One for each thing that happened on the page that will matter later: `a` = what happened, one concrete line (include any fact it established, like something said about someone's past that nobody disputed), `list` = who perceived it: the people present who saw or heard it, and "PLAYER" if the player's character did. Someone hidden or out of earshot didn't perceive it. Someone seeing the player's character for the first time: an event of what they saw. Everyone's memory is built from these, so be concrete and leave out nothing that matters.
 - `beat_done`: the current beat has played out.
+- `extra`: someone new appeared on the page who will likely be back (a named guest, a clerk). `a` = name as written, `b` = one line: who they are, what they want, their manner.
+- `promote`: one of the "Others" now matters to the story (they have their own aim in it, or the player keeps dealing with them). `a` = name, `b` = their full file in markdown with sections Goals, Busy with, Limits, Secrets, Knows, Attitude, under 150 words; `Knows` only what they could know from their line and what they saw.
 
 Record only what the passage shows happened. Return JSON `{"ops": [...]}`; no changes is `{"ops": []}`.
 
 ## Records
 Present: {{present}}. Place: {{place}}. Current beat: {{beat}}
+Others (one line each, no file): {{others}}
 Secrets: {{secrets}}
 Open consequences: {{consequences}}
 Clocks: {{clocks}}

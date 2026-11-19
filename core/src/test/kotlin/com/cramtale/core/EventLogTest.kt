@@ -130,4 +130,17 @@ class EventLogTest {
         e.checkKnows()
         assertEquals(1, fake.sent("knows_check").size, "once per story")
     }
+
+    @Test
+    fun `extras are one line until they matter, then get a file`() {
+        state.writeExtras(mapOf("大槻" to "Gate captain; wants the toll flowing and no talk of demons; indifferent."))
+        state.apply(StateOp.parse("""{"ops":[{"op":"extra","a":"客","b":"A traveller with a glowing charm; curious and chatty.","list":[],"n":0}]}"""))
+        assertEquals(setOf("大槻", "客"), state.extras().keys)
+        assertTrue("大槻" in state.castNameParts(), "extras' names are names too")
+        val refused = state.apply(StateOp.parse("""{"ops":[{"op":"promote","a":"客","b":"Just a line.","list":[],"n":0}]}"""))
+        assertTrue(refused.single().startsWith("refused"), refused.toString())
+        state.apply(StateOp.parse("""{"ops":[{"op":"promote","a":"客","b":"## Goals\\nSee the hero's ward.\\n## Knows\\nThe charm glowed near Kai.","list":[],"n":0}]}"""))
+        assertTrue("客" in state.characterNames())
+        assertEquals(setOf("大槻"), state.extras().keys)
+    }
 }

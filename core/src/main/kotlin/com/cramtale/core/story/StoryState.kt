@@ -59,8 +59,24 @@ class StoryState(val dir: File) {
 
     fun characterNames(): List<String> = characterFiles().keys.sorted()
 
+    private val extrasFile get() = File(stateDir, "extras.md")
+
+    /**
+     * The supporting cast: people the story needs (a gate guard, a neighbour) with one line each and no file.
+     * They have no secrets or leads; when one comes to matter, the scribe promotes them to a full file.
+     */
+    fun extras(): Map<String, String> = if (!extrasFile.exists()) emptyMap() else extrasFile.readLines().mapNotNull { l ->
+        Regex("^-\\s*([^:：]+)[:：]\\s*(.+)$").find(l.trim())?.let { it.groupValues[1].trim() to it.groupValues[2].trim() }
+    }.toMap()
+
+    fun writeExtras(extras: Map<String, String>) {
+        stateDir.mkdirs()
+        extrasFile.writeAtomic("# Others (one line each; promoted to a file when they come to matter)\n" +
+            extras.entries.joinToString("") { "- ${it.key}: ${it.value}\n" })
+    }
+
     /** The cast's names as they appear in text: タム and グエン in "グエン・ヴァン・タム", 村井 in "村井 早苗 (clerk)". */
-    fun castNameParts(): Set<String> = characterNames().flatMap { n ->
+    fun castNameParts(): Set<String> = (characterNames() + extras().keys).flatMap { n ->
         val parts = n.split(' ', '　', '・', '(', ')', '（', '）').map { it.trim() }.filter { it.isNotEmpty() }
         val whole = parts.joinToString("")
         // the writer often spells a name in kana (榊 ともえ → さかきともえ): readings count too
@@ -348,6 +364,20 @@ class StoryState(val dir: File) {
                     f.writeAtomic("$body\n- (turn ${scene.turn}) ${op.fact}\n")
                     addEvent(scene.turn, scene.place, op.fact, scene.present.toSet() + PLAYER); "about the player: ${op.fact}"
                 }
+                is StateOp.Extra -> when {
+                    op.name.isBlank() || op.line.isBlank() -> "refused extra: empty"
+                    character(op.name) != null || op.name in extras() -> "already known: ${op.name}"
+                    else -> { writeExtras(extras() + (op.name to op.line)); "extra: ${op.name}: ${op.line}" }
+                }
+                is StateOp.Promote -> when {
+                    character(op.name) != null -> "already has a file: ${op.name}"
+                    "## Goals" !in op.file || "## Knows" !in op.file -> "refused promote: a file needs Goals and Knows"
+                    else -> {
+                        writeCharacter(op.name, op.file)
+                        writeExtras(extras() - op.name)
+                        "promoted: ${op.name}"
+                    }
+                }
                 is StateOp.BeatDone -> {
                     scene.beats.firstOrNull { !it.done }?.done = true; "beat done"
                 }
@@ -401,6 +431,10 @@ sealed interface StateOp {
     /** Something that happened, with who perceived it: the record everyone's memory is computed from. */
     data class Happened(val text: String, val witnesses: List<String>) : StateOp
     data object BeatDone : StateOp
+    /** Someone new on the page who'll be back: a one-line extra. */
+    data class Extra(val name: String, val line: String) : StateOp
+    /** An extra who now matters: they get a full file (goals, limits, knows…) and their own decisions. */
+    data class Promote(val name: String, val file: String) : StateOp
 
     companion object {
         /** The player's character in witness lists. */
@@ -440,6 +474,8 @@ sealed interface StateOp {
                         "player_fact" -> PlayerFact(x)
                         "event" -> Happened(x, list)
                         "beat_done" -> BeatDone
+                        "extra" -> Extra(x, y)
+                        "promote" -> Promote(x, y)
                         else -> null
                     }
                 }.getOrNull()
@@ -452,7 +488,7 @@ sealed interface StateOp {
         val SCHEMA = """
         {"type":"object","additionalProperties":false,"required":["ops"],"properties":{"ops":{"type":"array","items":{
           "type":"object","additionalProperties":false,"required":["op","a","b","list","n"],"properties":{
-            "op":{"type":"string","enum":["chronicle","drop","reveal","new_secret","consequence","resolve","clock","new_clock","move","character","learns","player_fact","event","beat_done"]},
+            "op":{"type":"string","enum":["chronicle","drop","reveal","new_secret","consequence","resolve","clock","new_clock","move","character","learns","player_fact","event","beat_done","extra","promote"]},
             "a":{"type":"string"},"b":{"type":"string"},"list":{"type":"array","items":{"type":"string"}},"n":{"type":"integer"}}}}}}
         """.trimIndent()
     }

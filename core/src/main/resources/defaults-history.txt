@@ -40,6 +40,7 @@ prompts/offscreen.md	da33d7a258c6887e
 prompts/rewrite.md	03d628a71348ed45
 prompts/rewrite.md	d0230c2a7f4b7475
 prompts/scribe.md	09c38873d4cccd49
+prompts/scribe.md	16bb4a58da40fa97
 prompts/scribe.md	5312d3d3253abe29
 prompts/scribe.md	9719735796c43d77
 prompts/scribe.md	b6f4c89318cd48a3
@@ -47,6 +48,7 @@ prompts/scribe.md	c8be64b012c9bf86
 prompts/scribe.md	ca0113436efff64c
 prompts/scribe.md	fbcd14e8632c9542
 prompts/setup.md	0acb34b3488eed22
+prompts/setup.md	0c3396807b55d55c
 prompts/setup.md	196314d1d41b6f57
 prompts/setup.md	29b8272ec6d5035d
 prompts/setup.md	3516944cc6d37b19
