@@ -16,6 +16,7 @@ prompts/intent.md	a50f457560911fff
 prompts/intent.md	c5f4b80b6af7313e
 prompts/intent.md	cadddffd46fdca6d
 prompts/intent.md	cfce777a29cd716b
+prompts/intent.md	d2e507ffbcfa53bb
 prompts/intent.md	d58caecd0af48e15
 prompts/intent.md	e013bd101f68ba67
 prompts/judge.md	416a0b7a21907934
@@ -44,6 +45,7 @@ prompts/scribe.md	c8be64b012c9bf86
 prompts/scribe.md	ca0113436efff64c
 prompts/scribe.md	fbcd14e8632c9542
 prompts/setup.md	0acb34b3488eed22
+prompts/setup.md	196314d1d41b6f57
 prompts/setup.md	29b8272ec6d5035d
 prompts/setup.md	3fb2525e5db1b74d
 prompts/setup.md	4b2029e3676507da

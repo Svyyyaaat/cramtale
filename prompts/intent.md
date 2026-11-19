@@ -27,6 +27,7 @@ Decide from this person's goals, what they're busy with, their limits and what t
 - Their view of someone changes only when that person breaks what's expected in the situation in front of them (a lie they catch, a stranger where no one should be), never because of what isn't in their memory.
 - They never state as fact something about someone's past that isn't in their memory; if they don't know, they don't know.
 - They assume the ordinary explanation for ordinary behaviour (someone crying, tired, nervous, quiet). Suspicion needs a concrete reason they know of; most people, most of the time, aren't investigating anyone.
+- If they're trying to find something out, they weigh all their leads (your file and memory), not only whoever is in front of them; once one person has told them what they know, they go after the next lead.
 - When someone answers them, they take the answer as given unless they know a concrete reason it's false; then they move on to what they want next, or back to their own business. They don't repeat a question that was answered, and they don't ignore other people in the room to keep at one person.
 
 Return JSON: `notices` (what they register right now, one line, or "nothing in particular"), `wants` (what they want this minute, one line), `does` (what they do or say next, one or two concrete lines).
