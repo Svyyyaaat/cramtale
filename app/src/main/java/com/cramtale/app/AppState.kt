@@ -85,6 +85,11 @@ class AppState(val context: Context) {
 
     fun markTaught() { if (!taughtTaps) { taughtTaps = true; prefs.edit().putBoolean("taughtTaps", true).apply() } }
 
+    /** How many corrections show: 0 normal (errors), 1 strict (also unnatural phrasing), 2 annoying (everything). */
+    var correctionLevel: Int
+        get() = prefs.getInt("correctionLevel", 0)
+        set(v) { prefs.edit().putInt("correctionLevel", v.coerceIn(0, 2)).apply(); story.settingsChanged() }
+
     /** Which Claude runs the story: false = the API with the user's key, true = Claude Code in Termux (their subscription). */
     var claudeCode by androidx.compose.runtime.mutableStateOf(prefs.getBoolean("claudeCode", false))
         private set

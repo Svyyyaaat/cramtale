@@ -255,7 +255,8 @@ class StoryController(
             counted.size to unknown.map { it.lemma }
         }
         return StoryEngine(dir, llm, costs, session, unknown,
-            settings = StoryEngine.Settings(firmStyleRules = app.firmStyleRules, length = app.passageLength.text, aimWords = app.passageLength.aim)).also { e ->
+            settings = StoryEngine.Settings(firmStyleRules = app.firmStyleRules, length = app.passageLength.text, aimWords = app.passageLength.aim,
+                corrections = app.correctionLevel)).also { e ->
             engine = e
             e.onCall = { purpose -> if (isWorking) STEP_LABELS[purpose]?.let { busy = it } }
             var last = 0L
@@ -608,7 +609,8 @@ class StoryController(
         title = place()
         val d = t.draft
         val player = t.player
-        val corrections = t.corrections
+        // the ones kept back (above your corrections setting) are in the mistake log, not on screen
+        val corrections = t.corrections.filter { it.shown }
         val turn = t.turn
         val roll = t.roll?.toString()
         val complication = t.complication

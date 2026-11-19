@@ -118,6 +118,10 @@ fun PlayerBubble(text: String, corrections: List<Correction>, onNotAMistake: ((C
                     withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.tertiary)) { append(c.right) }
                 }, style = MaterialTheme.typography.bodyLarge)
                 Text(c.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (c.repeat) Text(if (c.level == Correction.LEVEL_ERROR) "You've made this mistake before." else "You've written this before; shown because it came up again.",
+                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.accent)
+                else if (c.level != Correction.LEVEL_ERROR) Text(if (c.level == "unnatural") "Correct, but not how people say it" else "A small polish",
+                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (onNotAMistake != null) TextButton({ onNotAMistake(c) }, contentPadding = PaddingValues(horizontal = 0.dp)) {
                     Text("Not a mistake", style = MaterialTheme.typography.labelMedium)
                 }

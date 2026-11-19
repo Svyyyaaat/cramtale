@@ -45,6 +45,8 @@ data class SettingsValues(
     val materialYou: Boolean = true,
     /** Claude Code in Termux instead of the API. */
     val claudeCode: Boolean = false,
+    /** 0 normal, 1 strict, 2 annoying. */
+    val corrections: Int = 0,
 )
 
 val TEXT_SCALES = listOf(0.85f to "Small", 1f to "Normal", 1.15f to "Large", 1.3f to "Larger")
@@ -54,7 +56,7 @@ fun SettingsScreen(state: AppState, onNewStory: () -> Unit, onScale: (Float) -> 
                    go: (Screen) -> Unit = {}, onRestartSetup: () -> Unit = {}) {
     var v by remember {
         mutableStateOf(SettingsValues(state.textScale, state.passageLength, state.twoReads, state.firmStyleRules, state.story.keyHint(),
-            state.story.styleLine(), state.themeMode, state.materialYou, state.claudeCode))
+            state.story.styleLine(), state.themeMode, state.materialYou, state.claudeCode, state.correctionLevel))
     }
     SettingsContent(v,
         onScale = { state.textScale = it; onScale(it); v = v.copy(textScale = it) },
@@ -67,6 +69,7 @@ fun SettingsScreen(state: AppState, onNewStory: () -> Unit, onScale: (Float) -> 
         onTheme = { state.setTheme(it); v = v.copy(theme = it) },
         onColors = { state.chooseMaterialYou(it); v = v.copy(materialYou = it) },
         onBackend = { state.chooseClaudeCode(it); v = v.copy(claudeCode = it) },
+        onCorrections = { state.correctionLevel = it; v = v.copy(corrections = it) },
         claudeCodeSetup = { ClaudeCodeSetup(state) },
         advanced = listOf(
             Triple("Calibrate on real text", "Paste Japanese you read; it marks what you know") { go(Screen.CALIBRATE) },
@@ -84,6 +87,7 @@ fun SettingsContent(
     onTheme: (com.cramtale.app.AppState.ThemeMode) -> Unit = {},
     onColors: (Boolean) -> Unit = {},
     onBackend: (Boolean) -> Unit = {},
+    onCorrections: (Int) -> Unit = {},
     claudeCodeSetup: @Composable () -> Unit = {},
     /** Rarely used screens: (name, what it is, open). */
     advanced: List<Triple<String, String, () -> Unit>> = emptyList(),
@@ -130,6 +134,14 @@ fun SettingsContent(
 
         SectionTitle("Reviews")
         PaperCard {
+            Text("Corrections to your Japanese", style = MaterialTheme.typography.titleSmall)
+            Segmented(listOf("Normal", "Strict", "Annoying"), v.corrections) { onCorrections(it) }
+            Hint(when (v.corrections) {
+                0 -> "Only real mistakes."
+                1 -> "Also phrasing that's correct but not how people say it."
+                else -> "Everything a teacher would mention, small polish included."
+            } + " Ones not shown are kept, and shown if you make the same one again.")
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Toggle("Young cards need two untapped reads", "Cards with an interval under 21 days count as Good only after two reads in separate passages.", v.twoReads, onTwoReads)
         }
 

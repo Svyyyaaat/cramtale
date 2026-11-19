@@ -14,7 +14,26 @@ import org.json.JSONObject
 import java.io.File
 
 /** A definite mistake in the player's Japanese (prompts/mistakes.md). */
-data class Correction(val wrong: String, val right: String, val type: String, val reason: String, val key: String)
+/**
+ * One correction of the player's Japanese. [level]: "error" (definitely wrong), "unnatural" (correct but no native
+ * would say it here) or "nitpick" (a teacher's small improvement). [shown]: whether the reader sees it now (its
+ * level is within their setting, or they made the same mistake before); hidden ones are kept for that.
+ * [repeat]: the same key came up before.
+ */
+data class Correction(val wrong: String, val right: String, val type: String, val reason: String, val key: String,
+                      val level: String = LEVEL_ERROR, val shown: Boolean = true, val repeat: Boolean = false) {
+    companion object {
+        const val LEVEL_ERROR = "error"
+        val LEVELS = listOf("error", "unnatural", "nitpick")
+        fun rank(level: String) = LEVELS.indexOf(level).let { if (it < 0) 0 else it }
+    }
+
+    fun toJson(): JSONObject = JSONObject().put("wrong", wrong).put("right", right).put("type", type).put("reason", reason).put("key", key)
+        .put("level", level).put("shown", shown).put("repeat", repeat)
+}
+
+fun correctionFrom(o: JSONObject, key: String = o.getString("key")) = Correction(o.getString("wrong"), o.getString("right"), o.optString("type"),
+    o.optString("reason"), key, o.optString("level", Correction.LEVEL_ERROR).ifBlank { Correction.LEVEL_ERROR }, o.optBoolean("shown", true), o.optBoolean("repeat"))
 
 /** Review material for the writer, already in priority order. */
 data class DueWord(val word: String, val noteId: Long, val isNew: Boolean)
@@ -64,8 +83,7 @@ class PendingTurn(
     fun toJson(): JSONObject = JSONObject()
         .put("turn", turn).put("player", player ?: JSONObject.NULL).put("rollNote", rollNote ?: JSONObject.NULL)
         .put("complication", complication ?: JSONObject.NULL).put("packet", packet ?: JSONObject.NULL).put("current", current)
-        .put("corrections", JSONArray(corrections.map { JSONObject().put("wrong", it.wrong).put("right", it.right)
-            .put("type", it.type).put("reason", it.reason).put("key", it.key) }))
+        .put("corrections", JSONArray(corrections.map { it.toJson() }))
         .put("roll", roll?.let { r -> JSONObject().put("dice", JSONArray(r.dice)).put("modifier", r.modifier).put("outcome", r.outcome.name) }
             ?: JSONObject.NULL)
         .put("pool", JSONObject()
@@ -87,9 +105,7 @@ class PendingTurn(
             val p = o.getJSONObject("pool")
             val t = PendingTurn(
                 turn = o.getInt("turn"), player = o.str("player"),
-                corrections = o.optJSONArray("corrections").objects().map {
-                    Correction(it.getString("wrong"), it.getString("right"), it.optString("type"), it.optString("reason"), it.getString("key"))
-                },
+                corrections = o.optJSONArray("corrections").objects().map { correctionFrom(it) },
                 roll = o.optJSONObject("roll")?.let { r ->
                     val d = r.getJSONArray("dice")
                     Dice.Roll((0 until d.length()).map { d.getInt(it) }, r.getInt("modifier"), Dice.Outcome.valueOf(r.getString("outcome")))
@@ -160,6 +176,8 @@ class StoryEngine(
         val chapterTurns: Int = 30,
         /** Away longer than this, and the next turn starts a new session (off-screen moves, new beats). */
         val sessionGapMs: Long = 3 * 60 * 60 * 1000L,
+        /** Which corrections show: 0 errors only, 1 also unnatural phrasing, 2 everything (nitpicks too). */
+        val corrections: Int = 0,
         /** Review words to aim for in a passage (fewer is fine when the scene doesn't take them). */
         val aimWords: Int = 7,
     )
@@ -570,7 +588,7 @@ class StoryEngine(
             .put("passage", t.draft.passage).put("roll", t.roll?.toString() ?: "")
             .put("place", s.place).put("present", JSONArray(s.present)).put("observable", t.observable)
             .put("packet", t.packet ?: "").put("sentAs", sentAs(t, turnsInChapter(s.chapter).isEmpty()))
-            .put("corrections", JSONArray(t.corrections.map { JSONObject().put("wrong", it.wrong).put("right", it.right).put("key", it.key) }))
+            .put("corrections", JSONArray(t.corrections.map { it.toJson() }))
             .put("checks", JSONArray(t.draft.checks.map { "${it.name}: ${if (it.passed) "ok" else it.detail}" }))
             .put("versions", t.drafts.size).put("ops", JSONArray(applied))
             .toString() + "\n")
@@ -851,9 +869,14 @@ class StoryEngine(
             .filter { it in knownKeys }
         val a = o.optJSONArray("errors") ?: return emptyList()
         return (0 until a.length()).map { a.getJSONObject(it) }
-            .map { Correction(it.getString("wrong"), it.getString("right"), it.optString("type"), it.optString("reason"), it.getString("key")) }
+            .map { correctionFrom(it) }
             // the span must be real text from the message, and actually change something
             .filter { it.wrong.isNotBlank() && it.wrong in message && it.wrong != it.right && it.key.isNotBlank() }
+            .map { c ->
+                // above the reader's setting it stays hidden, unless it's a mistake they've made before
+                val before = c.key in knownKeys
+                c.copy(shown = Correction.rank(c.level) <= settings.corrections || before, repeat = before)
+            }
     }
 
     /**
@@ -970,8 +993,8 @@ class StoryEngine(
             "grammar":{"type":"array","items":{"type":"string"}}}}"""
         val MISTAKES_SCHEMA = """{"type":"object","additionalProperties":false,"required":["errors","correct_keys"],"properties":{
             "correct_keys":{"type":"array","items":{"type":"string"}},"errors":{"type":"array","items":{
-            "type":"object","additionalProperties":false,"required":["wrong","right","type","reason","key"],"properties":{
-            "wrong":{"type":"string"},"right":{"type":"string"},
+            "type":"object","additionalProperties":false,"required":["wrong","right","type","reason","key","level"],"properties":{
+            "wrong":{"type":"string"},"right":{"type":"string"},"level":{"type":"string","enum":["error","unnatural","nitpick"]},
             "type":{"type":"string","enum":["conjugation","particle","word choice","grammar pattern","spelling","other"]},
             "reason":{"type":"string"},"key":{"type":"string"}}}}}}"""
         val ADJUDICATOR_SCHEMA = """{"type":"object","additionalProperties":false,"required":["roll","action","difficulty","stakes","observable"],"properties":{

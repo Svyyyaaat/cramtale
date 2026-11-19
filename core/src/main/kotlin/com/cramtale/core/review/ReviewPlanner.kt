@@ -62,7 +62,9 @@ class ReviewPlanner(private val grammar: GrammarPatterns?, private val skipsFile
  * fixed keys stop being sent to the writer as weak points.
  */
 class MistakeLog(private val file: File?) {
-    data class Key(val key: String, var count: Int, var correctSince: Int, var proposed: Boolean, var decided: String?, val examples: MutableList<Pair<String, Correction>>)
+    /** [count]: times shown to you; [hidden]: times it was below your corrections setting and kept back. */
+    data class Key(val key: String, var count: Int, var correctSince: Int, var proposed: Boolean, var decided: String?, val examples: MutableList<Pair<String, Correction>>,
+                   var hidden: Int = 0)
 
     private val keys = LinkedHashMap<String, Key>()
 
@@ -73,8 +75,8 @@ class MistakeLog(private val file: File?) {
                 keys[o.getString("key")] = Key(o.getString("key"), o.getInt("count"), o.getInt("correctSince"), o.getBoolean("proposed"),
                     o.optString("decided").ifEmpty { null },
                     (0 until ex.length()).map { ex.getJSONObject(it) }.map { e ->
-                        e.getString("message") to Correction(e.getString("wrong"), e.getString("right"), e.optString("type"), e.optString("reason"), o.getString("key"))
-                    }.toMutableList())
+                        e.getString("message") to com.cramtale.core.story.correctionFrom(e, o.getString("key"))
+                    }.toMutableList(), o.optInt("hidden"))
             }
         }
     }
@@ -82,16 +84,19 @@ class MistakeLog(private val file: File?) {
     val all get() = keys.values.toList()
 
     /** Keys the writer should keep in mind: seen, not fixed. */
-    fun weakPoints(limit: Int = 5) = keys.values.filter { it.correctSince < 3 }.sortedByDescending { it.count }.take(limit).map { it.key }
+    fun weakPoints(limit: Int = 5) = keys.values.filter { it.count > 0 && it.correctSince < 3 }.sortedByDescending { it.count }.take(limit).map { it.key }
 
     /** Records one message's check; returns keys that just reached their second occurrence (card proposals). */
     fun record(message: String, corrections: List<Correction>, correctKeys: List<String>): List<Key> {
         val newlyProposed = ArrayList<Key>()
         for (c in corrections.distinctBy { it.key }) {
             val k = keys.getOrPut(c.key) { Key(c.key, 0, 0, false, null, ArrayList()) }
-            k.count++
             k.correctSince = 0
             k.examples += message to c
+            if (!c.shown) { k.hidden++; continue }
+            // shown now: the times it was kept back count too (that's why it's shown)
+            k.count += 1 + k.hidden
+            k.hidden = 0
             if (k.count >= 2 && !k.proposed) { k.proposed = true; newlyProposed += k }
         }
         for (ck in correctKeys) keys[ck]?.let { if (corrections.none { c -> c.key == ck }) it.correctSince++ }
@@ -122,10 +127,10 @@ class MistakeLog(private val file: File?) {
         val f = file ?: return
         f.parentFile?.mkdirs()
         f.writeAtomic(JSONArray(keys.values.map { k ->
-            JSONObject().put("key", k.key).put("count", k.count).put("correctSince", k.correctSince).put("proposed", k.proposed)
+            JSONObject().put("key", k.key).put("count", k.count).put("hidden", k.hidden).put("correctSince", k.correctSince).put("proposed", k.proposed)
                 .put("decided", k.decided ?: "")
                 .put("examples", JSONArray(k.examples.map { (m, c) ->
-                    JSONObject().put("message", m).put("wrong", c.wrong).put("right", c.right).put("type", c.type).put("reason", c.reason)
+                    c.toJson().put("message", m)
                 }))
         }).toString(1))
     }
