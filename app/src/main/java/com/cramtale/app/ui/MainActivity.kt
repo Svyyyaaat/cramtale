@@ -30,7 +30,7 @@ import com.cramtale.app.CramtaleApp
 enum class Screen(val title: String) {
     HOME("Cramtale"), STORY("Story"), VOCAB("Vocabulary check"), CALIBRATE("Calibrate on text"), DECK("Your decks"),
     LOGS("Review log and costs"), FILES("Prompts and story files"), TARGET("AnkiDroid connection"), PROBE("AnkiDroid probe"),
-    SETTINGS("Settings"),
+    SETTINGS("Settings"), STORIES("Your stories"), STYLE("Writing style"),
 }
 
 class MainActivity : ComponentActivity() {
@@ -66,6 +66,12 @@ fun App(state: AppState) {
     val screen = stack.last()
     val back: () -> Unit = { if (stack.size > 1) stack.removeAt(stack.size - 1) }
     BackHandler(enabled = !onboarding && stack.size > 1) { back() }
+    val newStory: () -> Unit = {
+        if (state.story.archiveAndReset() != null) {
+            // straight to "Your story": the rest of setup is done, and the style carries over
+            state.onboardingStep = 6; state.onboardingDone = false; onboarding = true
+        }
+    }
 
     // a Surface, so every text gets the theme's content colour (dark mode included)
     // home data reads files, the deck snapshot and AnkiDroid: off the main thread, fresh on each return
@@ -95,14 +101,10 @@ fun App(state: AppState) {
                     Screen.FILES -> FilesScreen(state)
                     Screen.TARGET -> TargetScreen(state) { stack.add(Screen.PROBE) }
                     Screen.PROBE -> ProbeScreen(state)
-                    Screen.SETTINGS -> SettingsScreen(state, onScale = { scale = it }, onPickStyle = {
-                        state.story.clearStyle(); state.onboardingStep = 7; state.onboardingDone = false; onboarding = true
-                    }, onNewStory = {
-                        if (state.story.archiveAndReset() != null) {
-                            // straight to "Your story": the rest of setup is done
-                            state.onboardingStep = 6; state.onboardingDone = false; onboarding = true
-                        }
-                    })
+                    Screen.SETTINGS -> SettingsScreen(state, onScale = { scale = it }, onPickStyle = { stack.add(Screen.STYLE) }, onNewStory = newStory)
+                    Screen.STORIES -> StoriesScreen(state, onContinue = { stack.add(Screen.STORY) }, onNewStory = newStory,
+                        onSwitched = { home = null; stack.clear(); stack.add(Screen.HOME); stack.add(Screen.STORY) })
+                    Screen.STYLE -> StyleScreen(state)
                     else -> {}
                 }
             }
@@ -126,8 +128,10 @@ fun homeInfo(state: AppState): HomeInfo {
         reader.decks().filter { it.name in top }.let { ds -> DueCounts(ds.sumOf { it.review }, ds.sumOf { it.learn }, ds.sumOf { it.new }) }
     }.getOrNull()
     val today = s.gradeLog.today()
+    val stories = s.stories()
     return HomeInfo(
         due = due, perPassage = s.cardsPerPassage() ?: state.passageLength.estimate, readToday = today.cards, goodToday = today.good, againToday = today.again,
+        title = stories.firstOrNull { it.current }?.title, styleName = s.styleName(), storyCount = stories.size,
         place = s.place(), turn = s.turn(), chapter = s.chapter(), lastLines = s.lastLines(), totalCost = s.totalCost(),
         collection = t?.let { (if (it.isReal) "Real collection" else "Copy") + " · " + it.packageName } ?: "Not connected",
         collectionIsReal = t?.isReal == true, connected = t != null && wordCount > 0,

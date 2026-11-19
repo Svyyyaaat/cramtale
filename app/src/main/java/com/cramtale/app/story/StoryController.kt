@@ -162,7 +162,7 @@ class StoryController(
      */
     fun archiveAndReset(): File? {
         if (isWorking) return null
-        val keep = listOf("log/mistakes.json", "log/grades.jsonl", "log/skips.json", "log/two-reads.json", "log/costs.jsonl", "log/not-vocab.txt", "log/known-new.json", "log/flashcards.json")
+        val keep = USER_FILES
         val archive = File(context.filesDir, "story-archive/" + java.text.SimpleDateFormat("yyyy-MM-dd_HHmm", java.util.Locale.US).format(java.util.Date()))
         archive.parentFile?.mkdirs()
         engine?.shutdown()
@@ -178,6 +178,63 @@ class StoryController(
         history.clear(); current = null; error = null; retry = null; proposals.clear(); replyDraft = ""; ankiNote = null
         synchronized(tapLock) { tappedNotes.clear(); tappedWords.clear() }; meaningCache.clear()
         return archive
+    }
+
+    // ------------------------------------------------------------------ stories and style
+
+    /** One story on the phone: the one being played, or one in story-archive/. */
+    data class StorySummary(val dir: File, val title: String, val place: String?, val chapter: Int, val turn: Int,
+                            val lastActive: Long, val lastLines: String?, val style: String?, val current: Boolean)
+
+    private fun summary(d: File, current: Boolean): StorySummary? {
+        val world = File(d, "state/world.md").takeIf { it.exists() } ?: return null
+        val sc = runCatching { com.cramtale.core.story.StoryState(d).scene() }.getOrNull()
+        // stories made before titles: the world's first line stands in
+        val title = File(d, "state/title.txt").takeIf { it.exists() }?.readText()?.trim()?.ifEmpty { null }
+            ?: world.readLines().map { it.trim().trimStart('#').trim() }.firstOrNull { it.isNotEmpty() }?.let { if (it.length > 48) it.take(46) + "…" else it }
+            ?: "Untitled story"
+        val log = File(d, "log/turns.jsonl")
+        val last = log.takeIf { it.exists() }?.readLines()?.lastOrNull { it.isNotBlank() }?.let { runCatching { JSONObject(it) }.getOrNull() }
+        val active = sc?.lastActive?.takeIf { it > 0 } ?: last?.optLong("at")?.takeIf { it > 0 } ?: world.lastModified()
+        return StorySummary(d, title, sc?.place?.ifBlank { null }, sc?.chapter ?: 1, sc?.turn ?: 0, active,
+            last?.optString("passage")?.lines()?.filter { it.isNotBlank() }?.takeLast(2)?.joinToString("\n"),
+            com.cramtale.core.story.StylePresets.name(d), current)
+    }
+
+    private val archiveRoot get() = File(context.filesDir, "story-archive")
+
+    /** Every story on the phone, the one being played first, then the rest by when they were last played. */
+    fun stories(): List<StorySummary> = listOfNotNull(summary(dir, true)) +
+        archiveRoot.listFiles { f -> f.isDirectory }.orEmpty().mapNotNull { summary(it, false) }.sortedByDescending { it.lastActive }
+
+    /**
+     * Picks up an archived story where it was left: the current one goes to the archive and the chosen one
+     * takes its place. What's about you rather than a story (mistakes, review log, costs) stays with you.
+     */
+    fun switchTo(other: File): Boolean {
+        if (isWorking || other.parentFile != archiveRoot || !other.isDirectory) return false
+        val mine = USER_FILES.associateWith { k -> File(dir, k).takeIf { it.exists() }?.readBytes() }
+        engine?.shutdown(); engine = null
+        if (File(dir, "state/world.md").exists()) {
+            val parked = File(archiveRoot, java.text.SimpleDateFormat("yyyy-MM-dd_HHmm-ss", java.util.Locale.US).format(java.util.Date()))
+            if (!dir.renameTo(parked)) return false
+        } else dir.deleteRecursively()   // an empty, never set-up story: nothing to keep
+        if (!other.renameTo(dir)) return false
+        for ((k, bytes) in mine) if (bytes != null) File(dir, k).also { it.parentFile?.mkdirs() }.writeBytes(bytes)
+        history.clear(); current = null; error = null; retry = null; proposals.clear(); replyDraft = ""; ankiNote = null
+        synchronized(tapLock) { tappedNotes.clear(); tappedWords.clear() }; meaningCache.clear()
+        return true
+    }
+
+    /** The style's short name ("Light novel"), or its description for styles picked before names were kept. */
+    fun styleName(): String? = com.cramtale.core.story.StylePresets.name(dir) ?: styleLine()?.let { if (it.length > 40) it.take(38) + "…" else it }
+
+    /** The sample passage the writer imitates now. */
+    fun styleSample(): String? = File(dir, "config/style_sample.md").takeIf { it.exists() }?.readText()?.trim()?.ifEmpty { null }
+
+    /** The built-in styles with how many words in their sample you'd not know. */
+    fun presets(): List<Pair<StoryEngine.StyleOption, Double>> = com.cramtale.core.story.StylePresets.ALL.map { o ->
+        o to (app.matcherIfReady()?.analyze(o.passage)?.stats(app.policy, app.lists)?.unknownRate ?: 0.0)
     }
 
     private var engine: StoryEngine? = null
@@ -290,7 +347,12 @@ class StoryController(
         }
     }
 
-    suspend fun pickStyle(o: StoryEngine.StyleOption) = work("Saving…") { engine().pickStyle(o) }
+    /** Sets the story's style (only files: no model call). The next passage is written in it. */
+    fun pickStyle(o: StoryEngine.StyleOption) {
+        com.cramtale.core.story.StylePresets.write(dir, o)
+        for (n in listOf("style_sample.md", "style_line.txt")) File(dir, "config/$n.previous").delete()
+        settingsChanged()
+    }
 
     // ------------------------------------------------------------------ turns
 
@@ -742,6 +804,9 @@ class StoryController(
         ?.mapNotNull { runCatching { JSONObject(it).optDouble("dollars") }.getOrNull() }?.sum() ?: 0.0
 
     companion object {
+        /** What's about you, not a story: follows you to a new or another story. */
+        val USER_FILES = listOf("log/mistakes.json", "log/grades.jsonl", "log/skips.json", "log/two-reads.json", "log/costs.jsonl",
+            "log/not-vocab.txt", "log/known-new.json", "log/flashcards.json")
         /** The progress line while each model call runs. */
         val STEP_LABELS = mapOf(
             "mistakes" to "Checking your Japanese…", "adjudicator" to "Deciding what's at stake…",

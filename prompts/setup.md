@@ -7,6 +7,7 @@ Create the starting material for a Japanese roleplaying game, as its game master
 Make a small, grounded world: one town or neighbourhood, present day unless the seed says otherwise, adults with work, money and history. The player's character is someone with a stake in it and something to lose (describe them only by situation, never by personality or feelings: the player plays them).
 
 Return JSON:
+- `title`: a short title for the story (2–6 words, English), the kind on a book spine.
 - `world`: markdown, under 250 words: the place, the institutions and money that matter, what is going wrong.
 - `player`: two sentences: who the player character really is, what they have, what they owe, including anything hidden.
 - `history`: eight to twelve things that happened before the story starts, the record everyone's memory is built from. Each is `text` (one concrete line in English: what happened, when, how long, to whom) and `witnesses` (the names of who saw it, took part or was told it; "PLAYER" for the player's character). Cover the player's character's recent past, how they know each person, and what each person saw or was told about them. Anything not in here, a person doesn't know.

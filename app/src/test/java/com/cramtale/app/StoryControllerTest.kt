@@ -28,7 +28,7 @@ import java.io.File
 @Config(sdk = [35])
 class StoryControllerTest {
     private val fake = FakeLlm(mapOf(
-        "setup" to """{"world":"森の村。","player":"見習いの薬屋。","characters":[{"name":"ミナ","file":"## Goals\nFind her brother."},
+        "setup" to """{"title":"The Well","world":"森の村。","player":"見習いの薬屋。","characters":[{"name":"ミナ","file":"## Goals\nFind her brother."},
             {"name":"老人","file":"## Goals\nKeep the well shut."}],"secrets":[],"clocks":[],"complications":["雨が止まない"],
             "opening":{"place":"村の広場","present":["ミナ"],"situation":"ミナ asks for medicine."}}""",
         "style_picker" to """{"styles":[""" + (1..4).joinToString(",") {
@@ -64,7 +64,7 @@ class StoryControllerTest {
         shadowOf(Looper.getMainLooper()).idle()
     }
 
-    @Before fun clean() { File(context.filesDir, "story").deleteRecursively() }
+    @Before fun clean() { File(context.filesDir, "story").deleteRecursively(); File(context.filesDir, "story-archive").deleteRecursively() }
 
     @Test
     fun `restart shows the waiting passage without writing a new one`() = runBlocking {
@@ -242,5 +242,30 @@ class StoryControllerTest {
         val started = generateSequence { app.nextStartedService }.toList()
         assertTrue(started.toString(), started.any { it.component?.className == com.cramtale.app.story.TurnService::class.java.name && it.action == null })
         assertEquals("stop", started.last().action)
+    }
+
+    @Test
+    fun `stories can be picked up again, and what's yours follows you`() = runBlocking {
+        val c = controller()
+        c.setup("")
+        c.pickStyle(com.cramtale.core.story.StylePresets.ALL[1])
+        c.start(); settle(c)
+        File(c.dir, "state/title.txt").writeText("First\n")
+        c.archiveAndReset()!!
+        c.setup("")
+        File(c.dir, "state/title.txt").writeText("Second\n")
+        File(c.dir, "log/mistakes.json").writeText("[\"new mistake\"]")
+        val all = c.stories()
+        assertEquals(listOf("Second", "First"), all.map { it.title })
+        assertTrue(all[0].current)
+        assertEquals("Light novel", all[1].style)
+        assertTrue(c.switchTo(all[1].dir))
+        assertEquals("First", c.stories().first { it.current }.title)
+        assertEquals(listOf("First", "Second"), c.stories().map { it.title })
+        assertEquals("your mistakes come along", "[\"new mistake\"]", File(c.dir, "log/mistakes.json").readText())
+        assertEquals("Light novel", c.styleName())
+        assertTrue("the first story's turn is still there", c.turn() >= 0 && File(c.dir, "log/turns.jsonl").exists() || File(c.dir, "state/pending.json").exists())
+        // nothing outside the archive can be switched to
+        assertTrue(!c.switchTo(File(context.filesDir, "elsewhere").apply { mkdirs() }))
     }
 }

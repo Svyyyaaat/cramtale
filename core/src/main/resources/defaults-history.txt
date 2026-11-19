@@ -45,8 +45,10 @@ prompts/setup.md	29b8272ec6d5035d
 prompts/setup.md	3fb2525e5db1b74d
 prompts/setup.md	4b2029e3676507da
 prompts/setup.md	57ac7e661147ec14
+prompts/setup.md	5fcef9cc8fee0427
 prompts/setup.md	d85539029951c09b
 prompts/style_picker.md	9cca079d4411fee2
+prompts/style_picker.md	bd9d51280ffbb58c
 prompts/summary.md	729ce6b9ae001da3
 prompts/turn.md	315eb5b2c66f62e3
 prompts/turn.md	351d8bbe2dea6db1

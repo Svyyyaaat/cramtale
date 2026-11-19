@@ -322,6 +322,7 @@ class StoryEngine(
                 "- ${c.getString("name")}: 0/${c.optInt("size", 6)} — when full: ${c.optString("when_full")}"
             } + "\n")
         File(stateDir, "player.md").writeAtomic(o.optString("player").trim() + "\n")
+        o.optString("title").takeIf { it.isNotBlank() }?.let { File(stateDir, "title.txt").writeAtomic(it.trim() + "\n") }
         // the backstory goes into the record as witnessed events: everyone's memory, the player's included, starts here
         o.optJSONArray("history")?.let { h ->
             for (i in 0 until h.length()) h.getJSONObject(i).let { e ->
@@ -367,11 +368,7 @@ class StoryEngine(
         return (0 until a.length()).map { i -> a.getJSONObject(i).let { StyleOption(it.getString("name"), it.getString("line"), it.getString("passage")) } }
     }
 
-    fun pickStyle(o: StyleOption) {
-        File(dir, "config").mkdirs()
-        File(dir, "config/style_sample.md").writeAtomic(o.passage.trim() + "\n")
-        File(dir, "config/style_line.txt").writeAtomic(o.line.trim() + "\n")
-    }
+    fun pickStyle(o: StyleOption) = StylePresets.write(dir, o)
 
     fun hasStyle() = !prompts.config("style_sample.md").isNullOrBlank()
 
@@ -966,7 +963,8 @@ class StoryEngine(
             "leak" to "Don't make review words guessable from the sentence around them.",
         )
 
-        val SETUP_SCHEMA = """{"type":"object","additionalProperties":false,"required":["world","player","history","player_public","characters","secrets","clocks","complications","ambience","opening"],"properties":{
+        val SETUP_SCHEMA = """{"type":"object","additionalProperties":false,"required":["title","world","player","history","player_public","characters","secrets","clocks","complications","ambience","opening"],"properties":{
+            "title":{"type":"string"},
             "world":{"type":"string"},"player":{"type":"string"},"history":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["text","witnesses"],"properties":{"text":{"type":"string"},"witnesses":{"type":"array","items":{"type":"string"}}}}},"player_public":{"type":"string"},
             "characters":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["name","file"],"properties":{"name":{"type":"string"},"file":{"type":"string"}}}},
             "secrets":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["text","knows"],"properties":{"text":{"type":"string"},"knows":{"type":"array","items":{"type":"string"}}}}},

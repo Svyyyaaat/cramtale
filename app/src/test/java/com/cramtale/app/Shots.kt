@@ -111,6 +111,20 @@ class Shots {
         }
     }
 
+    private fun summary(title: String, current: Boolean, turn: Int, style: String?) = com.cramtale.app.story.StoryController.StorySummary(
+        java.io.File(title), title, "村の広場", 2, turn, System.currentTimeMillis() - 3 * 86_400_000L,
+        "「これ、高いの？」\nミナは瓶を棚に戻した。", style, current)
+
+    @Test fun f1_stories() = shot {
+        com.cramtale.app.ui.StoriesContent(listOf(summary("The Well Keeper", true, 14, "Light novel"),
+            summary("Demon in the Frost", false, 41, "Mostly dialogue"), summary("Night Bus", false, 3, null)), {}, {}, {})
+    }
+
+    @Test fun f2_style() = shot {
+        val presets = com.cramtale.core.story.StylePresets.ALL.map { it to 0.0 }
+        com.cramtale.app.ui.StyleContent("Light novel", presets[1].first.passage, presets, null, null, null, {}, {})
+    }
+
     @Test fun a9_story_setup() = shot { StoryStepContent("", {}, null, null, {}, {}) }
 
     @Test fun b1_styles() = shot {
@@ -123,7 +137,8 @@ class Shots {
     @Test fun c1_home() = shot {
         HomeContent(HomeInfo("西田製作所の事務所", 12, 1, "村井はかばんの口を閉めて、立ち上がらずに待っていた。", 1.42,
             "Real collection · com.ichi2.anki", true, true, 7127, 10000,
-            due = DueCounts(142, 6, 20), perPassage = 6.4, readToday = 23, goodToday = 19, againToday = 4), {}, {})
+            due = DueCounts(142, 6, 20), perPassage = 6.4, readToday = 23, goodToday = 19, againToday = 4,
+            title = "The Well Keeper", styleName = "Light novel", storyCount = 3), {}, {})
     }
 
     private val passage = "信用金庫の村井は、早朝にもかかわらず化粧も髪も崩れていなかった。机に布のかばんを置き、薄いファイルを一冊出す。\n「先月お約束いただいた返済の計画書、今日もらえますか」"
@@ -158,7 +173,8 @@ class Shots {
     @Test fun c2_home_dark() = shot(dark = true) {
         HomeContent(HomeInfo("西田製作所の事務所", 12, 1, "村井はかばんの口を閉めて、立ち上がらずに待っていた。", 1.42,
             "Real collection · com.ichi2.anki", true, true, 7127, 10000,
-            due = DueCounts(142, 6, 20), perPassage = 6.4, readToday = 23, goodToday = 19, againToday = 4), {}, {})
+            due = DueCounts(142, 6, 20), perPassage = 6.4, readToday = 23, goodToday = 19, againToday = 4,
+            title = "The Well Keeper", styleName = "Light novel", storyCount = 3), {}, {})
     }
 
     @Test fun a6b_vocab_question_dark() = shot(dark = true) {

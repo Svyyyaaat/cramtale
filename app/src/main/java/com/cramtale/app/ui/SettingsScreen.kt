@@ -109,7 +109,7 @@ fun SettingsContent(
                     Text("Writing style", style = MaterialTheme.typography.titleSmall)
                     Hint(v.styleLine ?: "Not picked yet")
                 }
-                TextButton(onPickStyle) { Text("Choose again") }
+                TextButton(onPickStyle) { Text("Change") }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Toggle("Style rules as firm prohibitions", "Off: the style is described positively (\"short sentences\"). On: as rules (\"never…\").", v.firmStyle, onFirm)

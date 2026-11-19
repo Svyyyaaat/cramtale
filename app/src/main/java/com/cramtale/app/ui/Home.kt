@@ -31,6 +31,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.LibraryBooks
+import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Link
@@ -73,6 +75,9 @@ data class HomeInfo(
     val readToday: Int = 0,
     val goodToday: Int = 0,
     val againToday: Int = 0,
+    val title: String? = null,
+    val styleName: String? = null,
+    val storyCount: Int = 1,
 )
 
 @Composable
@@ -92,6 +97,12 @@ fun HomeContent(info: HomeInfo, go: (Screen) -> Unit, onRestartSetup: () -> Unit
         }
 
         StoryHero(info) { go(Screen.STORY) }
+        // the story's own choices, one tap away but quieter than Continue
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            QuickLink(Icons.AutoMirrored.Filled.LibraryBooks, "Stories",
+                if (info.storyCount > 1) "${info.storyCount} on this phone" else "new or earlier", Modifier.weight(1f)) { go(Screen.STORIES) }
+            QuickLink(Icons.Filled.Brush, "Style", info.styleName ?: "pick one", Modifier.weight(1f)) { go(Screen.STYLE) }
+        }
         TodayCard(info)
 
         SectionTitle("Tools")
@@ -102,10 +113,27 @@ fun HomeContent(info: HomeInfo, go: (Screen) -> Unit, onRestartSetup: () -> Unit
             Tile(Icons.Filled.BarChart, "Review log", "$%.2f spent".format(info.totalCost)) { go(Screen.LOGS) },
             Tile(Icons.Filled.Description, "Story files", "prompts, cast", Tint.JADE) { go(Screen.FILES) },
             Tile(Icons.Filled.Link, "AnkiDroid", if (info.collectionIsReal) "real collection" else if (info.connected) "copy" else "connect", Tint.VERMILION) { go(Screen.TARGET) },
-            Tile(Icons.Filled.Settings, "Settings", "text, length, key") { go(Screen.SETTINGS) },
+            Tile(Icons.Filled.Settings, "Settings", "text, length, Claude") { go(Screen.SETTINGS) },
             Tile(Icons.Filled.Tune, "Setup again", "the walk-through", Tint.NEUTRAL) { onRestartSetup() },
         ))
         Spacer(Modifier.height(12.dp))
+    }
+}
+
+/** A small tonal link under the hero: icon, name, current value. */
+@Composable
+fun QuickLink(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, value: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    Surface(modifier.clip(MaterialTheme.shapes.medium).clickable(onClick = onClick), shape = MaterialTheme.shapes.medium, color = cs.secondaryContainer) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, Modifier.size(20.dp), tint = cs.onSecondaryContainer)
+            Spacer(Modifier.width(10.dp))
+            Column {
+                Text(title, style = MaterialTheme.typography.titleSmall, color = cs.onSecondaryContainer, maxLines = 1)
+                Text(value, style = MaterialTheme.typography.bodySmall, color = cs.onSecondaryContainer.copy(alpha = 0.75f),
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
     }
 }
 
@@ -138,8 +166,8 @@ fun StoryHero(info: HomeInfo, onOpen: () -> Unit) {
             .clickable(onClick = onOpen).padding(22.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text(if (info.turn == 0) "A new story" else "Chapter ${info.chapter} · turn ${info.turn}",
-            style = MaterialTheme.typography.labelLarge, color = a.onHero.copy(alpha = 0.7f))
+        Text(listOfNotNull(info.title, if (info.turn == 0) "a new story" else "chapter ${info.chapter} · turn ${info.turn}").joinToString(" · "),
+            style = MaterialTheme.typography.labelLarge, color = a.onHero.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(info.place ?: "Your story", style = MaterialTheme.typography.titleLarge, color = a.onHero)
         info.lastLines?.let {
             Text(it, style = ReadingText.copy(fontSize = 16.sp, lineHeight = 28.sp), color = a.onHero.copy(alpha = 0.85f),

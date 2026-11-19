@@ -234,7 +234,7 @@ fun StyleStepContent(options: List<Pair<StoryEngine.StyleOption, Double>>?, busy
                      wait: (@Composable (String) -> Unit)? = null) {
     StepFrame(onBack, footer = {}) {
         StepHeader(7, SETUP_STEPS, "Pick the one you like reading",
-            "One scene, four styles. Your pick sets the voice of the whole story.")
+            "One scene in different styles. Your pick sets the voice of the story; you can change it any time from the home screen.")
         if (busy != null) wait?.invoke(busy) ?: Busy(busy)
         if (error != null) ErrorNote(error, onMore)
         for ((o, rate) in options.orEmpty()) {
@@ -358,11 +358,11 @@ fun OnboardingFlow(state: AppState, onFinished: () -> Unit) {
         else -> {
             // a new story keeps the style you picked before
             if (state.story.hasStyle()) { LaunchedEffect(Unit) { state.onboardingDone = true; onFinished() }; return }
-            var options by remember { mutableStateOf<List<Pair<StoryEngine.StyleOption, Double>>?>(null) }
-            LaunchedEffect(Unit) { options = state.story.styleOptions() }
+            // the built-in styles show at once; "four more" asks Claude for new ones
+            var options by remember { mutableStateOf<List<Pair<StoryEngine.StyleOption, Double>>?>(state.story.presets()) }
             StyleStepContent(options, state.story.busy, state.story.error,
                 onPick = { o -> scope.launch { state.story.pickStyle(o); state.onboardingDone = true; onFinished() } },
-                onMore = { scope.launch { options = state.story.styleOptions(fresh = options != null) } },
+                onMore = { scope.launch { state.story.styleOptions(fresh = true)?.let { options = it } } },
                 onBack = { if (state.story.restoreStyle()) { state.onboardingDone = true; onFinished() } else back() },
                 wait = { label -> StudyWhileWaiting(state, label) })
         }
