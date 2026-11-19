@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -135,13 +136,23 @@ fun QuickLink(icon: androidx.compose.ui.graphics.vector.ImageVector, title: Stri
     }
 }
 
-/** The app's mark: the launcher icon's page on its indigo tile, drawn small. */
+/**
+ * The app's mark, drawn like the launcher draws it: the 108dp adaptive layers scaled so their 72dp visible
+ * middle fills the tile. With wallpaper colours it's the themed (one-colour) icon in the scheme's tones.
+ */
 @Composable
 fun AppMark(size: androidx.compose.ui.unit.Dp) {
-    Box(Modifier.size(size).clip(RoundedCornerShape(size * 0.28f))) {
-        androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.cramtale.app.R.drawable.ic_launcher_background), null, Modifier.size(size))
-        androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.cramtale.app.R.drawable.ic_launcher_foreground), null,
-            Modifier.size(size * 1.15f).offset(x = -size * 0.075f, y = -size * 0.075f))
+    val cs = MaterialTheme.colorScheme
+    val themed = LocalDynamicColor.current
+    Box(Modifier.size(size).clip(RoundedCornerShape(size * 0.28f)).background(if (themed) cs.primaryContainer else Color.Transparent),
+        contentAlignment = Alignment.Center) {
+        val layer = Modifier.requiredSize(size * 1.5f)
+        if (themed) androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.cramtale.app.R.drawable.ic_launcher_monochrome), null, layer,
+            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(cs.onPrimaryContainer))
+        else {
+            androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.cramtale.app.R.drawable.ic_launcher_background), null, layer)
+            androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.cramtale.app.R.drawable.ic_launcher_foreground), null, layer)
+        }
     }
 }
 

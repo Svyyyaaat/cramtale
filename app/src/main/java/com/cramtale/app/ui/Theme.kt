@@ -107,6 +107,9 @@ private val AppShapes = Shapes(
     small = RoundedCornerShape(12.dp), medium = RoundedCornerShape(20.dp), large = RoundedCornerShape(28.dp),
 )
 
+/** True when the colours come from the wallpaper (Material You): the app's mark follows them. */
+val LocalDynamicColor = androidx.compose.runtime.staticCompositionLocalOf { false }
+
 @Composable
 fun CramtaleTheme(dark: Boolean = isSystemInDarkTheme(), materialYou: Boolean = false, content: @Composable () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -119,7 +122,7 @@ fun CramtaleTheme(dark: Boolean = isSystemInDarkTheme(), materialYou: Boolean = 
         else -> Light
     }
     val accents = if (dynamic) accentsFrom(scheme) else if (dark) DarkAccents else LightAccents
-    androidx.compose.runtime.CompositionLocalProvider(LocalAccents provides accents) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalAccents provides accents, LocalDynamicColor provides dynamic) {
         MaterialTheme(colorScheme = scheme, typography = Type, shapes = AppShapes, content = content)
     }
 }

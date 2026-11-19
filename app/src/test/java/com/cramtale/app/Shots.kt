@@ -49,6 +49,8 @@ import com.cramtale.core.match.Status
 import com.cramtale.core.match.VocabCheck
 import com.cramtale.core.story.Correction
 import com.cramtale.core.story.StoryEngine
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.background
 import org.junit.Rule
 import org.junit.Test
 
@@ -238,22 +240,39 @@ class Shots {
 
     @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
     /** The launcher icon at large size: circle and rounded-square masks, and the themed (monochrome) version. */
+    /** Like a launcher: the middle 72dp of the 108dp layers is what shows, under the launcher's mask. */
+    @Composable
+    private fun Launcher(size: androidx.compose.ui.unit.Dp, shape: androidx.compose.ui.graphics.Shape, themed: Boolean) {
+        androidx.compose.foundation.layout.Box(Modifier.size(size).clip(shape)
+            .background(if (themed) androidx.compose.ui.graphics.Color(0xFFDCE1F7) else androidx.compose.ui.graphics.Color.Transparent),
+            contentAlignment = androidx.compose.ui.Alignment.Center) {
+            val layer = Modifier.requiredSize(size * 1.5f)
+            if (themed) androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher_monochrome), null, layer,
+                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(androidx.compose.ui.graphics.Color(0xFF3A4255)))
+            else {
+                androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher_background), null, layer)
+                androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher_foreground), null, layer)
+            }
+        }
+    }
+
     @Test fun z1_icon() = shot {
-        androidx.compose.foundation.layout.FlowRow(Modifier.padding(16.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)) {
-            for (shape in listOf(androidx.compose.foundation.shape.CircleShape, androidx.compose.foundation.shape.RoundedCornerShape(28.dp))) {
-                androidx.compose.foundation.layout.Box(Modifier.size(180.dp).clip(shape)) {
-                    androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher_background), null, Modifier.size(180.dp))
-                    androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher_foreground), null, Modifier.size(180.dp))
-                }
+        androidx.compose.foundation.layout.Column(Modifier.padding(16.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)) {
+            androidx.compose.foundation.layout.Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)) {
+                Launcher(150.dp, androidx.compose.foundation.shape.CircleShape, false)
+                Launcher(150.dp, androidx.compose.foundation.shape.CircleShape, true)
             }
-            for (small in listOf(48.dp, 64.dp)) androidx.compose.foundation.layout.Box(Modifier.size(small).clip(androidx.compose.foundation.shape.CircleShape)) {
-                androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher_background), null, Modifier.size(small))
-                androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher_foreground), null, Modifier.size(small))
+            androidx.compose.foundation.layout.Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Launcher(150.dp, androidx.compose.foundation.shape.RoundedCornerShape(36.dp), false)
+                Launcher(56.dp, androidx.compose.foundation.shape.CircleShape, false)
+                Launcher(56.dp, androidx.compose.foundation.shape.CircleShape, true)
             }
-            androidx.compose.foundation.layout.Box(Modifier.size(180.dp).clip(androidx.compose.foundation.shape.CircleShape)
-                .background(androidx.compose.ui.graphics.Color(0xFF3E3540))) {
-                androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher_monochrome), null, Modifier.size(180.dp),
-                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(androidx.compose.ui.graphics.Color(0xFFF2DDEC)))
+            // in the app, both colour modes
+            androidx.compose.foundation.layout.Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)) {
+                com.cramtale.app.ui.AppMark(64.dp)
+                androidx.compose.runtime.CompositionLocalProvider(com.cramtale.app.ui.LocalDynamicColor provides true) { com.cramtale.app.ui.AppMark(64.dp) }
+                com.cramtale.app.ui.AppMark(36.dp)
             }
         }
     }
