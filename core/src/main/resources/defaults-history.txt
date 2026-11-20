@@ -15,6 +15,7 @@ prompts/condense.md	a88c7168146f39e1
 prompts/director.md	3cb930e28cadea56
 prompts/director.md	7cbf277c440278ee
 prompts/director.md	e19192516fdf93aa
+prompts/ideas.md	2908c42394563729
 prompts/intent.md	158b4d4d5d66a141
 prompts/intent.md	a50f457560911fff
 prompts/intent.md	c5f4b80b6af7313e

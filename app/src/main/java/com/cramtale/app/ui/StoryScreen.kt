@@ -1,5 +1,8 @@
 package com.cramtale.app.ui
 
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.material.icons.filled.AutoStories
@@ -250,10 +253,13 @@ fun ProposalCard(p: MistakeLog.Key, onDecide: (Boolean) -> Unit) {
 }
 
 @Composable
-fun ReplyBar(busy: String?, canSend: Boolean, input: String, onInput: (String) -> Unit, onSend: (String) -> Unit) {
+fun ReplyBar(busy: String?, canSend: Boolean, input: String, onInput: (String) -> Unit, onSend: (String) -> Unit,
+             ideas: IdeasUi? = null) {
     Surface(color = MaterialTheme.colorScheme.surfaceContainer, tonalElevation = 2.dp) {
         Column(Modifier.navigationBarsPadding()) {
             if (busy != null) LinearProgressIndicator(Modifier.fillMaxWidth())
+            // ideas sit on the reply box: lines to start from when writing Japanese is the hard part
+            if (ideas != null && canSend && busy == null && input.isBlank()) IdeasArea(ideas) { onInput(it) }
             Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(input, onInput, Modifier.weight(1f).heightIn(min = 52.dp),
                     placeholder = { Text(if (busy != null) "Writing the next passage…" else "Say or do something…", maxLines = 1) }, shape = RoundedCornerShape(26.dp), maxLines = 5,
@@ -278,6 +284,60 @@ fun ReplyBar(busy: String?, canSend: Boolean, input: String, onInput: (String) -
                 }
             }
         }
+    }
+}
+
+/** What the reply bar needs to show ideas: the three (or none yet), whether they're coming, why they didn't. */
+data class IdeasUi(
+    val ideas: List<com.cramtale.core.story.StoryEngine.Idea>,
+    val loading: Boolean,
+    /** null: nothing to say; "": came back empty; else why it failed. */
+    val problem: String?,
+    val onAsk: () -> Unit,
+    val onDismiss: () -> Unit,
+)
+
+/**
+ * The Ideas button, or the three ideas: each a line to say or do in the story's reading face with its English
+ * meaning under it. Tapping one puts the Japanese in the reply box, to edit before sending.
+ */
+@Composable
+fun IdeasArea(ui: IdeasUi, onPick: (String) -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    if (ui.ideas.isEmpty()) {
+        Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.material3.FilledTonalButton(ui.onAsk, enabled = !ui.loading, contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                modifier = Modifier.heightIn(min = 36.dp)) {
+                if (ui.loading) androidx.compose.material3.CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                else Icon(Icons.Outlined.Lightbulb, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(if (ui.loading) "Finding ideas…" else "Ideas", style = MaterialTheme.typography.labelLarge)
+            }
+            Spacer(Modifier.width(10.dp))
+            when {
+                ui.problem == "" -> Text("No ideas came back. Try again.", style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
+                ui.problem != null -> Text(ui.problem, style = MaterialTheme.typography.bodySmall, color = cs.error, maxLines = 2,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                !ui.loading -> Text("Stuck? Three things you could say or do.", style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
+            }
+        }
+        return
+    }
+    Column(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 8.dp).clip(MaterialTheme.shapes.medium).background(cs.secondaryContainer)) {
+        Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Tap one to start from it", style = MaterialTheme.typography.labelMedium, color = cs.onSecondaryContainer.copy(alpha = 0.75f),
+                modifier = Modifier.weight(1f))
+            TextButton(ui.onAsk, enabled = !ui.loading) { Text(if (ui.loading) "Finding…" else "Other ideas") }
+            IconButton(ui.onDismiss) { Icon(Icons.Filled.Close, "Close ideas", tint = cs.onSecondaryContainer) }
+        }
+        ui.ideas.forEachIndexed { i, idea ->
+            if (i > 0) HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = cs.onSecondaryContainer.copy(alpha = 0.12f))
+            Column(Modifier.fillMaxWidth().clickable { onPick(idea.ja) }.padding(horizontal = 16.dp, vertical = 10.dp)) {
+                Text(idea.ja, style = ReadingText.copy(fontSize = 18.sp, lineHeight = 28.sp), color = cs.onSecondaryContainer)
+                if (idea.en.isNotBlank()) Text(idea.en, style = MaterialTheme.typography.bodySmall, color = cs.onSecondaryContainer.copy(alpha = 0.75f))
+            }
+        }
+        Spacer(Modifier.height(6.dp))
     }
 }
 
@@ -313,6 +373,7 @@ fun StoryContent(
     /** Show how tapping counts (until the first tap or "Got it"). */
     teach: Boolean = false,
     onTaught: () -> Unit = {},
+    ideas: IdeasUi? = null,
 ) {
     val listState = rememberLazyListState()
     LaunchedEffect(history.size, current) {
@@ -369,7 +430,7 @@ fun StoryContent(
             Icon(Icons.Outlined.Info, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(notice, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        ReplyBar(busy, current != null, reply, onReply, onSend)
+        ReplyBar(busy, current != null, reply, onReply, onSend, ideas)
     }
 }
 
@@ -515,6 +576,7 @@ fun StoryScreen(state: AppState, onBack: () -> Unit) {
         onAnswer = { c, good -> story.answerFlashcard(c, good) }, onTriage = { c, known -> story.triageNew(c, known) },
         onListen = { text -> if (state.speaker.speaking) state.speaker.stop() else state.speaker.say(text) },
         teach = !state.taughtTaps, onTaught = { state.markTaught() },
+        ideas = IdeasUi(story.ideas, story.ideasLoading, story.ideasProblem, onAsk = { story.suggest() }, onDismiss = { story.dismissIdeas() }),
     )
     info?.let { i -> StoryInfoSheet(i) { info = null } }
 

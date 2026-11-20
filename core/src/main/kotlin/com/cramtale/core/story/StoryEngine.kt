@@ -1159,6 +1159,27 @@ class StoryEngine(
         }
     }
 
+    /** A move the player's character could make: the Japanese to type, and what it means. */
+    data class Idea(val ja: String, val en: String)
+
+    /**
+     * Three things the player's character could say or do next, in Japanese at the learner's level (using a review word
+     * where natural), each with an English gloss: on request, for when writing Japanese is the hard part. Cheap model.
+     */
+    fun ideas(): List<Idea> {
+        val t = pending?.takeIf { it.ready } ?: return emptyList()
+        val s = state.scene()
+        val lastMessage = turnsInChapter(s.chapter).lastOrNull { it.optString("player").isNotBlank() }?.optString("player")
+            ?: t.player ?: "(nothing yet: plain です/ます is a safe start)"
+        val o = json(call("ideas", Models.CHECKS, Prompts.fill(prompts.prompt("ideas"), mapOf(
+            "player" to playerText(), "scene" to "Place: ${s.place}. Present: ${s.present.joinToString().ifEmpty { "nobody else" }}.",
+            "review_words" to t.pool.words.take(10).joinToString("、") { it.word }.ifEmpty { "(none today)" },
+            "last_message" to lastMessage.take(300), "passage" to t.draft.passage,
+        )), listOf(Msg(Role.USER, "Three ideas.")), schema = IDEAS_SCHEMA, maxTokens = 800, quiet = true))
+        return o.optJSONArray("ideas")?.let { a -> (0 until a.length()).mapNotNull { a.optJSONObject(it) } }.orEmpty()
+            .map { Idea(it.optString("ja").trim(), it.optString("en").trim()) }.filter { it.ja.isNotEmpty() }.take(3)
+    }
+
     /** The popup's one-line meaning of a word in its sentence. */
     fun meaning(word: String, sentence: String, onText: ((String) -> Unit)? = null): String =
         call("meaning", Models.CHECKS, Prompts.fill(prompts.prompt("meaning"), mapOf("word" to word, "sentence" to sentence)),
@@ -1302,6 +1323,8 @@ class StoryEngine(
             "Slice of life with a secret: a new job at a seaside café whose regulars all seem to be waiting for something.",
         )
 
+        val IDEAS_SCHEMA = """{"type":"object","additionalProperties":false,"required":["ideas"],"properties":{"ideas":{"type":"array","items":{
+            "type":"object","additionalProperties":false,"required":["ja","en"],"properties":{"ja":{"type":"string"},"en":{"type":"string"}}}}}}"""
         val REMEMBER_SCHEMA = """{"type":"object","additionalProperties":false,"required":["remembers"],"properties":{"remembers":{"type":"string"}}}"""
         val KNOWS_SCHEMA = """{"type":"object","additionalProperties":false,"required":["knows"],"properties":{"knows":{"type":"string"}}}"""
 

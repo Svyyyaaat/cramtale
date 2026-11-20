@@ -555,8 +555,40 @@ class StoryController(
      * Send from the reply box: the message shows as a bubble right away and leaves the box; if the turn
      * fails, it goes back into the box (Try again sends it as before).
      */
+    // ------------------------------------------------------------------ ideas
+
+    /** Three moves for the passage on screen (Japanese and a gloss), when asked for; empty until then. */
+    val ideas = mutableStateListOf<StoryEngine.Idea>()
+    /** Ideas are being found (they don't block the story: reading and tapping go on). */
+    var ideasLoading by mutableStateOf(false)
+        private set
+    /** Why the last request for ideas failed, or "" when it came back empty; null when there's nothing to say. */
+    var ideasProblem by mutableStateOf<String?>(null)
+        private set
+    /** Which passage the ideas are for: a new passage or version drops them. */
+    private var ideasFor: Pair<Int, Int>? = null
+
+    /** Asks for three ideas for the passage on screen (cheap model), in the background. */
+    fun suggest() {
+        val shown = current ?: return
+        if (ideasLoading || isWorking) return
+        ideasLoading = true; ideasProblem = null; ideas.clear()
+        val forPassage = shown.passage.turn to shown.passage.version
+        scope.launch {
+            val r = withContext(Dispatchers.IO) { runCatching { engine().ideas() } }
+            ideasLoading = false
+            // the reader moved on meanwhile: these were for another passage
+            if (current?.passage?.let { it.turn to it.version } != forPassage) return@launch
+            r.onSuccess { list -> ideas.addAll(list); ideasFor = forPassage; if (list.isEmpty()) ideasProblem = "" }
+                .onFailure { e -> ideasProblem = ErrorText.explain(e).substringBefore("\n\n") }
+        }
+    }
+
+    fun dismissIdeas() { ideas.clear(); ideasProblem = null }
+
     fun submit(message: String) {
         if (isWorking) return
+        dismissIdeas()
         if (message.isNotBlank()) { sending = message; replyDraft = "" }
         launch {
             send(message)
@@ -730,6 +762,7 @@ class StoryController(
             listOfNotNull(roll?.let { "Roll: $it" }, complication?.let { "Complication: $it" }, if (d.rewritten) "Rewritten once by the checks" else null),
             version = t.current, versions = t.drafts.size)
         current = ShownTurn(player, corrections, passage)
+        if (ideasFor != null && ideasFor != (passage.turn to passage.version)) { dismissIdeas(); ideasFor = null }
         // the scribe for this version starts now, in the background, while it's read
         runCatching { engine?.prepareCommit() }
         if (shownAt == 0L || current?.passage?.turn != turn) shownAt = System.currentTimeMillis()

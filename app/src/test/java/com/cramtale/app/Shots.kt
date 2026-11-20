@@ -167,7 +167,7 @@ class Shots {
         return out
     }
 
-    private fun storyShot(dark: Boolean, error: String? = null, versions: Int = 1) = shot(dark) {
+    private fun storyShot(dark: Boolean, error: String? = null, versions: Int = 1, ideas: com.cramtale.app.ui.IdeasUi? = null) = shot(dark) {
         val p = ShownPassage(3, passage, spans(passage), emptyList(), setOf("早朝".hashCode().toLong()), mapOf("早朝".hashCode().toLong() to "early morning"), emptyList(), emptyList(),
             version = versions - 1, versions = versions)
         val prev = ShownPassage(2, "午前八時。事務所の暖房はまだ効いていない。", spans("午前八時。事務所の暖房はまだ効いていない。"), emptyList(), emptySet(), emptyMap(), emptyList(), emptyList())
@@ -178,8 +178,20 @@ class Shots {
             busy = null, error = error, onRetry = if (error != null) ({}) else null,
             reply = if (error != null) "すみません、もう少し待ってくれませんか。" else "", proposals = emptyList(), tapVersion = 0,
             isTapped = { it.surface == "布" }, statusOf = { if (it.surface == "返済") Status.UNKNOWN else Status.DECK },
-            onBack = {}, onTap = { _, _ -> }, onGrammar = {}, onReroll = {}, onEdit = {}, onSend = {}, onDecide = { _, _ -> }, onListen = {})
+            onBack = {}, onTap = { _, _ -> }, onGrammar = {}, onReroll = {}, onEdit = {}, onSend = {}, onDecide = { _, _ -> }, onListen = {},
+            ideas = ideas ?: com.cramtale.app.ui.IdeasUi(emptyList(), false, null, {}, {}))
     }
+
+    private val threeIdeas = listOf(
+        com.cramtale.core.story.StoryEngine.Idea("「返済は来週まで待ってください」と頼む", "Ask her to wait until next week for the repayment"),
+        com.cramtale.core.story.StoryEngine.Idea("ファイルを見て、「これは誰が書いたんですか」", "Look at the file: \"Who wrote this?\""),
+        com.cramtale.core.story.StoryEngine.Idea("黙って部屋を出る", "Leave the room without a word"),
+    )
+
+    @Test fun d10_ideas() = storyShot(false, ideas = com.cramtale.app.ui.IdeasUi(threeIdeas, false, null, {}, {}))
+    @Test fun d10b_ideas_dark() = storyShot(true, ideas = com.cramtale.app.ui.IdeasUi(threeIdeas, false, null, {}, {}))
+    @Test fun d10c_ideas_loading() = storyShot(false, ideas = com.cramtale.app.ui.IdeasUi(emptyList(), true, null, {}, {}))
+    @Test fun d10d_ideas_failed() = storyShot(false, ideas = com.cramtale.app.ui.IdeasUi(emptyList(), false, "No internet: couldn't reach Claude.", {}, {}))
 
     @Test fun c2_home_dark() = shot(dark = true) {
         HomeContent(HomeInfo("西田製作所の事務所", 12, 1, "村井はかばんの口を閉めて、立ち上がらずに待っていた。", 1.42,

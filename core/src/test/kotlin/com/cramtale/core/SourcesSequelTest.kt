@@ -61,4 +61,28 @@ class SourcesSequelTest {
         assertTrue("A month later, the ward cracks" in f.sent("director").last().messages.joinToString { it.text }, "the player's wish reaches the plan")
         assertFalse(File(dir, "state/next.md").exists(), "used once")
     }
+
+    @Test
+    fun `ideas are Japanese at the learner's level, with review words and a gloss`() {
+        val dir = Files.createTempDirectory("ideas").toFile()
+        val f = FakeLlm(mapOf("setup" to setup, "knows_check" to """{"knows":"x"}""",
+            "director" to """{"beats":[{"goal":"g","place":"the gate","characters":["鷺沼"],"pressure":"p"}],"opening":""}""",
+            "adjudicator" to """{"roll":false,"action":"","difficulty":0,"stakes":"","observable":"x"}""",
+            "mistakes" to """{"errors":[],"correct_keys":[]}""", "intent" to """{"notices":"x","wants":"y","does":"z"}""",
+            "judge" to """{"violations":[]}""", "leak" to """{"guesses":[]}""", "scribe" to """{"ops":[]}""",
+            "writer" to """{"passage":"鷺沼は薪を見た。","used":[],"grammar":[]}""",
+            "ideas" to """{"ideas":[{"ja":"「薪はいかがですか」","en":"Offer her firewood"},{"ja":"黙って帰る","en":"Leave quietly"},{"ja":"","en":"empty"}]}"""))
+        val e = StoryEngine(dir, f, CostLog(null), "s")
+        e.setup("")
+        e.startSession(DuePool())
+        assertTrue(e.ideas().isEmpty(), "no passage waiting: nothing to suggest for")
+        e.playerTurn("「こんばんは」と言う", DuePool(words = listOf(com.cramtale.core.story.DueWord("薪", 1, false))))
+        val ideas = e.ideas()
+        assertEquals(listOf("「薪はいかがですか」", "黙って帰る"), ideas.map { it.ja })
+        assertEquals("Offer her firewood", ideas.first().en)
+        val sent = f.sent("ideas").single()
+        val text = sent.messages.joinToString { it.text }
+        assertTrue("薪" in text && "「こんばんは」と言う" in text, "review words and how the player writes")
+        assertEquals(com.cramtale.core.llm.Models.CHECKS, sent.model, "the cheap model")
+    }
 }
