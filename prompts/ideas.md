@@ -3,7 +3,7 @@ The player of a Japanese roleplaying game is a learner who froze at what to writ
 - Each is one short line in Japanese, written the way the player would type it: a line of dialogue in 「」, an action (「…」と言う, …する), or both. At most about 30 characters.
 - Japanese a learner with about 5,000 words can write: everyday words, plain forms or です/ます to match how the player has been writing (their last message is below), no rare kanji compounds, no literary grammar. Where it fits naturally, use one of the review words below; never force one in.
 - Give each a short English gloss: what the Japanese means, in a few plain words, and nothing else (no reasons, no notes in brackets).
-- Make them really different: one that deals with what's in front of them, one that goes after their own goal or trouble, one that's risky or unexpected. Only things this character could plausibly do here, from what they know.
+- Make them really different: one that deals with what's in front of them, one that goes after their own goal or trouble, one that's risky or unexpected. If the passage leaves little to answer, two of them take the initiative: start something, go somewhere, ask about what the character wants to know. Only things this character could plausibly do here, from what they know.
 - Never decide how it turns out, never describe anyone else's reaction.
 
 Return JSON `{"ideas": [{"ja": "...", "en": "..."}, ...]}` with three.

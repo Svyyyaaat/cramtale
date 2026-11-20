@@ -18,6 +18,7 @@ prompts/director.md	7cbf277c440278ee
 prompts/director.md	e19192516fdf93aa
 prompts/ideas.md	2908c42394563729
 prompts/ideas.md	8f0f916bde9c27c6
+prompts/ideas.md	c2285b90ff50568c
 prompts/intent.md	158b4d4d5d66a141
 prompts/intent.md	a50f457560911fff
 prompts/intent.md	c5f4b80b6af7313e
@@ -27,6 +28,7 @@ prompts/intent.md	d2e507ffbcfa53bb
 prompts/intent.md	d58caecd0af48e15
 prompts/intent.md	e013bd101f68ba67
 prompts/judge.md	416a0b7a21907934
+prompts/judge.md	4699df7636a1582b
 prompts/judge.md	498cd6fea0496203
 prompts/judge.md	600ed059d0a10e3e
 prompts/judge.md	61391e1a2edc5aa3
@@ -87,6 +89,7 @@ prompts/writer.md	0718f687de575e25
 prompts/writer.md	88ca4f85fb7a5e53
 prompts/writer.md	96e65b13c16673ae
 prompts/writer.md	9f283afdead0baad
+prompts/writer.md	a13565424335ada1
 prompts/writer.md	aaeaf03b32c0a7f5
 prompts/writer.md	afe2f481646c5413
 prompts/writer.md	b62276f500f4b051

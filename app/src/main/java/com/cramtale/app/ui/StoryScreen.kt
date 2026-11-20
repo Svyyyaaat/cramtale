@@ -202,7 +202,7 @@ fun TeachTaps(onDone: () -> Unit) {
             Text("Your Anki words are in the story", style = MaterialTheme.typography.titleSmall, color = cs.onSecondaryContainer)
             Text("Read past a word you know: it counts as Good. Don't know one? Tap it: you see its meaning, and it counts as Again.",
                 style = MaterialTheme.typography.bodyMedium, color = cs.onSecondaryContainer)
-            MarkKey(SpanStyle(fontSize = 12.sp, color = cs.tertiary), "〔meaning〕", "a new card, with its meaning the first time")
+            MarkKey(SpanStyle(textDecoration = TextDecoration.Underline, color = cs.tertiary), "箇所", "a new card: tap it for its meaning")
             MarkKey(SpanStyle(textDecoration = TextDecoration.Underline, color = cs.accent), "返済", "probably new to you, not in your decks")
             MarkKey(SpanStyle(background = LocalAccents.current.tapped), "布", "a word you tapped")
             TextButton(onDone, contentPadding = PaddingValues(horizontal = 0.dp)) { Text("Got it") }
@@ -241,16 +241,16 @@ fun PassageText(p: ShownPassage, interactive: Boolean, isTapped: (Span) -> Boole
             var pos = 0
             for (s in p.spans) {
                 if (s.start > pos) append(p.text.substring(pos, s.start))
+                // a new card is marked, not glossed: the story text stays Japanese; its meaning is a tap away
+                val isNew = s.deck.any { it.noteId in p.newNotes }
                 val style = when {
                     interactive && isTapped(s) -> SpanStyle(background = tappedBg)
+                    isNew -> SpanStyle(textDecoration = TextDecoration.Underline, color = glossColor)
                     statusOf(s) == Status.UNKNOWN -> SpanStyle(textDecoration = TextDecoration.Underline, color = unknownLine)
                     else -> SpanStyle()
                 }
                 if (interactive && (s.isWord || statusOf(s) == Status.NAME)) withLink(LinkAnnotation.Clickable("w${s.start}") { onTap(s) }) { withStyle(style) { append(s.surface) } }
                 else withStyle(style) { append(s.surface) }
-                s.deck.firstOrNull { it.noteId in p.newNotes }?.let { w ->
-                    withStyle(SpanStyle(fontSize = 12.sp, color = glossColor)) { append("〔${p.glosses[w.noteId].orEmpty()}〕") }
-                }
                 pos = s.end
             }
             if (pos < p.text.length) append(p.text.substring(pos))
