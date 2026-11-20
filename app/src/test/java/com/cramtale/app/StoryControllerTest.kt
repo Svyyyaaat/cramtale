@@ -271,4 +271,41 @@ class StoryControllerTest {
         // nothing outside the archive can be switched to
         assertTrue(!c.switchTo(File(context.filesDir, "elsewhere").apply { mkdirs() }))
     }
+
+    @Test
+    fun `a story saved as a zip opens again, with your history, and a crafted zip is refused`() = runBlocking {
+        val c = controller()
+        c.setup("")
+        File(c.dir, "state/title.txt").writeText("Backed up\n")
+        File(c.dir, "log/mistakes.json").writeText("[]")
+        File(c.dir, "log/grades.jsonl").writeText("{\"at\":1}\n")
+        File(c.dir, "log/calls.jsonl").writeText("debug\n")
+        val zip = java.io.ByteArrayOutputStream()
+        assertTrue(c.exportStory(c.dir, zip))
+        val names = java.util.zip.ZipInputStream(zip.toByteArray().inputStream()).use { z -> generateSequence { z.nextEntry?.name }.toList() }
+        assertTrue("state/world.md" in names && "log/mistakes.json" in names)
+        assertTrue("the debug log stays out", names.none { it.contains("calls") })
+
+        // a phone with a history keeps its own
+        val kept = c.importStory(zip.toByteArray().inputStream())
+        assertTrue(kept.message, kept.ok && "kept" in kept.message)
+        assertEquals(2, c.stories().count { it.title == "Backed up" })
+
+        // a fresh phone takes the history from the backup
+        File(c.dir, "log/mistakes.json").delete(); File(c.dir, "log/grades.jsonl").delete()
+        val fresh = c.importStory(zip.toByteArray().inputStream())
+        assertTrue(fresh.message, fresh.ok && "came with it" in fresh.message)
+        assertTrue(File(c.dir, "log/grades.jsonl").exists())
+
+        // ../ in an entry name: refused, nothing written outside the shelf
+        val evil = java.io.ByteArrayOutputStream()
+        java.util.zip.ZipOutputStream(evil).use { z ->
+            z.putNextEntry(java.util.zip.ZipEntry("state/world.md")); z.write("x".toByteArray()); z.closeEntry()
+            z.putNextEntry(java.util.zip.ZipEntry("../../escaped.txt")); z.write("x".toByteArray()); z.closeEntry()
+        }
+        val r = c.importStory(evil.toByteArray().inputStream())
+        assertTrue(!r.ok)
+        assertTrue(!File(context.filesDir, "escaped.txt").exists() && !File(context.filesDir.parentFile, "escaped.txt").exists())
+        assertTrue(!c.importStory("not a zip".byteInputStream()).ok)
+    }
 }

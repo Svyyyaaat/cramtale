@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.FileOpen
+import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
@@ -56,18 +58,41 @@ fun StoriesScreen(state: AppState, onContinue: () -> Unit, onNewStory: () -> Uni
     var stories by remember { mutableStateOf<List<StorySummary>?>(null) }
     var tick by remember { mutableStateOf(0) }
     var problem by remember { mutableStateOf<String?>(null) }
+    var note by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    var exporting by remember { mutableStateOf<StorySummary?>(null) }
+    val saveTo = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        val s = exporting ?: return@rememberLauncherForActivityResult
+        exporting = null
+        if (uri != null) scope.launch {
+            val ok = withContext(Dispatchers.IO) { state.story.exportStory(s.dir, uri) }
+            if (ok) { note = "Saved a backup of “${s.title}”."; problem = null } else problem = "Couldn't save the backup there. Try another place."
+        }
+    }
+    val openZip = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            val r = withContext(Dispatchers.IO) { state.story.importStory(uri) }
+            if (r.ok) { note = r.message; problem = null } else problem = r.message
+            tick++
+        }
+    }
     LaunchedEffect(tick) { stories = withContext(Dispatchers.IO) { state.story.stories() } }
     val list = stories ?: return Busy("Opening your stories…")
-    StoriesContent(list, onContinue, onNewStory, problem, writing = state.story.isWorking, onSwitch = { s ->
+    StoriesContent(list, onContinue, onNewStory, problem, writing = state.story.isWorking, note = note, onSwitch = { s ->
         if (state.story.switchTo(s.dir)) { problem = null; tick++; onSwitched() }
         else problem = if (state.story.isWorking) "A passage is still being written. Switch once it's done." else "Couldn't open “${s.title}”. It's still in the list; try again."
-    })
+    }, onExport = { s -> exporting = s; saveTo.launch(state.story.exportName(s)) },
+        onImport = { openZip.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) })
 }
 
 /** Your stories: the one being played as an open book with Continue, the earlier ones as a quiet shelf. */
 @Composable
 fun StoriesContent(stories: List<StorySummary>, onContinue: () -> Unit, onNewStory: () -> Unit, problem: String? = null,
-                   writing: Boolean = false, onSwitch: (StorySummary) -> Unit) {
+                   writing: Boolean = false, note: String? = null, onSwitch: (StorySummary) -> Unit,
+                   /** A story to a zip (a backup), and a zip back onto the shelf. */
+                   onExport: (StorySummary) -> Unit = {}, onImport: () -> Unit = {}) {
     var confirmNew by remember { mutableStateOf(false) }
     var confirmSwitch by remember { mutableStateOf<StorySummary?>(null) }
     val current = stories.firstOrNull { it.current }
@@ -75,6 +100,7 @@ fun StoriesContent(stories: List<StorySummary>, onContinue: () -> Unit, onNewSto
     val cs = MaterialTheme.colorScheme
     Page {
         if (problem != null) ErrorNote(problem)
+        if (note != null) Text(note, style = MaterialTheme.typography.bodyMedium, color = cs.primary)
         if (writing) Text("A passage is being written. You can switch stories once it's done.",
             style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
         if (current != null) PaperCard {
@@ -89,6 +115,7 @@ fun StoriesContent(stories: List<StorySummary>, onContinue: () -> Unit, onNewSto
                 }
             }
             PrimaryButton(if (current.turn == 0) "Begin" else "Continue", onContinue, icon = Icons.AutoMirrored.Filled.MenuBook)
+            QuietButton("Save a backup", { onExport(current) }, icon = Icons.Filled.SaveAlt, enabled = !writing)
         } else {
             // nothing set up: the only thing to do here is start one
             Text("No story yet.", style = ReadingText.copy(fontSize = 22.sp, lineHeight = 30.sp))
@@ -100,13 +127,17 @@ fun StoriesContent(stories: List<StorySummary>, onContinue: () -> Unit, onNewSto
             Column {
                 others.forEachIndexed { i, s ->
                     if (i > 0) HorizontalDivider(color = cs.outlineVariant)
-                    ShelfRow(s, enabled = !writing) { confirmSwitch = s }
+                    ShelfRow(s, enabled = !writing, onExport = { onExport(s) }) { confirmSwitch = s }
                 }
             }
         } else if (current != null) {
             Text("Start as many stories as you like. Each one waits here where you left it.",
                 style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
         }
+        SectionTitle("Backups")
+        Text("A backup is one .zip file with the story and your mistakes and review history. Keep it anywhere; open it here, on this phone or another.",
+            style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
+        QuietButton("Open a backup", onImport, icon = Icons.Filled.FileOpen, enabled = !writing)
     }
     if (confirmNew) AlertDialog(onDismissRequest = { confirmNew = false }, title = { Text("Start a new story?") },
         text = { Text("“${current?.title}” stays here; you can pick it up again any time.") },
@@ -122,13 +153,16 @@ fun StoriesContent(stories: List<StorySummary>, onContinue: () -> Unit, onNewSto
 
 /** An earlier story on the shelf: its title in the reading face, where it stands, when you last played it. */
 @Composable
-private fun ShelfRow(s: StorySummary, enabled: Boolean, onPick: () -> Unit) {
+private fun ShelfRow(s: StorySummary, enabled: Boolean, onExport: () -> Unit = {}, onPick: () -> Unit) {
     val cs = MaterialTheme.colorScheme
     Row(Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onPick).padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(s.title, style = ReadingText.copy(fontSize = 18.sp, lineHeight = 26.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(progress(s), style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(ago(s.lastActive), style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
+        }
+        androidx.compose.material3.IconButton(onExport, enabled = enabled) {
+            Icon(Icons.Filled.SaveAlt, "Save a backup of ${s.title}", tint = cs.onSurfaceVariant)
         }
         TextButton(onPick, enabled = enabled) { Text("Continue") }
     }

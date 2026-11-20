@@ -792,7 +792,10 @@ class StoryController(
 
     fun storyInfo(): StoryInfo {
         val role = playerSheet()
-        val text = File(dir, "log/turns.jsonl").jsonLines().joinToString("\n") { it.optString("passage") } + "\n" + (current?.passage?.text ?: "")
+        // what you've read, without parsing a long game's whole log: the story so far, the chapters, the latest turns
+        val text = listOfNotNull(File(dir, "state/saga.md").takeIf { it.exists() }?.readText()).joinToString() +
+            File(dir, "state/chapters").listFiles().orEmpty().joinToString("\n") { it.readText() } +
+            File(dir, "log/turns.jsonl").tailJson(200).joinToString("\n") { it.optString("passage") } + "\n" + (current?.passage?.text ?: "")
         val cast = runCatching { com.cramtale.core.story.StoryState(dir).characterNames() }.getOrDefault(emptyList())
         // met = named in a passage you've read (by full name or any part of it)
         // (a whole name counts at any length, 榊 included; parts of a long name need two characters)
@@ -811,8 +814,81 @@ class StoryController(
     }
 
     /** Every session's costs, from the log file. */
-    fun totalCost(): Double = File(dir, "log/costs.jsonl").takeIf { it.exists() }?.readLines()
-        ?.mapNotNull { runCatching { JSONObject(it).optDouble("dollars") }.getOrNull() }?.sum() ?: 0.0
+    private var costMemo: Pair<Long, Double>? = null
+
+    /** Every session's costs, from the log file (a long game's is big: summed again only when it grew). */
+    fun totalCost(): Double {
+        val f = File(dir, "log/costs.jsonl")
+        if (!f.exists()) return 0.0
+        costMemo?.let { (len, sum) -> if (len == f.length()) return sum }
+        val sum = f.readLines().sumOf { runCatching { JSONObject(it).optDouble("dollars") }.getOrNull()?.takeIf { d -> !d.isNaN() } ?: 0.0 }
+        costMemo = f.length() to sum
+        return sum
+    }
+
+    // ------------------------------------------------------------------ backups
+
+    /**
+     * Writes the story in [d] as a zip to [out] (everything but the debug log). What's about you rather than the
+     * story (mistakes, grades, known-new cards…) goes in as it is now, whichever story this is, so a backup carries
+     * your learning history too. Blocking: off the main thread.
+     */
+    fun exportStory(d: File, out: java.io.OutputStream): Boolean = runCatching {
+        java.util.zip.ZipOutputStream(out.buffered()).use { zip ->
+            fun put(name: String, f: File) {
+                zip.putNextEntry(java.util.zip.ZipEntry(name)); f.inputStream().use { it.copyTo(zip) }; zip.closeEntry()
+            }
+            d.walkTopDown().filter { it.isFile && !it.name.startsWith("calls") && !it.name.startsWith(".") }.forEach { f ->
+                val rel = f.relativeTo(d).path.replace('\\', '/')
+                if (rel !in USER_FILES) put(rel, f)
+            }
+            for (k in USER_FILES) File(dir, k).takeIf { it.isFile }?.let { put(k, it) }
+        }
+    }.isSuccess
+
+    fun exportStory(d: File, uri: android.net.Uri): Boolean =
+        runCatching { context.contentResolver.openOutputStream(uri)?.use { exportStory(d, it) } ?: false }.getOrDefault(false)
+
+    /** A file name for the export: the title and the date. */
+    fun exportName(s: StorySummary): String = s.title.replace(Regex("[^\\p{L}\\p{N} _-]"), "").trim().take(40).ifEmpty { "story" } +
+        " " + java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date()) + ".zip"
+
+    /**
+     * Puts a backup onto the shelf. Returns what to tell the reader: whether it worked, and what happened to the
+     * learning history in it (taken on a phone that has none yet; otherwise this phone's own is kept).
+     */
+    fun importStory(input: java.io.InputStream): ImportResult {
+        val target = File(archiveRoot, "imported-" + java.text.SimpleDateFormat("yyyy-MM-dd_HHmm-ss", java.util.Locale.US).format(java.util.Date()))
+        val ok = runCatching {
+            java.util.zip.ZipInputStream(input.buffered()).use { zip ->
+                while (true) {
+                    val e = zip.nextEntry ?: break
+                    val out = File(target, e.name).canonicalFile
+                    // nothing outside the story's folder (a crafted zip could name ../../)
+                    check(out.path.startsWith(target.canonicalPath + File.separator)) { "bad entry ${e.name}" }
+                    if (e.isDirectory) out.mkdirs() else { out.parentFile?.mkdirs(); out.outputStream().use { zip.copyTo(it) } }
+                }
+            }
+            check(File(target, "state/world.md").exists()) { "not a story" }
+        }
+        if (ok.isFailure) { target.deleteRecursively(); return ImportResult(false, "That file isn't a Cramtale story backup (or it's damaged). Nothing was changed.") }
+        val history = USER_FILES.filter { File(target, it).isFile }
+        // a phone with no mistakes and no grades yet (a new install) takes the backup's; files it has stay its own
+        val fresh = listOf("log/mistakes.json", "log/grades.jsonl").none { File(dir, it).isFile }
+        if (history.isNotEmpty() && fresh) for (k in history) File(dir, k).takeIf { !it.exists() }?.let { to -> to.parentFile?.mkdirs(); File(target, k).copyTo(to) }
+        val title = summary(target, false)?.title ?: "The story"
+        return ImportResult(true, "“$title” is on your shelf." + when {
+            history.isEmpty() -> ""
+            fresh -> " Your mistakes and review history came with it."
+            else -> " Your mistakes and review history on this phone are kept as they are."
+        })
+    }
+
+    fun importStory(uri: android.net.Uri): ImportResult =
+        runCatching { context.contentResolver.openInputStream(uri)?.use { importStory(it) } }.getOrNull()
+            ?: ImportResult(false, "Couldn't read that file. Nothing was changed.")
+
+    data class ImportResult(val ok: Boolean, val message: String)
 
     companion object {
         /** What's about you, not a story: follows you to a new or another story. */
