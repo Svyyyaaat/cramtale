@@ -67,8 +67,8 @@ fun App(state: AppState) {
     val back: () -> Unit = { if (stack.size > 1) stack.removeAt(stack.size - 1) }
     BackHandler(enabled = !onboarding && stack.size > 1) { back() }
     val newStory: () -> Unit = {
-        if (state.story.archiveAndReset() != null) {
-            // straight to "Your story": the rest of setup is done, and the style carries over
+        // only the intent: the story you're in stays as it is until Create (Back on the story step cancels)
+        if (state.story.beginNewStory()) {
             state.onboardingStep = 6; state.onboardingDone = false; onboarding = true
         }
     }

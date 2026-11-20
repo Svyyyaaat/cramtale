@@ -281,7 +281,11 @@ fun OnboardingFlow(state: AppState, onFinished: () -> Unit) {
     val scope = rememberCoroutineScope()
     var step by remember { mutableIntStateOf(state.onboardingStep) }
     fun go(n: Int) { step = n; state.onboardingStep = n }
-    val back = { go((step - 1).coerceAtLeast(0)) }
+    val back = {
+        // backing out of a new story (from inside the app): cancel it, back to the story you were in
+        if (step == 6 && state.story.newStoryAsked) { state.story.cancelNewStory(); state.onboardingDone = true; onFinished() }
+        else go((step - 1).coerceAtLeast(0))
+    }
     androidx.activity.compose.BackHandler(enabled = step > 0) { back() }
 
     when (step) {
@@ -357,11 +361,15 @@ fun OnboardingFlow(state: AppState, onFinished: () -> Unit) {
                 claudeCodeSetup = { ClaudeCodeSetup(state, onReady = { tested = true }, intro = false) })
         }
         6 -> {
-            if (state.story.isSetUp()) { LaunchedEffect(Unit) { go(7) }; return }
-            var seed by remember { mutableStateOf("") }
+            if (state.story.isSetUp() && !state.story.newStoryAsked) { LaunchedEffect(Unit) { go(7) }; return }
             val taste = remember { state.story.taste() }
-            StoryStepContent(seed, { seed = it }, state.story.busy, state.story.error,
-                onCreate = { scope.launch { state.story.setup(seed); if (state.story.isSetUp()) go(7) } }, onBack = back,
+            StoryStepContent(state.story.seedDraft, { state.story.seedDraft = it }, state.story.busy, state.story.error,
+                onCreate = { scope.launch {
+                    // only now does the story you were in go onto the shelf
+                    if (state.story.newStoryAsked && !state.story.commitNewStory()) return@launch
+                    state.story.setup(state.story.seedDraft)
+                    if (state.story.isSetUp()) go(7)
+                } }, onBack = back,
                 taste = taste, wait = { label -> StudyWhileWaiting(state, label) })
         }
         else -> {

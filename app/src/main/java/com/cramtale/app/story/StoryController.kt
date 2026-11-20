@@ -126,7 +126,55 @@ class StoryController(
     private fun describe(e: Throwable): String = ErrorText.explain(e)
 
     /** The reply being typed: kept here so leaving the screen or a failed send doesn't lose it. */
-    var replyDraft by mutableStateOf("")
+    private val prefs get() = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+
+    /** The reply being typed: saved as it's typed, so leaving the app, a kill or a failed send doesn't lose it. */
+    var replyDraft: String
+        get() = replyState
+        set(v) { replyState = v; prefs.edit().putString("replyDraft", v).apply() }
+    private var replyState by mutableStateOf(context.getSharedPreferences("settings", Context.MODE_PRIVATE).getString("replyDraft", "").orEmpty())
+
+    /** The new story's description, saved as it's typed (and used when the story is created). */
+    var seedDraft: String
+        get() = seedState
+        set(v) { seedState = v; prefs.edit().putString("seedDraft", v).apply() }
+    private var seedState by mutableStateOf(context.getSharedPreferences("settings", Context.MODE_PRIVATE).getString("seedDraft", "").orEmpty())
+
+    // ------------------------------------------------------------------ a new story, safely
+
+    /** Where a story being set up keeps its files until it's created: the story you're in stays untouched until then. */
+    val staging get() = File(context.filesDir, "new-story")
+
+    /** "Start a new story" was tapped and Create not yet: the current story is still as it was (saved: survives a restart). */
+    val newStoryAsked: Boolean get() = prefs.getBoolean("newStoryAsked", false)
+
+    /**
+     * Starts setting up a new story. Nothing is moved yet: backing out leaves you where you were; [commitNewStory]
+     * (on Create) shelves the current story. [from]: a story whose world and people the new one keeps (a sequel).
+     */
+    fun beginNewStory(from: File? = null): Boolean {
+        if (isWorking) return false
+        staging.deleteRecursively()
+        seedDraft = ""
+        prefs.edit().putBoolean("newStoryAsked", true).putString("newFrom", from?.path.orEmpty()).apply()
+        return true
+    }
+
+    /** Backing out of setting up a new story: its files go, the story you were in is as it was. */
+    fun cancelNewStory() {
+        staging.deleteRecursively(); seedDraft = ""
+        prefs.edit().remove("newStoryAsked").remove("newFrom").apply()
+    }
+
+    /** Create was tapped: the story you're in goes onto the shelf (if there is one) and the files picked come along. */
+    fun commitNewStory(): Boolean {
+        if (isWorking) return false
+        if (isSetUp() && archiveAndReset() == null) return false
+        File(staging, "state/sources").takeIf { it.isDirectory }?.copyRecursively(File(dir, "state/sources"), overwrite = true)
+        staging.deleteRecursively()
+        prefs.edit().remove("newStoryAsked").apply()
+        return true
+    }
     /** Repeats the action that failed ("Try again"). */
     var retry by mutableStateOf<(() -> Unit)?>(null)
         private set
@@ -325,6 +373,8 @@ class StoryController(
     suspend fun setup(seed: String): Unit? = work("Creating the story…", again = { setup(seed) }) {
         runCatching { takeSnapshot() }   // flashcards for the wait
         engine().setup(seed)
+        // made: the description has done its job
+        seedDraft = ""
     }
 
     /** config/plot.md as it is now (the story's copy, else the bundled default). */

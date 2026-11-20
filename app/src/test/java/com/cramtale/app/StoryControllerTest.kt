@@ -64,7 +64,11 @@ class StoryControllerTest {
         shadowOf(Looper.getMainLooper()).idle()
     }
 
-    @Before fun clean() { File(context.filesDir, "story").deleteRecursively(); File(context.filesDir, "story-archive").deleteRecursively() }
+    @Before fun clean() {
+        File(context.filesDir, "story").deleteRecursively(); File(context.filesDir, "story-archive").deleteRecursively()
+        File(context.filesDir, "new-story").deleteRecursively()
+        context.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE).edit().clear().commit()
+    }
 
     @Test
     fun `restart shows the waiting passage without writing a new one`() = runBlocking {
@@ -307,5 +311,32 @@ class StoryControllerTest {
         assertTrue(!r.ok)
         assertTrue(!File(context.filesDir, "escaped.txt").exists() && !File(context.filesDir.parentFile, "escaped.txt").exists())
         assertTrue(!c.importStory("not a zip".byteInputStream()).ok)
+    }
+
+    @Test
+    fun `what you type survives a restart, and a new story only replaces this one on Create`() = runBlocking {
+        val c = controller()
+        c.setup("")
+        File(c.dir, "state/title.txt").writeText("Mine\n")
+        c.replyDraft = "「待って」と言う"
+        assertEquals("the reply is still there after a restart", "「待って」と言う", controller().replyDraft)
+
+        // start a new story, type, back out: nothing moved
+        assertTrue(c.beginNewStory())
+        c.seedDraft = "a ghost at a café"
+        assertEquals("a ghost at a café", controller().seedDraft)
+        File(c.staging, "state/sources").mkdirs(); File(c.staging, "state/sources/lore.md").writeText("lore")
+        c.cancelNewStory()
+        assertTrue(c.isSetUp() && !c.newStoryAsked)
+        assertEquals(listOf("Mine"), c.stories().map { it.title })
+        assertTrue(!c.staging.exists())
+
+        // again, and Create: this one goes onto the shelf, the picked files come along
+        assertTrue(c.beginNewStory())
+        File(c.staging, "state/sources").mkdirs(); File(c.staging, "state/sources/lore.md").writeText("lore")
+        assertTrue(c.commitNewStory())
+        assertTrue(!c.isSetUp())
+        assertEquals("lore", File(c.dir, "state/sources/lore.md").readText())
+        assertEquals(listOf("Mine"), c.stories().map { it.title })
     }
 }
