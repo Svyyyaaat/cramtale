@@ -136,6 +136,16 @@ class Shots {
         com.cramtale.app.ui.StyleContent("Light novel", presets[1].first.passage, presets, null, null, null, {}, {})
     }
 
+    @Test fun a9b_story_setup_files() = shot {
+        StoryStepContent("A demon at a mountain pass", {}, null, null, {}, {},
+            files = listOf("world.md" to 412, "my_character.md" to 2380), onAddFiles = {},
+            fileNote = "“scan.pdf” isn't a text file. Save it as .txt or .md (from a PDF or document: copy the text into a note) and add that.")
+    }
+
+    @Test fun a9c_story_sequel_dark() = shot(dark = true) {
+        StoryStepContent("", {}, null, null, {}, {}, sequelOf = "The Well Keeper")
+    }
+
     @Test fun a9_story_setup() = shot { StoryStepContent("", {}, null, null, {}, {}) }
 
     @Test fun b1_styles() = shot {
