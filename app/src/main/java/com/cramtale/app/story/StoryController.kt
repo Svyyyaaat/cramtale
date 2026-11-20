@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.cramtale.app.AppState
 import com.cramtale.app.anki.AnkiReader
+import com.cramtale.core.tailJson
 import com.cramtale.core.llm.AnthropicLlm
 import com.cramtale.core.llm.ClaudeCodeLlm
 import com.cramtale.core.llm.CostLog
@@ -30,6 +31,7 @@ import com.cramtale.core.story.DuePool
 import com.cramtale.core.story.StoryEngine
 import com.cramtale.core.story.UnknownWords
 import com.cramtale.core.jsonLines
+import com.cramtale.core.tailJson
 import com.cramtale.core.llm.ErrorText
 import com.cramtale.core.story.PendingTurn
 import kotlinx.coroutines.CoroutineScope
@@ -194,7 +196,7 @@ class StoryController(
             ?: world.readLines().map { it.trim().trimStart('#').trim() }.firstOrNull { it.isNotEmpty() }?.let { if (it.length > 48) it.take(46) + "…" else it }
             ?: "Untitled story"
         val log = File(d, "log/turns.jsonl")
-        val last = log.takeIf { it.exists() }?.readLines()?.lastOrNull { it.isNotBlank() }?.let { runCatching { JSONObject(it) }.getOrNull() }
+        val last = log.tailJson(1).lastOrNull()
         val active = sc?.lastActive?.takeIf { it > 0 } ?: last?.optLong("at")?.takeIf { it > 0 } ?: world.lastModified()
         return StorySummary(d, title, sc?.place?.ifBlank { null }, sc?.chapter ?: 1, sc?.turn ?: 0, active,
             last?.optString("passage")?.lines()?.filter { it.isNotBlank() }?.takeLast(2)?.joinToString("\n"),
@@ -415,7 +417,8 @@ class StoryController(
     private fun withoutExcluded(s: DueSnapshot) = DueSnapshot(s.cards.filter { !excluded(it) }, s.takenAt, s.unknownNotes)
 
     /** Keys of mistakes seen so far, so the checker reuses them. */
-    private fun knownKeys() = mistakes.all.map { it.key }
+    /** The mistake keys the checker is shown (the recent ones: a long game makes hundreds). */
+    private fun knownKeys() = mistakes.promptKeys()
 
     /** A reply that was sent but has no passage yet: kept on disk so a crash or failed call doesn't lose it. */
     private val outbox = File(dir, "log/outbox.txt")
@@ -444,7 +447,7 @@ class StoryController(
         // a reply sent while this passage was still waiting (its commit failed) goes back into the box
         if (message != null && e.pending?.ready == true && replyDraft.isBlank()) replyDraft = message
         // a waiting passage comes back as it was; a half-done turn is finished; otherwise the next one
-        val t = if (e.pending != null) e.resume() else e.playerTurn(message, pool, knownKeys())
+        val t = if (e.pending != null) e.resume() else e.playerTurn(message, pool, knownKeys(), mistakes::seen)
         afterTurn(t)
         // the reply that was waiting is answered: it leaves the box
         t.player?.let { p -> if (replyDraft.trim() == p.trim()) replyDraft = "" }
@@ -479,7 +482,7 @@ class StoryController(
         if (current != null && e.pending?.ready == true) commitCurrent()
         takeSnapshot()
         if (newSession && e.pending == null) e.startSession(pool)
-        val t = if (e.pending != null) e.resume() else e.playerTurn(message.takeIf { it.isNotBlank() }, pool, knownKeys())
+        val t = if (e.pending != null) e.resume() else e.playerTurn(message.takeIf { it.isNotBlank() }, pool, knownKeys(), mistakes::seen)
         afterTurn(t)
         replyDraft = ""
     }
@@ -644,7 +647,7 @@ class StoryController(
         val f = File(dir, "log/turns.jsonl")
         if (!f.exists()) return
         refreshCast()
-        f.jsonLines().takeLast(20).forEach { o ->
+        f.tailJson(20).forEach { o ->
             val text = o.getString("passage")
             val a = (if (quick) app.matcherIfReady() else app.matcher())?.analyze(text)?.let(::withNames)
             history += ShownTurn(o.optString("player").ifBlank { null }, emptyList(),
@@ -751,18 +754,18 @@ class StoryController(
     fun chapter(): Int = scene()?.chapter ?: 1
 
     /** The end of the last passage, for the home screen. */
-    fun lastLines(): String? = File(dir, "log/turns.jsonl").takeIf { it.exists() }?.readLines()?.lastOrNull { it.isNotBlank() }
-        ?.let { runCatching { JSONObject(it).getString("passage") }.getOrNull() }?.lines()?.filter { it.isNotBlank() }?.takeLast(3)?.joinToString("\n")
+    fun lastLines(): String? = File(dir, "log/turns.jsonl").tailJson(1).lastOrNull()
+        ?.let { runCatching { it.getString("passage") }.getOrNull() }?.lines()?.filter { it.isNotBlank() }?.takeLast(3)?.joinToString("\n")
 
     /**
      * Review words a passage actually carries, measured over the last 30 passages that had any (the
      * grade log against the turn log); null until there are a few.
      */
     fun cardsPerPassage(): Double? {
-        val turns = File(dir, "log/turns.jsonl").jsonLines().mapNotNull { o -> o.optLong("at").takeIf { it > 0 } }.takeLast(30)
+        val turns = File(dir, "log/turns.jsonl").tailJson(30).mapNotNull { o -> o.optLong("at").takeIf { it > 0 } }
         if (turns.size < 3) return null
         val since = turns.first() - 60_000
-        val graded = gradeLog.snapshot().count { it.optLong("at") >= since }
+        val graded = gradeLog.since(since).size
         return (graded.toDouble() / turns.size).takeIf { it > 0 }
     }
 
@@ -798,7 +801,7 @@ class StoryController(
                 .reversed().map { e -> (if (e.turn < 0) "Before the story: " else "") + e.text }
         }.getOrDefault(emptyList())
         val start = GradeLog.ankiDayStart()
-        val today = gradeLog.snapshot().filter { it.optLong("at") >= start }
+        val today = gradeLog.since(start)
             .associateBy { "${it.optLong("noteId")}/${it.optInt("ord")}" }.values
             .sortedByDescending { it.optLong("at") }.map { it.optString("word") to (it.optInt("ease") == 3) }
         return StoryInfo(role, met, chapters, today, remembers, sessionCost(), totalCost())

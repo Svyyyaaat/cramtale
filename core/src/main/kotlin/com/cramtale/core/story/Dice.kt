@@ -40,6 +40,9 @@ class Dice(val random: Random = Random.Default) {
  * until the table is used up.
  */
 class Complications(private val lines: List<Pair<Set<String>, String>>, private val random: Random = Random.Default) {
+    /** How many lines haven't been used yet. */
+    fun unused(used: Collection<String>) = lines.count { it.second !in used }
+
     fun draw(place: String, used: Collection<String>): String? {
         if (lines.isEmpty()) return null
         var pool = lines.filter { it.second !in used }

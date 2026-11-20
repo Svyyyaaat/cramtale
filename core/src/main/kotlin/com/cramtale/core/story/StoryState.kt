@@ -193,7 +193,29 @@ class StoryState(val dir: File) {
 
     private val eventsFile get() = File(stateDir, "events.jsonl")
 
-    fun events(): List<Event> = if (!eventsFile.exists()) emptyList() else eventsFile.readLines().filter { it.isNotBlank() }.mapNotNull { l ->
+    // a long game's record is tens of thousands of lines, read several times a turn: parsed once, then only
+    // what was appended since (the file only grows)
+    private var eventCache: List<Event> = emptyList()
+    private var eventCacheBytes = 0L
+
+    @Synchronized
+    fun events(): List<Event> {
+        val f = eventsFile
+        if (!f.exists()) { eventCache = emptyList(); eventCacheBytes = 0; return eventCache }
+        val len = f.length()
+        if (len == eventCacheBytes) return eventCache
+        val fresh = if (len > eventCacheBytes && eventCacheBytes > 0) {
+            java.io.RandomAccessFile(f, "r").use { r ->
+                r.seek(eventCacheBytes)
+                val b = ByteArray((len - eventCacheBytes).toInt()); r.readFully(b)
+                eventCache + parseEvents(b.decodeToString().lines())
+            }
+        } else parseEvents(f.readLines())
+        eventCache = fresh; eventCacheBytes = len
+        return fresh
+    }
+
+    private fun parseEvents(lines: List<String>): List<Event> = lines.filter { it.isNotBlank() }.mapNotNull { l ->
         runCatching {
             val o = JSONObject(l)
             Event(o.getString("id"), o.optInt("turn"), o.optString("place"), o.getString("text"), o.optJSONArray("witnesses").strings().toSet())
@@ -401,6 +423,24 @@ class StoryState(val dir: File) {
             if (start < 0) return file.trimEnd() + "\n## $name\n" + body.trim() + "\n"
             val end = (start + 1 until lines.size).firstOrNull { lines[it].startsWith("## ") } ?: lines.size
             return (lines.subList(0, start + 1) + body.trim().lines() + lines.subList(end, lines.size)).joinToString("\n") + "\n"
+        }
+
+        /** [file] without its "## [name]" section. */
+        fun removeSection(file: String, name: String): String {
+            val lines = file.trimEnd().lines()
+            val start = lines.indexOfFirst { it.trim() == "## $name" }
+            if (start < 0) return file
+            val end = (start + 1 until lines.size).firstOrNull { lines[it].startsWith("## ") } ?: lines.size
+            return (lines.subList(0, start) + lines.subList(end, lines.size)).joinToString("\n").trimEnd() + "\n"
+        }
+
+        /** The body of [file]'s "## [name]" section, or null. */
+        fun section(file: String, name: String): String? {
+            val lines = file.trimEnd().lines()
+            val start = lines.indexOfFirst { it.trim() == "## $name" }
+            if (start < 0) return null
+            val end = (start + 1 until lines.size).firstOrNull { lines[it].startsWith("## ") } ?: lines.size
+            return lines.subList(start + 1, end).joinToString("\n").trim()
         }
 
         private val STANCE_LINE = Regex("^- \\(turn -?\\d+\\) .*")

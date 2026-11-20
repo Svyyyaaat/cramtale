@@ -61,6 +61,11 @@ class OnAndroidTest {
         "writer" to """{"passage":"ミナは瓶を見た。「これ、高いの？」","used":[{"word":"瓶","form":"瓶"}],"grammar":[]}""",
         "rewrite" to """{"passage":"ミナは瓶を見た。","used":[],"grammar":[]}""",
         "meaning" to "a bottle",
+        // the long memory, at each chapter close
+        "saga" to "## What happened\nMina asked for medicine.\n## Where things stand\nShe is waiting.",
+        "remember" to """{"remembers":"The apothecary's apprentice sold me nothing yet."}""",
+        "condense" to "- an apprentice",
+        "knows_check" to """{"knows":"The apprentice sells medicine."}""",
     )
 
     @Before fun start() {
@@ -68,7 +73,9 @@ class OnAndroidTest {
             override fun dispatch(request: RecordedRequest): MockResponse {
                 val body = JSONObject(request.body.readUtf8())
                 synchronized(sent) { sent += body }
-                val text = replies[purpose] ?: error("nothing scripted for $purpose")
+                // an unscripted call fails at once (a thrown error here would leave the client waiting forever)
+                val text = replies[purpose] ?: return MockResponse().setResponseCode(400)
+                    .setBody("""{"type":"error","error":{"type":"invalid_request_error","message":"nothing scripted for $purpose"}}""")
                 val reply = JSONObject().put("id", "msg_1").put("type", "message").put("role", "assistant")
                     .put("model", body.getString("model"))
                     .put("content", org.json.JSONArray().put(JSONObject().put("type", "text").put("text", text)))

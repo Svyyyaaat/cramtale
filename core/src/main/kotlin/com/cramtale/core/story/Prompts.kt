@@ -48,7 +48,7 @@ class Prompts(private val dir: File?) {
             .joinToString("") { "%02x".format(it) }.take(16)
 
         val PROMPTS = listOf("writer", "turn", "director", "adjudicator", "mistakes", "scribe", "offscreen", "judge",
-            "leak", "rewrite", "summary", "meaning", "style_picker", "setup", "intent").map { "prompts/$it.md" }
+            "leak", "rewrite", "summary", "meaning", "style_picker", "setup", "intent", "knows_check", "saga", "remember", "condense").map { "prompts/$it.md" }
         val CONFIG = listOf("plot.md", "banned.txt", "complications.md", "style_rules_positive.md", "style_rules_firm.md",
             "style_sample.md", "style_line.txt", "ambience.md").map { "config/$it" }
 

@@ -1,6 +1,7 @@
 package com.cramtale.core.story
 
 import com.cramtale.core.jsonLines
+import com.cramtale.core.tailJson
 import com.cramtale.core.writeAtomic
 import com.cramtale.core.llm.CostLog
 import com.cramtale.core.llm.Llm
@@ -184,8 +185,13 @@ class StoryEngine(
 
     val prompts = Prompts(dir)
     val state = StoryState(dir)
+    /** Every turn, slim (no packets): the story's whole history for the app. */
     private val logFile = File(dir, "log/turns.jsonl")
+    /** One chapter's turns in full (with what was sent): what the writer's history and the checks read. */
+    private fun chapterLog(n: Int) = File(dir, "log/chapters/$n.jsonl")
     private val chaptersDir = File(dir, "state/chapters")
+    private val sagaFile = File(dir, "state/saga.md")
+    private val consolidatedFile = File(dir, "state/consolidated.txt")
     private val pendingFile = File(dir, "state/pending.json")
 
     /** The turn on screen, kept on disk: a restart shows the same passage, a failed write resumes it. */
@@ -295,6 +301,8 @@ class StoryEngine(
         // every reply, for tuning prompts (log/calls.jsonl); calls can run in parallel
         synchronized(logLock) {
             File(dir, "log").mkdirs()
+            // a debug log: kept to its last ~20 MB, not the whole of a long game
+            File(dir, "log/calls.jsonl").takeIf { it.length() > 20_000_000 }?.let { it.renameTo(File(dir, "log/calls.old.jsonl").apply { delete() }) }
             File(dir, "log/calls.jsonl").appendText(JSONObject().put("purpose", purpose).put("model", resp.model)
                 .put("out", resp.usage.output).put("text", resp.text).toString() + "\n")
         }
@@ -470,7 +478,9 @@ class StoryEngine(
      * The player's message (null to start or just continue): mistakes and the referee first, then
      * code rolls and draws the scene's complication, then the writer, then the checks.
      */
-    fun playerTurn(message: String?, pool: DuePool, knownMistakeKeys: List<String> = emptyList()): PendingTurn {
+    fun playerTurn(message: String?, pool: DuePool, knownMistakeKeys: List<String> = emptyList(),
+                   /** Whether a mistake key came up before (all of history; [knownMistakeKeys] is only what the checker is shown). */
+                   seenMistake: (String) -> Boolean = { it in knownMistakeKeys }): PendingTurn {
         pending?.let { p ->
             check(!p.ready) { "a passage is already waiting for its reply" }
             return resume()
@@ -479,7 +489,7 @@ class StoryEngine(
         val scene = state.scene()
         // the mistakes check and the referee don't depend on each other: side by side
         val (corrections, adjudication) = if (message.isNullOrBlank()) emptyList<Correction>() to null else both(
-            { checkMistakes(message, knownMistakeKeys) },
+            { checkMistakes(message, knownMistakeKeys, seenMistake) },
             { json(call("adjudicator", Models.CHECKS, Prompts.fill(prompts.prompt("adjudicator"), mapOf(
                 "scene" to sceneSummary(scene), "message" to message,
             )), listOf(Msg(Role.USER, "Decide.")), schema = ADJUDICATOR_SCHEMA, maxTokens = 400)) },
@@ -503,7 +513,11 @@ class StoryEngine(
         val s = state.scene()
         val beat = s.beats.firstOrNull { !it.done }
         if (s.complicationFor != beat?.goal) {
-            val c = Complications.parse(prompts.config("complications.md").orEmpty()).draw(s.place, s.usedComplications)
+            val table = Complications.parse(prompts.config("complications.md").orEmpty())
+            // a long game uses every one: the oldest come back (not the last few)
+            if (s.usedComplications.isNotEmpty() && table.unused(s.usedComplications) == 0)
+                s.usedComplications = s.usedComplications.takeLast(5).toMutableList()
+            val c = table.draw(s.place, s.usedComplications)
             s.complication = c
             s.complicationFor = beat?.goal
             if (c != null) s.usedComplications += c
@@ -580,18 +594,21 @@ class StoryEngine(
         val applied = state.apply(ops)
         unknownWords?.check(t.draft.passage)?.second?.let { words ->
             seenFile.parentFile.mkdirs()
-            seenFile.writeAtomic((seenWords() + words).sorted().joinToString("\n") + "\n")
+            val all = seenWords() + words
+            if (all.size != seenWords().size) seenFile.writeAtomic(all.sorted().joinToString("\n") + "\n")
         }
-        logFile.parentFile.mkdirs()
-        logFile.appendText(JSONObject()
+        val entry = JSONObject()
             .put("turn", t.turn).put("at", System.currentTimeMillis()).put("chapter", s.chapter).put("player", t.player ?: "")
             .put("passage", t.draft.passage).put("roll", t.roll?.toString() ?: "")
             .put("place", s.place).put("present", JSONArray(s.present)).put("observable", t.observable)
-            .put("packet", t.packet ?: "").put("sentAs", sentAs(t, turnsInChapter(s.chapter).isEmpty()))
             .put("corrections", JSONArray(t.corrections.map { it.toJson() }))
             .put("checks", JSONArray(t.draft.checks.map { "${it.name}: ${if (it.passed) "ok" else it.detail}" }))
-            .put("versions", t.drafts.size).put("ops", JSONArray(applied))
-            .toString() + "\n")
+            .put("versions", t.drafts.size)
+        // the chapter's file first: it is what "already recorded" checks; then the slim line in the whole log
+        val full = JSONObject(entry.toString()).put("packet", t.packet ?: "").put("sentAs", sentAs(t, turnsInChapter(s.chapter).isEmpty()))
+            .put("ops", JSONArray(applied))
+        chapterLog(s.chapter).also { it.parentFile.mkdirs() }.appendText(full.toString() + "\n")
+        logFile.appendText(entry.toString() + "\n")
         val s2 = state.scene()
         s2.turn += 1
         s2.lastActive = System.currentTimeMillis()
@@ -607,7 +624,9 @@ class StoryEngine(
         return call("scribe", Models.CHARACTERS, Prompts.fill(prompts.prompt("scribe"), records() + mapOf(
             "present" to s.present.joinToString(), "place" to s.place,
             "beat" to (s.beats.firstOrNull { !it.done }?.goal ?: "none"),
-            "others" to state.extras().entries.joinToString("; ") { "${it.key}: ${it.value}" }.ifEmpty { "none" },
+            // the latest few and anyone here (code refuses a second entry for someone already known anyway)
+            "others" to state.extras().entries.toList().let { x -> x.filter { it.key in s.present } + x.takeLast(15) }.distinct()
+                .joinToString("; ") { "${it.key}: ${it.value}" }.ifEmpty { "none" },
             "clocks" to state.clocks().joinToString("; ") { "${it.name} ${it.filled}/${it.size}" },
             "message" to (t.player ?: "(the player let the scene continue)"), "passage" to passage,
         )), listOf(Msg(Role.USER, "List the changes.")), schema = StateOp.SCHEMA, maxTokens = 4000, quiet = quiet)
@@ -628,8 +647,11 @@ class StoryEngine(
     }
 
     /** Closes the chapter once it has enough turns. */
-    fun maybeNewChapter(): String? =
-        if (turnsInChapter(state.scene().chapter).size >= settings.chapterTurns) newChapter() else null
+    fun maybeNewChapter(): String? {
+        // a chapter that closed but whose long memory failed to update is caught up first
+        runCatching { consolidatePending() }
+        return if (turnsInChapter(state.scene().chapter).size >= settings.chapterTurns) newChapter() else null
+    }
 
     /** A summary closes the chapter; the next one starts from it, keeping the writer's context short. */
     fun newChapter(): String {
@@ -643,13 +665,121 @@ class StoryEngine(
         File(chaptersDir, "${s.chapter}.md").writeAtomic(summary.trim() + "\n")
         s.chapter += 1
         state.save(s)
+        runCatching { consolidatePending() }
         return "chapter ${s.chapter} begins"
+    }
+
+    // ------------------------------------------------------------------ long memory
+
+    /** The whole story compressed (rewritten at every chapter close), or null before the first one closes. */
+    fun saga(): String? = sagaFile.takeIf { it.exists() }?.readText()?.trim()?.ifEmpty { null }
+
+    /** Chapters closed but not yet folded into the long memory (a failed call is caught up at the next chance). */
+    private fun consolidatePending() {
+        val done = consolidatedFile.takeIf { it.exists() }?.readText()?.trim()?.toIntOrNull() ?: 0
+        for (n in (done + 1) until state.scene().chapter) {
+            if (!File(chaptersDir, "$n.md").exists()) continue
+            consolidate(n)
+            consolidatedFile.writeAtomic("$n\n")
+        }
+    }
+
+    /**
+     * Folds closed chapter [n] into the long memory, so a game of hundreds of hours stays whole while every prompt
+     * stays the same size: the story so far is rewritten with it; everyone who perceived something in it gets their
+     * "Remembers" rewritten from what they perceived (their "Learned" notes folded in); the facts established about
+     * the player are merged when they pile up; and threads long overdue are closed.
+     */
+    internal fun consolidate(n: Int) {
+        onCall("saga")
+        val chapter = File(chaptersDir, "$n.md").readText().trim()
+        val saga = call("saga", Models.WRITER, Prompts.fill(prompts.prompt("saga"), mapOf(
+            "saga" to (saga() ?: "(this is the first chapter)"), "chapter" to chapter, "chapter_number" to n.toString(),
+        )), listOf(Msg(Role.USER, "Rewrite the story so far.")), maxTokens = 6000, quiet = true).trim()
+        check(saga.isNotBlank()) { "the story so far came back empty" }
+        sagaFile.writeAtomic(saga + "\n")
+
+        val turns = turnsInChapter(n).map { it.optInt("turn") }
+        val events = if (turns.isEmpty()) emptyList() else state.events().filter { it.turn in turns.min()..turns.max() }
+        all(state.characterNames().filter { name -> events.any { name in it.witnesses } }.map { name -> {
+            runCatching {
+                val file = state.character(name) ?: return@runCatching
+                val o = json(call("remember", Models.CHARACTERS, Prompts.fill(prompts.prompt("remember"), mapOf(
+                    "name" to name, "file" to StoryState.removeSection(file, "Remembers"),
+                    "remembers" to (StoryState.section(file, "Remembers") ?: "(nothing yet)"),
+                    "events" to events.filter { name in it.witnesses }.joinToString("\n") { memoryLine(it) },
+                )), listOf(Msg(Role.USER, "Rewrite what $name remembers.")), schema = REMEMBER_SCHEMA, maxTokens = 3000, quiet = true))
+                val r = o.optString("remembers").trim()
+                // read again: a turn may have changed the file meanwhile
+                val now = state.character(name) ?: return@runCatching
+                if (r.isNotEmpty()) state.writeCharacter(name, StoryState.replaceSection(StoryState.removeSection(now, "Learned"), "Remembers", r))
+            }
+        } })
+
+        runCatching {
+            val f = File(dir, "state/player.md")
+            val sheet = f.takeIf { it.exists() }?.readText() ?: return@runCatching
+            val facts = StoryState.section(sheet, "Established in the story") ?: return@runCatching
+            if (facts.lines().count { it.isNotBlank() } <= 25) return@runCatching
+            val merged = call("condense", Models.CHARACTERS, Prompts.fill(prompts.prompt("condense"), mapOf("facts" to facts)),
+                listOf(Msg(Role.USER, "Rewrite the list.")), maxTokens = 3000, quiet = true).trim()
+            if (merged.lines().any { it.startsWith("- ") }) f.writeAtomic(StoryState.replaceSection(sheet, "Established in the story", merged))
+        }
+
+        // threads long overdue (and the oldest of the undated ones, past a few dozen) are closed: they stopped mattering
+        val turn = state.scene().turn
+        val open = state.consequences().filter { it.open }
+        val stale = open.filter { c -> c.dueTurn != null && c.dueTurn < turn - 40 } + open.filter { it.dueTurn == null }.dropLast(30)
+        if (stale.isNotEmpty()) state.apply(stale.map { StateOp.ResolveConsequence(it.id) })
+    }
+
+    // ------------------------------------------------------------------ keeping prompts the same size in a long game
+
+    /** Who is in play: here now, in a planned beat, or seen in the record lately. Everyone else gets one line. */
+    private fun activeCast(): Set<String> {
+        val s = state.scene()
+        val recent = state.events().filter { it.turn >= s.turn - 60 }.flatMap { it.witnesses }
+        return (s.present + s.beats.flatMap { it.characters } + recent).toSet()
+    }
+
+    /** Someone not in play lately, in one line: where they stand, else their goals' first line. */
+    private fun brief(name: String): String {
+        val f = state.character(name).orEmpty()
+        val line = (StoryState.section(f, "Now") ?: StoryState.section(f, "Goals")).orEmpty().lines().firstOrNull { it.isNotBlank() }.orEmpty()
+        return "- $name (not seen lately): ${line.take(200)}"
+    }
+
+    private fun castBlock(): String {
+        val names = state.characterNames()
+        val active = if (names.size <= 8) names.toSet() else activeCast()
+        val full = names.filter { it in active }.joinToString("\n\n") { n -> "### $n\n" + state.character(n) }
+        // the dormant: the most recently made two dozen in a line each, the rest by name only
+        val dormant = names.filter { it !in active }
+        val rest = (dormant.takeLast(24).map { brief(it) } + listOfNotNull(dormant.dropLast(24).takeIf { it.isNotEmpty() }
+            ?.let { "- also, long out of the story: " + it.take(60).joinToString() + if (it.size > 60) " and ${it.size - 60} more" else "" })).joinToString("\n")
+        return full + if (rest.isEmpty()) "" else "\n\n#### Others in the story, not in play lately\n$rest"
+    }
+
+    private fun openConsequences(): List<StoryState.Consequence> {
+        val open = state.consequences().filter { it.open }
+        return open.filter { it.dueTurn != null } + open.filter { it.dueTurn == null }.takeLast(15)
+    }
+
+    private fun boundedSecrets(): List<StoryState.Secret> {
+        val all = state.secrets()
+        if (all.size <= 20) return all
+        val active = activeCast()
+        return all.filter { s -> s.knows.isEmpty() || s.knows.any { it in active } }.takeLast(20).let { (it + all.takeLast(5)).distinct() }
     }
 
     // ------------------------------------------------------------------ the writer and its checks
 
-    private fun turnsInChapter(chapter: Int): List<JSONObject> =
-        logFile.jsonLines().filter { it.optInt("chapter") == chapter }
+    internal fun turnsInChapter(chapter: Int): List<JSONObject> {
+        val f = chapterLog(chapter)
+        if (f.exists()) return f.jsonLines()
+        // stories from before the chapter files: their whole log had everything
+        return logFile.jsonLines().filter { it.optInt("chapter") == chapter }
+    }
 
     private fun writerSystem(): List<Msg> {
         val fixed = Prompts.fill(prompts.prompt("writer"), mapOf(
@@ -658,7 +788,9 @@ class StoryEngine(
             "style_sample" to prompts.config("style_sample.md"),
         ))
         val prev = File(chaptersDir, "${state.scene().chapter - 1}.md")
-        val summary = if (prev.exists()) listOf(Msg(Role.SYSTEM, "## The story so far (previous chapter)\n" + prev.readText(), cache = true)) else emptyList()
+        // the long view: the whole story so far, rewritten each chapter, then the previous chapter in more detail
+        val earlier = saga()?.let { "## The story so far, from the beginning\n$it\n\n" }.orEmpty()
+        val summary = if (prev.exists()) listOf(Msg(Role.SYSTEM, earlier + "## The story so far (previous chapter)\n" + prev.readText(), cache = true)) else emptyList()
         return listOf(Msg(Role.SYSTEM, fixed, cache = true)) + summary
     }
 
@@ -681,7 +813,9 @@ class StoryEngine(
         val beat = s.beats.firstOrNull { !it.done }
         val names = s.present.toSet()
         val characters = s.present.mapNotNull { n -> state.character(n)?.let { "#### $n\n$it" } } +
-            (state.characterNames() - names).map { n -> "- $n (not here)" } +
+            // who else is in play (by name), not everyone the story ever met
+            (state.characterNames() - names).let { away -> val inPlay = if (away.size <= 20) away else away.filter { it in activeCast() }.takeLast(20)
+                inPlay.map { n -> "- $n (not here)" } + listOfNotNull((away.size - inPlay.size).takeIf { it > 0 }?.let { "- ($it others not in play lately)" }) } +
             listOfNotNull(extrasBlock(names).trim().takeIf { it.isNotEmpty() })
         val tags = names + s.place
         return Prompts.fill(prompts.prompt("turn"), mapOf(
@@ -694,9 +828,9 @@ class StoryEngine(
             "roll" to (t.roll?.let { "$it. ${t.rollNote ?: it.outcome.instruction}" } ?: "No roll this turn."),
             "complication" to (t.complication ?: "none"),
             "characters" to characters.joinToString("\n\n"),
-            "secrets" to state.secrets().filter { sec -> sec.knows.any { it in names } || sec.knows.isEmpty() }
+            "secrets" to state.secrets().filter { sec -> sec.knows.any { it in names } || sec.knows.isEmpty() }.takeLast(25)
                 .joinToString("\n") { "- ${it.id}: ${it.text} (known to ${it.knows.joinToString()})" }.ifEmpty { "none" },
-            "consequences" to state.consequences().filter { it.open }.joinToString("\n") { c ->
+            "consequences" to openConsequences().joinToString("\n") { c ->
                 "- ${c.id}: ${c.text}" + (c.dueTurn?.let { d -> if (d <= s.turn) " (DUE NOW)" else " (due turn $d)" } ?: "")
             }.ifEmpty { "nothing" },
             "clocks" to state.clocks().joinToString("\n") { "- ${it.name}: ${it.filled}/${it.size} (when full: ${it.whenFull})" }.ifEmpty { "none" },
@@ -722,7 +856,8 @@ class StoryEngine(
      */
     internal fun recentSlips(turns: Int = 10, max: Int = 3): String {
         val counts = HashMap<String, Int>()
-        for (o in logFile.jsonLines().takeLast(turns)) {
+        val ch = state.scene().chapter
+        for (o in (turnsInChapter(ch - 1) + turnsInChapter(ch)).takeLast(turns)) {
             val a = o.optJSONArray("checks") ?: continue
             val rules = (0 until a.length()).map { a.optString(it) }
                 .filter { !it.endsWith(": ok") && !it.endsWith(":ok") }
@@ -781,7 +916,15 @@ class StoryEngine(
     private val seenFile get() = File(dir, "state/seen_words.txt")
 
     /** Words the story already used: you've had the chance to tap them, so they don't send passages back again. */
-    private fun seenWords(): Set<String> = if (seenFile.exists()) seenFile.readLines().filter { it.isNotBlank() }.toSet() else emptySet()
+    // read on every check: kept in memory, re-read only when the file changed (it's bounded by your vocabulary, not by turns)
+    @Volatile private var seenCache: Pair<Long, Set<String>> = -1L to emptySet()
+    private fun seenWords(): Set<String> {
+        val stamp = if (seenFile.exists()) seenFile.lastModified() xor seenFile.length() else 0L
+        seenCache.takeIf { it.first == stamp }?.let { return it.second }
+        val words = if (seenFile.exists()) seenFile.readLines().filter { it.isNotBlank() }.toSet() else emptySet()
+        seenCache = stamp to words
+        return words
+    }
 
     /** Unknown share not counting words the story already introduced, and those unknown lemmas. */
     private fun unknownCheck(passage: String): Pair<Double, List<String>>? {
@@ -856,7 +999,7 @@ class StoryEngine(
         private set
 
     /** Definite errors in the player's Japanese (prompts/mistakes.md). */
-    fun checkMistakes(message: String, knownKeys: List<String>): List<Correction> {
+    fun checkMistakes(message: String, knownKeys: List<String>, seen: (String) -> Boolean = { it in knownKeys }): List<Correction> {
         val s = state.scene()
         val context = turnsInChapter(s.chapter).lastOrNull()?.optString("passage").orEmpty()
         val o = json(call("mistakes", Models.CHECKS, Prompts.fill(prompts.prompt("mistakes"), mapOf(
@@ -874,7 +1017,7 @@ class StoryEngine(
             .filter { it.wrong.isNotBlank() && it.wrong in message && it.wrong != it.right && it.key.isNotBlank() }
             .map { c ->
                 // above the reader's setting it stays hidden, unless it's a mistake they've made before
-                val before = c.key in knownKeys
+                val before = seen(c.key)
                 c.copy(shown = Correction.rank(c.level) <= settings.corrections || before, repeat = before)
             }
     }
@@ -963,8 +1106,11 @@ class StoryEngine(
 
     /** The one-line people; [here] marks who is in the scene. They know only ordinary things and what they see. */
     private fun extrasBlock(here: Set<String>? = null): String {
-        val x = state.extras()
-        if (x.isEmpty()) return ""
+        val all = state.extras()
+        if (all.isEmpty()) return ""
+        // a long game meets many: those here, and the latest dozen
+        val keep = all.keys.toList().takeLast(12).toSet() + (here ?: state.scene().present.toSet())
+        val x = if (all.size <= 15) all else all.filterKeys { it in keep }
         return "\n\n#### Others (one line each: no secrets, they know only ordinary local things and what happens in front of them)\n" +
             x.entries.joinToString("\n") { (n, l) -> "- $n: $l" + if (here != null && n !in here) " (not here)" else "" }
     }
@@ -972,9 +1118,10 @@ class StoryEngine(
     private fun records(): Map<String, String> = mapOf(
         "plot" to prompts.config("plot.md").orEmpty(),
         "world" to state.world(),
-        "characters" to state.characterNames().joinToString("\n\n") { n -> "### $n\n" + state.character(n) } + extrasBlock(),
-        "secrets" to state.secrets().joinToString("\n") { "- ${it.id}: ${it.text} [knows: ${it.knows.joinToString()}]" }.ifEmpty { "none" },
-        "consequences" to state.consequences().filter { it.open }.joinToString("\n") { "- ${it.id}: ${it.text}" }.ifEmpty { "none" },
+        "characters" to castBlock() + extrasBlock(),
+        "secrets" to boundedSecrets().joinToString("\n") { "- ${it.id}: ${it.text} [knows: ${it.knows.joinToString()}]" }.ifEmpty { "none" },
+        "consequences" to openConsequences().joinToString("\n") { "- ${it.id}: ${it.text}" }.ifEmpty { "none" },
+        "saga" to (saga() ?: "(the story has just begun)"),
         "chronicle" to state.chronicle().takeLast(20).joinToString("\n") { "- ${it.id}: ${it.text}" }.ifEmpty { "none" },
     )
 
@@ -1026,6 +1173,7 @@ class StoryEngine(
             "leak" to "Don't make review words guessable from the sentence around them.",
         )
 
+        val REMEMBER_SCHEMA = """{"type":"object","additionalProperties":false,"required":["remembers"],"properties":{"remembers":{"type":"string"}}}"""
         val KNOWS_SCHEMA = """{"type":"object","additionalProperties":false,"required":["knows"],"properties":{"knows":{"type":"string"}}}"""
 
         val SETUP_SCHEMA = """{"type":"object","additionalProperties":false,"required":["title","world","player","history","player_public","characters","extras","secrets","clocks","complications","ambience","opening"],"properties":{

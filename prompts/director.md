@@ -21,6 +21,9 @@ Return JSON: `beats`: exactly three, each with `goal` (what this beat is about, 
 ## Owed and due
 {{consequences}}
 
+## The story so far
+{{saga}}
+
 ## Chronicle
 {{chronicle}}
 

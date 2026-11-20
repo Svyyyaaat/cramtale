@@ -1,6 +1,8 @@
 package com.cramtale.core.review
 
 import com.cramtale.core.writeAtomic
+import com.cramtale.core.tailJson
+import com.cramtale.core.jsonLines
 import com.cramtale.core.match.DeckWord
 import org.json.JSONObject
 import java.io.File
@@ -180,7 +182,10 @@ class GradingEngine(
 
 /** Optional two-read rule: the first untapped read of a young review card, waiting for a second passage. */
 class PendingReads(private val file: File?) {
-    private val firsts: MutableMap<String, String> = HashMap<String, String>().apply {
+    // insertion-ordered and capped: a young card read once and never again shouldn't stay forever
+    private val firsts: MutableMap<String, String> = object : LinkedHashMap<String, String>() {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?) = size > 2000
+    }.apply {
         file?.takeIf { it.exists() }?.let { f -> val o = JSONObject(f.readText()); o.keys().forEach { put(it, o.getString(it)) } }
     }
 
@@ -195,11 +200,23 @@ class PendingReads(private val file: File?) {
  * card's state before. The dry-run report reads it back.
  */
 class GradeLog(private val file: File?) {
+    /** The recent answers, oldest first: a long game's whole log stays on disk ([history]), not in memory. */
     val entries = ArrayList<JSONObject>()
 
     init {
-        // a torn last line (an append cut short by a kill) is skipped, not fatal
-        file?.takeIf { it.exists() }?.forEachLine { l -> if (l.isNotBlank()) runCatching { JSONObject(l) }.onSuccess { entries += it } }
+        // the tail only; a torn last line (an append cut short by a kill) is skipped, not fatal
+        file?.let { entries += it.tailJson(KEEP) }
+    }
+
+    /** Every answer ever logged, read from disk: for the report screen, not for every turn. */
+    fun history(): List<JSONObject> = file?.takeIf { it.exists() }?.jsonLines() ?: snapshot()
+
+    /** Answers at or after [at], read from the end (cheap however long the log is). */
+    @Synchronized
+    fun since(at: Long): List<JSONObject> {
+        val out = ArrayList<JSONObject>()
+        for (i in entries.indices.reversed()) { val e = entries[i]; if (e.optLong("at") < at) break; out += e }
+        return out.asReversed()
     }
 
     /** A copy to read from another thread (a turn may be committing meanwhile). */
@@ -215,12 +232,13 @@ class GradeLog(private val file: File?) {
             .put("sent", o.sent).put("note", o.note)
             .put("before", JSONObject().put("type", g.before.type).put("queue", g.before.queue).put("due", g.before.due).put("reps", g.before.reps).put("ivl", g.before.ivl))
         entries += e
+        if (entries.size > KEEP + 1000) entries.subList(0, 1000).clear()
         file?.let { it.parentFile?.mkdirs(); it.appendText(e.toString() + "\n") }
     }
 
     fun sentToday(): Int {
         val dayStart = ankiDayStart()
-        return snapshot().count { it.optBoolean("sent") && it.optLong("at") >= dayStart }
+        return since(dayStart).count { it.optBoolean("sent") }
     }
 
     /** Today's reads (Anki's day): each card once, its latest grade. */
@@ -228,11 +246,14 @@ class GradeLog(private val file: File?) {
 
     fun today(now: Long = System.currentTimeMillis(), rolloverHour: Int = 4): Today {
         val start = ankiDayStart(now, rolloverHour)
-        val latest = snapshot().filter { it.optLong("at") >= start }.associateBy { "${it.optLong("noteId")}/${it.optInt("ord")}" }.values
+        val latest = since(start).associateBy { "${it.optLong("noteId")}/${it.optInt("ord")}" }.values
         return Today(latest.size, latest.count { it.optInt("ease") == 3 }, latest.count { it.optInt("ease") == 1 })
     }
 
     companion object {
+        /** Answers kept in memory: far more than a day's reading. */
+        const val KEEP = 5000
+
         /** Anki's day starts at the rollover hour (4 AM by default), not at midnight. */
         fun ankiDayStart(now: Long = System.currentTimeMillis(), rolloverHour: Int = 4): Long {
             val zone = java.time.ZoneId.systemDefault()

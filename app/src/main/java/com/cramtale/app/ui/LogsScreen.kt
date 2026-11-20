@@ -72,7 +72,7 @@ fun LogsScreen(state: AppState) {
             val t = state.target ?: run { reportNote = "No AnkiDroid connected."; return@withContext }
             val reader = AnkiReader(context, t)
             if (!reader.hasPermission()) { reportNote = "No access to AnkiDroid."; return@withContext }
-            report = DryRunReport.build(story.gradeLog.snapshot(), reader::card)
+            report = DryRunReport.build(story.gradeLog.history(), reader::card)
         }
     }
     LogsContent(LogsData(report, reportNote, story.totalCost(), story.sessionCost(), story.costs.byPurpose(story.session),

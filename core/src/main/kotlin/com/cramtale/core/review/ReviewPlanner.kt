@@ -81,18 +81,24 @@ class MistakeLog(private val file: File?) {
         }
     }
 
-    val all get() = keys.values.toList()
+    val all: List<Key> @Synchronized get() = keys.values.toList()
 
     /** Keys the writer should keep in mind: seen, not fixed. */
+    @Synchronized
     fun weakPoints(limit: Int = 5) = keys.values.filter { it.count > 0 && it.correctSince < 3 }.sortedByDescending { it.count }.take(limit).map { it.key }
 
     /** Records one message's check; returns keys that just reached their second occurrence (card proposals). */
+    @Synchronized
     fun record(message: String, corrections: List<Correction>, correctKeys: List<String>): List<Key> {
         val newlyProposed = ArrayList<Key>()
         for (c in corrections.distinctBy { it.key }) {
             val k = keys.getOrPut(c.key) { Key(c.key, 0, 0, false, null, ArrayList()) }
             k.correctSince = 0
             k.examples += message to c
+            // a long game repeats a mistake many times: a few examples say what it is
+            while (k.examples.size > MAX_EXAMPLES) k.examples.removeAt(0)
+            // most recent last: the order [promptKeys] reads
+            keys.remove(c.key); keys[c.key] = k
             if (!c.shown) { k.hidden++; continue }
             // shown now: the times it was kept back count too (that's why it's shown)
             k.count += 1 + k.hidden
@@ -104,12 +110,25 @@ class MistakeLog(private val file: File?) {
         return newlyProposed
     }
 
+    /** Whether [key] came up before, shown or kept back. */
+    @Synchronized
+    fun seen(key: String) = key in keys
+
+    /**
+     * The keys the checker is shown so it reuses them: the most recent [n]. A long game makes hundreds; an old one
+     * not in the list may come back under a new name, which costs a repeat, not correctness.
+     */
+    @Synchronized
+    fun promptKeys(n: Int = 60): List<String> = keys.keys.toList().takeLast(n)
+
+    @Synchronized
     fun decide(key: String, approved: Boolean) { keys[key]?.decided = if (approved) "approved" else "rejected"; save() }
 
     /**
      * "Not a mistake": the checker was wrong. The example goes, the key counts one less (gone at zero), and a
      * card proposal it triggered is withdrawn if it no longer has two occurrences.
      */
+    @Synchronized
     fun dismiss(message: String, c: Correction) {
         val k = keys[c.key] ?: return
         val i = k.examples.indexOfFirst { (m, e) -> m == message && e.wrong == c.wrong }
@@ -122,6 +141,8 @@ class MistakeLog(private val file: File?) {
     }
 
     fun pending() = keys.values.filter { it.proposed && it.decided == null }
+
+    companion object { const val MAX_EXAMPLES = 5 }
 
     private fun save() {
         val f = file ?: return
