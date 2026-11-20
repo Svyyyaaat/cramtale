@@ -53,5 +53,5 @@ Write the passage in Japanese, in the style of the style sample below. Return JS
 {{world}}
 {{lore}}
 
-## Style sample (write like this)
+## Style sample (write like this: its voice, rhythm and amount of dialogue, not its subject; the story is about what the world and the player make it)
 {{style_sample}}

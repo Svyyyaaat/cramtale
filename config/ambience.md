@@ -5,7 +5,7 @@
 - A dog barks somewhere down the street, then stops.
 - [sticky 2; group weather] Wind rattles a loose shutter.
 - Someone outside calls a name, twice.
-- A cart or a car goes by; the floor hums for a moment.
+- Wheels or hooves go by outside; the floor hums for a moment.
 - [sticky 5; group weather] Rain starts, light, on the roof.
 - A kettle or a pot begins to rattle in another room.
 - A child cries in the next house over.
@@ -15,10 +15,10 @@
 - A bell rings in the distance.
 - Pigeons scatter off the roof.
 - Someone coughs on the other side of the wall.
-- A door bangs somewhere in the neighbourhood.
+- A door bangs somewhere nearby.
 - Mice or rats scratch inside a wall.
 - [sticky 3] A clock ticks loudly in the quiet.
 - [sticky 1] Two people argue in the street over a price.
-- A delivery is dropped off next door with a thud.
+- Something heavy is dropped next door with a thud.
 - A smell of cooking drifts in from a neighbour.
 - The light changes as a cloud goes over.

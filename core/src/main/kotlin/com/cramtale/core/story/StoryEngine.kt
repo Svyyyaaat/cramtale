@@ -186,7 +186,7 @@ class StoryEngine(
         val aimWords: Int = 7,
     )
 
-    val prompts = Prompts(dir)
+    val prompts = Prompts(dir).also { runCatching { StylePresets.upgrade(dir) } }
     val state = StoryState(dir)
     /** Every turn, slim (no packets): the story's whole history for the app. */
     private val logFile = File(dir, "log/turns.jsonl")
@@ -466,7 +466,7 @@ class StoryEngine(
     data class StyleOption(val name: String, val line: String, val passage: String)
 
     /** Four versions of one scene in clearly different styles (first run). */
-    fun styleOptions(scene: String = "A tenant comes to ask the landlord for more time to pay the rent. The landlord has his own debts."): List<StyleOption> {
+    fun styleOptions(scene: String = STYLE_SCENE): List<StyleOption> {
         val a = validJson("style_picker", { o ->
             val s = o.optJSONArray("styles")
             s != null && s.length() >= 4 && (0 until s.length()).all { s.getJSONObject(it).optString("passage").length > 50 }
@@ -1329,6 +1329,10 @@ class StoryEngine(
             "School mystery: the student council of a mountain boarding school, and a club room that shouldn't exist.",
             "Slice of life with a secret: a new job at a seaside café whose regulars all seem to be waiting for something.",
         )
+
+        /** The style picker's scene: the built-in samples' scene, of no particular genre or era. */
+        const val STYLE_SCENE = "On a snowy night a traveller reaches a small mountain inn and asks for a room. The innkeeper says it is full, " +
+            "but a light is on in the last room, the one he says nobody uses."
 
         val IDEAS_SCHEMA = """{"type":"object","additionalProperties":false,"required":["ideas"],"properties":{"ideas":{"type":"array","items":{
             "type":"object","additionalProperties":false,"required":["ja","en"],"properties":{"ja":{"type":"string"},"en":{"type":"string"}}}}}}"""

@@ -1,5 +1,6 @@
 config/ambience.md	426e37fa1952c50e
 config/ambience.md	7568d2c88eaddf35
+config/ambience.md	d2991b46ee5890ed
 config/banned.txt	0c39bdcece86c84b
 config/complications.md	6d117f1cda6f87bb
 config/complications.md	aa4159e5884f813e
@@ -84,6 +85,7 @@ prompts/turn.md	cc15a8969ef26c28
 prompts/writer.md	05347385409ebbf5
 prompts/writer.md	0718f687de575e25
 prompts/writer.md	88ca4f85fb7a5e53
+prompts/writer.md	96e65b13c16673ae
 prompts/writer.md	9f283afdead0baad
 prompts/writer.md	aaeaf03b32c0a7f5
 prompts/writer.md	afe2f481646c5413
