@@ -1,5 +1,8 @@
 package com.cramtale.app.ui
 
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material3.Icon
@@ -214,16 +217,51 @@ fun KeyStepContent(key: String, onKey: (String) -> Unit, onNext: () -> Unit, onB
 
 @Composable
 fun StoryStepContent(seed: String, onSeed: (String) -> Unit, busy: String?, error: String?, onCreate: () -> Unit, onBack: () -> Unit,
-                     taste: String = "", wait: (@Composable (String) -> Unit)? = null) {
+                     taste: String = "", wait: (@Composable (String) -> Unit)? = null,
+                     /** Text files picked for this story: name and size in characters. */
+                     files: List<Pair<String, Int>> = emptyList(), onAddFiles: (() -> Unit)? = null, onRemoveFile: (String) -> Unit = {},
+                     fileNote: String? = null,
+                     /** The story this one continues (its world and people), or null for a fresh one. */
+                     sequelOf: String? = null) {
     // nothing typed: the story is a surprise (a spark from many genres), and the button says so
-    StepFrame(onBack, footer = { StepFooter(if (seed.isBlank()) "Surprise me" else "Create the story", onCreate, enabled = busy == null) }) {
-        StepHeader(6, SETUP_STEPS, "Your story",
-            "Any genre. A few people with their own goals and secrets, and trouble that moves while you're away.")
-        OutlinedTextField(seed, onSeed, Modifier.fillMaxWidth().heightIn(min = 120.dp), shape = MaterialTheme.shapes.medium,
-            label = { Text("What should it be about? (optional)") }, placeholder = { Text("A place, a trouble, who you play…") })
-        // a few starting points, one tap to fill in (and edit)
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            for (example in PREMISE_EXAMPLES) androidx.compose.material3.SuggestionChip({ onSeed(example) }, { Text(example, maxLines = 1) })
+    val primary = when {
+        sequelOf != null -> "Continue the story"
+        seed.isBlank() && files.isEmpty() -> "Surprise me"
+        else -> "Create the story"
+    }
+    StepFrame(onBack, footer = { StepFooter(primary, onCreate, enabled = busy == null) }) {
+        if (sequelOf != null) {
+            StepHeader(6, SETUP_STEPS, "What happens next",
+                "The next part of “$sequelOf”: the same world and people, who remember what happened. Time has passed.")
+            OutlinedTextField(seed, onSeed, Modifier.fillMaxWidth().heightIn(min = 120.dp), shape = MaterialTheme.shapes.medium,
+                label = { Text("What should this part be about? (optional)") }, placeholder = { Text("A month later, a letter arrives…") })
+        } else {
+            StepHeader(6, SETUP_STEPS, "Your story",
+                "Any genre. A few people with their own goals and secrets, and trouble that moves while you're away.")
+            OutlinedTextField(seed, onSeed, Modifier.fillMaxWidth().heightIn(min = 120.dp), shape = MaterialTheme.shapes.medium,
+                label = { Text("What should it be about? (optional)") }, placeholder = { Text("A place, a trouble, who you play…") })
+            // a few starting points, one tap to fill in (and edit)
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for (example in PREMISE_EXAMPLES) androidx.compose.material3.SuggestionChip({ onSeed(example) }, { Text(example, maxLines = 1) })
+            }
+        }
+        // your own material: lore, a character sheet, notes, an old chat log
+        if (onAddFiles != null) PaperCard {
+            Text("Your files", style = MaterialTheme.typography.titleSmall)
+            if (files.isEmpty()) Text("Optional: text files with a world, your character, other people or an earlier chat. The story is built from them.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            for ((name, size) in files) Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.Description, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    Text(if (size >= 1000) "%,d KB".format((size + 512) / 1024) else "$size characters", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                androidx.compose.material3.IconButton({ onRemoveFile(name) }) { Icon(Icons.Filled.Close, "Remove $name") }
+            }
+            if (fileNote != null) Text(fileNote, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            QuietButton(if (files.isEmpty()) "Add files" else "Add more", onAddFiles, icon = Icons.Filled.Add)
         }
         if (busy != null) wait?.invoke(busy) ?: Busy(busy)
         if (error != null) ErrorNote(error)
@@ -363,7 +401,21 @@ fun OnboardingFlow(state: AppState, onFinished: () -> Unit) {
         6 -> {
             if (state.story.isSetUp() && !state.story.newStoryAsked) { LaunchedEffect(Unit) { go(7) }; return }
             val taste = remember { state.story.taste() }
+            var files by remember { mutableStateOf(state.story.attachments().map { it.name to it.text.length }) }
+            var fileNote by remember { mutableStateOf<String?>(null) }
+            val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+                scope.launch {
+                    val notes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { uris.mapNotNull { state.story.attach(it) } }
+                    fileNote = notes.joinToString("\n").ifEmpty { null }
+                    files = state.story.attachments().map { it.name to it.text.length }
+                }
+            }
+            val sequelOf = remember { state.story.sequelTitle() }
             StoryStepContent(state.story.seedDraft, { state.story.seedDraft = it }, state.story.busy, state.story.error,
+                files = files, fileNote = fileNote, sequelOf = sequelOf,
+                // files are for a fresh story (a sequel keeps the earlier one's world and files)
+                onAddFiles = if (sequelOf == null) ({ pick.launch(arrayOf("text/*", "application/json", "application/octet-stream")) }) else null,
+                onRemoveFile = { n -> state.story.detach(n); files = state.story.attachments().map { it.name to it.text.length } },
                 onCreate = { scope.launch {
                     // only now does the story you were in go onto the shelf
                     if (state.story.newStoryAsked && !state.story.commitNewStory()) return@launch

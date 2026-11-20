@@ -140,6 +140,43 @@ class StoryController(
         set(v) { seedState = v; prefs.edit().putString("seedDraft", v).apply() }
     private var seedState by mutableStateOf(context.getSharedPreferences("settings", Context.MODE_PRIVATE).getString("seedDraft", "").orEmpty())
 
+    // ------------------------------------------------------------------ files and sequels
+
+    /** Text files picked for the story being set up (lore, character sheets, notes, an old chat log). */
+    fun attachments(): List<com.cramtale.core.story.Sources.Source> = com.cramtale.core.story.Sources(staging).all()
+
+    /** Adds the file at [uri]; null when it worked, else what to tell the reader. Blocking: call off the main thread. */
+    fun attach(uri: android.net.Uri): String? {
+        val r = context.contentResolver
+        val name = runCatching {
+            r.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+        }.getOrNull() ?: uri.lastPathSegment?.substringAfterLast('/') ?: "notes.txt"
+        val bytes = runCatching { r.openInputStream(uri)?.use { input ->
+            // readNBytes is Android 13+: read up to the limit by hand
+            val out = java.io.ByteArrayOutputStream(); val buf = ByteArray(16_384)
+            while (out.size() < MAX_ATTACHMENT) { val n = input.read(buf, 0, minOf(buf.size, MAX_ATTACHMENT - out.size())); if (n < 0) break; out.write(buf, 0, n) }
+            out.toByteArray()
+        } }.getOrNull() ?: return "Couldn't read “$name”."
+        return attach(name, bytes)
+    }
+
+    /** [attach] for bytes already read (tests, the CLI): refuses what isn't plain text. */
+    fun attach(name: String, bytes: ByteArray): String? {
+        if (!com.cramtale.core.story.Sources.looksLikeText(bytes))
+            return "“$name” isn't a text file. Save it as .txt or .md (from a PDF or document: copy the text into a note) and add that."
+        com.cramtale.core.story.Sources(staging).add(name, bytes.decodeToString().removePrefix("\uFEFF"))
+        return null
+    }
+
+    fun detach(name: String) = com.cramtale.core.story.Sources(staging).remove(name)
+
+    /** The earlier story the one being created continues (its world and people), between Create and setup. */
+    fun sequelOf(): File? = prefs.getString("sequelOf", "")?.takeIf { it.isNotEmpty() }?.let(::File)?.takeIf { File(it, "state/world.md").exists() }
+
+    /** The title of the story the new one will continue, for the story step (before or after Create). */
+    fun sequelTitle(): String? = (sequelOf() ?: prefs.getString("newFrom", "")?.takeIf { it.isNotEmpty() }?.let(::File))
+        ?.let { summary(it, it == dir)?.title }
+
     // ------------------------------------------------------------------ a new story, safely
 
     /** Where a story being set up keeps its files until it's created: the story you're in stays untouched until then. */
@@ -169,7 +206,11 @@ class StoryController(
     /** Create was tapped: the story you're in goes onto the shelf (if there is one) and the files picked come along. */
     fun commitNewStory(): Boolean {
         if (isWorking) return false
-        if (isSetUp() && archiveAndReset() == null) return false
+        val from = prefs.getString("newFrom", "").orEmpty()
+        val wasCurrent = from == dir.path
+        val archived = if (isSetUp()) archiveAndReset() ?: return false else null
+        // a sequel of the story you were in continues the copy that just went onto the shelf
+        prefs.edit().putString("sequelOf", when { from.isEmpty() -> ""; wasCurrent -> archived?.path.orEmpty(); else -> from }).apply()
         File(staging, "state/sources").takeIf { it.isDirectory }?.copyRecursively(File(dir, "state/sources"), overwrite = true)
         staging.deleteRecursively()
         prefs.edit().remove("newStoryAsked").apply()
@@ -372,7 +413,9 @@ class StoryController(
 
     suspend fun setup(seed: String): Unit? = work("Creating the story…", again = { setup(seed) }) {
         runCatching { takeSnapshot() }   // flashcards for the wait
-        engine().setup(seed)
+        val from = sequelOf()
+        if (from != null) engine().carryOver(from, seed) else engine().setup(seed)
+        prefs.edit().remove("sequelOf").remove("newFrom").apply()
         // made: the description has done its job
         seedDraft = ""
     }
@@ -942,6 +985,9 @@ class StoryController(
 
     companion object {
         /** What's about you, not a story: follows you to a new or another story. */
+        /** The most of one file that's read (bigger files are cut when kept anyway). */
+        const val MAX_ATTACHMENT = 400_000
+
         val USER_FILES = listOf("log/mistakes.json", "log/grades.jsonl", "log/skips.json", "log/two-reads.json", "log/costs.jsonl",
             "log/not-vocab.txt", "log/known-new.json", "log/flashcards.json")
         /** The progress line while each model call runs. */

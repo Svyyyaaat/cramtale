@@ -54,7 +54,8 @@ import kotlinx.coroutines.withContext
 // ---------------------------------------------------------------- stories
 
 @Composable
-fun StoriesScreen(state: AppState, onContinue: () -> Unit, onNewStory: () -> Unit, onSwitched: () -> Unit) {
+fun StoriesScreen(state: AppState, onContinue: () -> Unit, onNewStory: () -> Unit, onSwitched: () -> Unit,
+                  onSequel: (StorySummary) -> Unit = {}) {
     var stories by remember { mutableStateOf<List<StorySummary>?>(null) }
     var tick by remember { mutableStateOf(0) }
     var problem by remember { mutableStateOf<String?>(null) }
@@ -84,7 +85,7 @@ fun StoriesScreen(state: AppState, onContinue: () -> Unit, onNewStory: () -> Uni
         if (state.story.switchTo(s.dir)) { problem = null; tick++; onSwitched() }
         else problem = if (state.story.isWorking) "A passage is still being written. Switch once it's done." else "Couldn't open “${s.title}”. It's still in the list; try again."
     }, onExport = { s -> exporting = s; saveTo.launch(state.story.exportName(s)) },
-        onImport = { openZip.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) })
+        onImport = { openZip.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) }, onSequel = onSequel)
 }
 
 /** Your stories: the one being played as an open book with Continue, the earlier ones as a quiet shelf. */
@@ -92,7 +93,9 @@ fun StoriesScreen(state: AppState, onContinue: () -> Unit, onNewStory: () -> Uni
 fun StoriesContent(stories: List<StorySummary>, onContinue: () -> Unit, onNewStory: () -> Unit, problem: String? = null,
                    writing: Boolean = false, note: String? = null, onSwitch: (StorySummary) -> Unit,
                    /** A story to a zip (a backup), and a zip back onto the shelf. */
-                   onExport: (StorySummary) -> Unit = {}, onImport: () -> Unit = {}) {
+                   onExport: (StorySummary) -> Unit = {}, onImport: () -> Unit = {},
+                   /** A new story that keeps this one's world and people (and their memories). */
+                   onSequel: (StorySummary) -> Unit = {}) {
     var confirmNew by remember { mutableStateOf(false) }
     var confirmSwitch by remember { mutableStateOf<StorySummary?>(null) }
     val current = stories.firstOrNull { it.current }
@@ -140,9 +143,13 @@ fun StoriesContent(stories: List<StorySummary>, onContinue: () -> Unit, onNewSto
         QuietButton("Open a backup", onImport, icon = Icons.Filled.FileOpen, enabled = !writing)
     }
     if (confirmNew) AlertDialog(onDismissRequest = { confirmNew = false }, title = { Text("Start a new story?") },
-        text = { Text("“${current?.title}” stays here; you can pick it up again any time.") },
-        confirmButton = { TextButton({ confirmNew = false; onNewStory() }) { Text("Start a new story") } },
-        dismissButton = { TextButton({ confirmNew = false }) { Text("Cancel") } })
+        text = { Text("“${current?.title}” stays here; you can pick it up again any time. A new story can start fresh, " +
+            "or keep this one's world and people, who remember what happened.") },
+        confirmButton = { TextButton({ confirmNew = false; onNewStory() }) { Text("Start fresh") } },
+        dismissButton = { Row {
+            TextButton({ confirmNew = false }) { Text("Cancel") }
+            current?.let { c -> TextButton({ confirmNew = false; onSequel(c) }) { Text("Keep its people") } }
+        } })
     confirmSwitch?.let { s ->
         AlertDialog(onDismissRequest = { confirmSwitch = null }, title = { Text("Continue “${s.title}”?") },
             text = { Text("It opens where you left off." + (current?.let { " “${it.title}” stays here." } ?: "")) },

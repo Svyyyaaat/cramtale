@@ -51,6 +51,7 @@ Write the passage in Japanese, in the style of the style sample below. Return JS
 
 ## The world
 {{world}}
+{{lore}}
 
 ## Style sample (write like this)
 {{style_sample}}

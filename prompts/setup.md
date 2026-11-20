@@ -1,5 +1,5 @@
 Create the starting material for a Japanese roleplaying game, as its game master.
-{{seed}}
+{{seed}}{{material}}
 The player's taste in stories (how it should feel, whatever it's about):
 
 {{plot}}

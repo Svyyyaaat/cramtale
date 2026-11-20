@@ -338,6 +338,8 @@ class StoryEngine(
         }) {
             call("setup", Models.WRITER, Prompts.fill(prompts.prompt("setup"), mapOf(
                 "plot" to prompts.config("plot.md"),
+                "material" to Sources(dir).material(MATERIAL_SETUP).let { m -> if (m.isEmpty()) "" else
+                    "\n## Material from the player\n" + MATERIAL_RULES + "\n\n$m\n" },
                 // what the player asked for is the premise, first; "Surprise me" gets a spark picked by code
                 "seed" to if (seed.isBlank()) "\n## A spark to build from (the player asked to be surprised)\n${surprise()}\n" +
                     "Take it somewhere of your own: invent the specifics, keep the genre.\n" else
@@ -390,6 +392,63 @@ class StoryEngine(
             place = opening.getString("place")
             present = (0 until opening.getJSONArray("present").length()).map { opening.getJSONArray("present").getString(it) }.toMutableList()
             beats = mutableListOf(StoryState.Beat(opening.getString("situation"), place, present.toList(), ""))
+        })
+    }
+
+    // ------------------------------------------------------------------ a new story with an old one's people
+
+    private val nextFile get() = File(dir, "state/next.md")
+
+    /** What the player asked the next part to be about (a sequel), for the first session's plan only. */
+    private fun nextPart(): String = nextFile.takeIf { it.exists() }?.readText()?.trim()?.takeIf { it.isNotEmpty() }
+        ?.let { "The player asked for this part of the story to be about: $it\n" }.orEmpty()
+
+    /**
+     * Starts this (empty) story as the next part of the one in [from]: the same world, cast, extras (with their
+     * current stances), the player's character, secrets, open consequences, clocks and everyone's memories, with the
+     * earlier story as "the story so far" (its story so far or chapter summaries, plus a summary of where it stopped).
+     * Time has passed: the world moves off-screen first, then the next session is planned with [seed] in mind.
+     */
+    fun carryOver(from: File, seed: String = "") {
+        check(!isSetUp()) { "this story is set up already" }
+        val old = StoryEngine(from, llm, costs, session, dice = dice, settings = settings)
+        old.shutdown()
+        val src = File(from, "state")
+        val dst = File(dir, "state").apply { mkdirs() }
+        // the files that make the world and its people; not the old story's log, chapters, long memory or waiting passage
+        src.listFiles().orEmpty().filter { it.name !in setOf("chapters", "pending.json", "style_options.json", "next.md", "saga.md", "consolidated.txt") }.forEach { f ->
+            val to = File(dst, f.name)
+            if (f.name == "sources") f.listFiles().orEmpty().forEach { s -> if (!File(to, s.name).exists()) { to.mkdirs(); s.copyTo(File(to, s.name)) } }
+            else f.copyRecursively(to, overwrite = true)
+        }
+        for (n in listOf("complications.md", "ambience.md")) File(from, "config/$n").takeIf { it.exists() }?.copyTo(File(dir, "config/$n").also { it.parentFile.mkdirs() }, overwrite = true)
+        val sc = old.state.scene()
+        val earlier = File(from, "state/chapters").listFiles { f -> f.extension == "md" }.orEmpty()
+            .sortedBy { it.nameWithoutExtension.toIntOrNull() ?: 0 }.map { it.readText().trim() }
+        val last = old.turnsInChapter(sc.chapter)
+        val lastSummary = if (last.isEmpty()) null else call("summary", Models.WRITER, Prompts.fill(prompts.prompt("summary"), mapOf(
+            "chapter" to last.joinToString("\n\n") { o -> (o.optString("player").takeIf { it.isNotBlank() }?.let { "Player: $it\n" } ?: "") + o.getString("passage") },
+        )), listOf(Msg(Role.USER, "Summarize.")), maxTokens = 6000).trim()
+        File(dst, "chapters").mkdirs()
+        // a long story's chapters are already in its story so far: that, plus where it stopped
+        val past = old.saga()?.let { listOf(it) + listOfNotNull(lastSummary) } ?: (earlier + listOfNotNull(lastSummary))
+        val text = "## An earlier part of this story (time has passed since)\n\n" + past.joinToString("\n\n") + "\n"
+        File(dst, "chapters/0.md").writeAtomic(text)
+        sagaFile.writeAtomic(text)
+        File(from, "state/title.txt").takeIf { it.exists() }?.readText()?.trim()?.takeIf { it.isNotEmpty() }
+            ?.let { File(dst, "title.txt").writeAtomic("$it II\n") }
+        if (seed.isNotBlank()) nextFile.writeAtomic(seed.trim() + "\n")
+        // same clock and turn numbers (consequences are due by turn), a fresh chapter 1, and a session that
+        // starts by moving the world
+        state.save(sc.apply {
+            chapter = 1
+            beats = ArrayList()
+            sessionDue = true
+            if (session == 0) session = 1
+            if (turn == 0) turn = 1
+            movedForSession = 0
+            complication = null; complicationFor = null
+            lastActive = System.currentTimeMillis()
         })
     }
 
@@ -466,7 +525,7 @@ class StoryEngine(
         }) {
             call("director", Models.WRITER, Prompts.fill(prompts.prompt("director"), records() + mapOf(
             "opening_rule" to openingRule,
-            "situation" to "Place: ${s.place}. Present: ${s.present.joinToString()}. Turn ${s.turn}. " +
+            "situation" to nextPart() + "Place: ${s.place}. Present: ${s.present.joinToString()}. Turn ${s.turn}. " +
                 "Unfinished beats: ${s.beats.filter { !it.done }.joinToString("; ") { it.goal }.ifEmpty { "none" }}",
         )), listOf(Msg(Role.USER, "Plan the three beats now.")), schema = DIRECTOR_SCHEMA, maxTokens = 16000)
         }
@@ -476,6 +535,7 @@ class StoryEngine(
             StoryState.Beat(b.getString("goal"), b.optString("place"),
                 (0 until (b.optJSONArray("characters")?.length() ?: 0)).map { b.getJSONArray("characters").getString(it) }, b.optString("pressure"))
         }.toMutableList()
+        nextFile.delete()
         s.session += 1
         s.movedForSession = s.session
         s.sessionDue = false
@@ -802,6 +862,10 @@ class StoryEngine(
             // the fixed (cached) prompt must not change from turn to turn: no clocks here, they're in the packet
             "plot" to prompts.config("plot.md"), "world" to state.world().substringBefore("## Clocks").trim() + "\n\n## The player's character\n" + playerText(),
             "style_sample" to prompts.config("style_sample.md"),
+            "lore" to Sources(dir).material(MATERIAL_WRITER).let { m -> if (m.isEmpty()) "" else
+                "\n## Reference: the player's files (background, true unless the records say it changed)\nLook things up here " +
+                    "when the scene needs them: a name, a rule, how a place looks. Don't bring in an object, place or person from it " +
+                    "just because it's there, and don't retell it. The files may be in any language; the passage stays in simple Japanese.\n$m\n" },
         ))
         val prev = File(chaptersDir, "${state.scene().chapter - 1}.md")
         // the long view: the whole story so far, rewritten each chapter, then the previous chapter in more detail
@@ -1188,6 +1252,25 @@ class StoryEngine(
             "unknown words" to "Stay inside a 5,000-word vocabulary plus the review words; prefer the everyday word.",
             "leak" to "Don't make review words guessable from the sentence around them.",
         )
+
+        /** How setup reads the player's files: they replace the defaults below them, each file for what it is. */
+        const val MATERIAL_RULES = "The player gave these files. They are the story: where they describe the world, the people or the " +
+            "player's character, that is what the game uses, and the defaults further down (one place, two or three " +
+            "people, two sentences about the player) apply only to what the files leave open. Read each file for what it is:\n" +
+            "- A world description: the world, its places, rules and troubles; keep its tone and genre.\n" +
+            "- A sheet for the player's character (\"my character\", \"I\", the one the player plays): `player` holds it all " +
+            "(not two sentences), `player_public` what others can see of it.\n" +
+            "- A sheet for someone else: one of `characters` (or `extras` if minor), keeping their name, goals, secrets and what they know.\n" +
+            "- A log or summary of earlier play: what already happened. It goes into `history` (with who saw it), and `opening` " +
+            "continues from where it ends; never replay it.\n" +
+            "- Several separate settings or casts that don't belong together: build the world from the one about the player's " +
+            "character (or the first), and bring others in only where the files themselves connect them.\n" +
+            "Don't put every object, place and person from the files into the opening: start with what this scene needs; the rest " +
+            "stays in the world for later. Files may be in any language: write the records in English as usual, keep names as given."
+
+        /** How much of the player's files the setup reads, and the writer keeps (cached) every turn. */
+        const val MATERIAL_SETUP = 60_000
+        const val MATERIAL_WRITER = 24_000
 
         /** Sparks for "Surprise me": genre and a hook, the specifics left to setup. */
         val SPARKS = listOf(

@@ -209,7 +209,7 @@ fun FilesScreen(state: AppState) {
     val f = open
     if (f == null) {
         val groups = remember {
-            listOf("config" to "Your taste and style", "prompts" to "The game master's prompts", "state" to "Story state", "state/characters" to "Characters")
+            listOf("config" to "Your taste and style", "prompts" to "The game master's prompts", "state" to "Story state", "state/characters" to "Characters", "state/sources" to "Your files")
                 .map { (d, title) -> title to File(root, d).listFiles { x -> x.isFile }.orEmpty().sortedBy { it.name } }
                 .filter { it.second.isNotEmpty() }
         }

@@ -339,4 +339,21 @@ class StoryControllerTest {
         assertEquals("lore", File(c.dir, "state/sources/lore.md").readText())
         assertEquals(listOf("Mine"), c.stories().map { it.title })
     }
+
+    @Test
+    fun `a sequel of the story you're in continues it, and binary files are refused`() = runBlocking {
+        val c = controller()
+        c.setup("")
+        File(c.dir, "state/title.txt").writeText("Well\n")
+        assertTrue(c.beginNewStory(c.dir))
+        assertEquals("Well", c.sequelTitle())
+        assertTrue(c.attach("scan.pdf", byteArrayOf(0x25, 0x50, 0x44, 0x46, 0, 0, 1))!!.contains("isn't a text file"))
+        assertNull(c.attach("notes.md", "Mina has a brother.".toByteArray()))
+        assertEquals(listOf("notes.md"), c.attachments().map { it.name })
+        assertTrue(c.commitNewStory())
+        c.setup("a year later")
+        assertEquals("Well II", File(c.dir, "state/title.txt").readText().trim())
+        assertTrue(File(c.dir, "state/characters").listFiles()!!.isNotEmpty())
+        assertEquals(2, c.stories().size)
+    }
 }

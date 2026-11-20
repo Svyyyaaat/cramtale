@@ -66,8 +66,14 @@ fun App(state: AppState) {
     val screen = stack.last()
     val back: () -> Unit = { if (stack.size > 1) stack.removeAt(stack.size - 1) }
     BackHandler(enabled = !onboarding && stack.size > 1) { back() }
+    // only the intent: the story you're in stays as it is until Create (Back on the story step cancels);
+    // [from]: a story whose world and people the new one keeps
+    val newStoryFrom: (java.io.File?) -> Unit = { from ->
+        if (state.story.beginNewStory(from)) {
+            state.onboardingStep = 6; state.onboardingDone = false; onboarding = true
+        }
+    }
     val newStory: () -> Unit = {
-        // only the intent: the story you're in stays as it is until Create (Back on the story step cancels)
         if (state.story.beginNewStory()) {
             state.onboardingStep = 6; state.onboardingDone = false; onboarding = true
         }
@@ -104,6 +110,7 @@ fun App(state: AppState) {
                     Screen.SETTINGS -> SettingsScreen(state, onScale = { scale = it }, onPickStyle = { stack.add(Screen.STYLE) }, onNewStory = newStory,
                         go = { s -> stack.add(s) }, onRestartSetup = { state.onboardingStep = 0; state.onboardingDone = false; onboarding = true })
                     Screen.STORIES -> StoriesScreen(state, onContinue = { stack.add(Screen.STORY) }, onNewStory = newStory,
+                        onSequel = { s -> newStoryFrom(s.dir) },
                         onSwitched = { home = null; stack.clear(); stack.add(Screen.HOME); stack.add(Screen.STORY) })
                     Screen.STYLE -> StyleScreen(state)
                     else -> {}
