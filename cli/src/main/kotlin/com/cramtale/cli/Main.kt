@@ -27,6 +27,15 @@ private const val USAGE = """cramtale CLI (matcher calibration)
   deck-selftest --jmdict <db> --deck <deck.jsonl>   (finds each note's word in its own example sentence)
   analyze      --jmdict <db> --deck <deck.jsonl> [--lists <dir>] [--threshold N]
                [--new-suspended-unknown] [--no-studied-suspended] <text file | ->
+  play         --dir DIR [--jmdict <db> --deck <deck.jsonl>] [--seed TEXT] [--files a.md,b.txt]
+               [--claude-code yes] [--script replies.txt] [--chapter-turns N]
+               Play a story in the terminal. With a deck, review words come from it (a stand-in for Anki's due
+               list: studied words, fresh each session) and unknown words are checked as on the phone.
+               --files: text files for a new story (lore, character sheets), as in the app.
+               --claude-code yes: calls go through Claude Code (claude -p, your subscription) via the app's
+                 Termux script, instead of the API (ANTHROPIC_API_KEY).
+               --script: replies, one per line (empty: let the scene go on; /ideas: ask for ideas), then stop.
+               Needs a UTF-8 locale (export LC_ALL=C.UTF-8), or Java reads Japanese arguments as question marks.
 """
 
 fun main(args: Array<String>) {
@@ -37,6 +46,7 @@ fun main(args: Array<String>) {
         "vocab-check" -> vocabCheck(Opts(args.drop(1)))
         "deck-report" -> deckReport(Opts(args.drop(1)))
         "story-smoke" -> storySmoke(Opts(args.drop(1)))
+        "play" -> play(Opts(args.drop(1)))
         "tokens" -> generateSequence(::readLine).forEach { line ->
             println(com.cramtale.core.text.Tokenizer.tokenize(line).joinToString(" ") { "${it.surface}/${it.base}/${it.pos1}-${it.pos2}" })
         }
@@ -303,6 +313,88 @@ private fun storySmoke(o: Opts) {
     costs.entries.filter { it.purpose == "writer" }.forEach {
         println("  writer call: in ${it.usage.input}, cache read ${it.usage.cacheRead}, cache write ${it.usage.cacheWrite}, out ${it.usage.output}")
     }
+}
+
+/** The app's Termux script, run here: one claude -p per call (the reply streams to a file, as on the phone). */
+private fun claudeCode() = com.cramtale.core.llm.ClaudeCodeLlm { request, _ ->
+    val script = listOf("app/src/main/assets/termux/claude_call.py", "../app/src/main/assets/termux/claude_call.py").map(::File).first { it.exists() }
+    val req = File.createTempFile("call", ".json").apply { writeText(request.toString()); deleteOnExit() }
+    val stream = File.createTempFile("stream", ".txt").apply { deleteOnExit() }
+    val p = ProcessBuilder("python3", script.path, req.path, stream.path).redirectError(ProcessBuilder.Redirect.INHERIT).start()
+    p.inputStream.bufferedReader().readText().also { p.waitFor() }
+}
+
+/** A story in the terminal, with the learning parts that don't need a phone: review words, unknown words, mistakes. */
+private fun play(o: Opts) {
+    val dir = File(o.need("--dir")).apply { mkdirs() }
+    val llm = if (o.named["--claude-code"] == "yes") claudeCode() else
+        com.cramtale.core.llm.AnthropicLlm(System.getenv("ANTHROPIC_API_KEY") ?: run { System.err.println("set ANTHROPIC_API_KEY, or --claude-code yes"); exitProcess(1) })
+    val costs = com.cramtale.core.llm.CostLog(File(dir, "log/costs.jsonl"))
+    val mistakes = com.cramtale.core.review.MistakeLog(File(dir, "log/mistakes.json"))
+    // with a deck: review words and the unknown-word check, as on the phone
+    val deck = if (o.named["--deck"] != null) load(o) else null
+    val policy = KnownPolicy()
+    val lists = KnownLists()
+    val matcher = deck?.let { (dict, index, _) -> Matcher(dict, index, frequency) }
+    val rnd = kotlin.random.Random(System.currentTimeMillis())
+    fun pool() = com.cramtale.core.story.DuePool(
+        words = deck?.third.orEmpty().filter { it.state == CardState.STUDIED && it.noteType == "Japanese Core 5k" && it.word.none { c -> c.isDigit() } }
+            .shuffled(rnd).take(15).map { com.cramtale.core.story.DueWord(it.word, it.noteId, false) },
+        weakPoints = mistakes.weakPoints(),
+    )
+    var pool = pool()
+    val unknown = matcher?.let { m -> com.cramtale.core.story.UnknownWords { text ->
+        val a = m.analyze(text)
+        val reviewing = pool.words.map { it.word }.toSet()
+        val counted = a.words().filter { s -> s.status(policy, lists).let { it != Status.IGNORED && it != Status.NAME } }
+        counted.size to counted.filter { s -> s.status(policy, lists) in setOf(Status.UNKNOWN, Status.DECK_NEW) && s.deck.none { it.word in reviewing } }.map { it.lemma }
+    } }
+    val settings = com.cramtale.core.story.StoryEngine.Settings(chapterTurns = o.named["--chapter-turns"]?.toInt() ?: 30)
+    val e = com.cramtale.core.story.StoryEngine(dir, llm, costs, "cli", unknown, settings = settings)
+    e.onCall = { purpose -> System.err.println("  … $purpose") }
+    if (!e.isSetUp()) {
+        o.named["--files"]?.split(',')?.filter { it.isNotBlank() }?.forEach { f ->
+            val bytes = File(f).readBytes()
+            require(com.cramtale.core.story.Sources.looksLikeText(bytes)) { "$f isn't a text file" }
+            com.cramtale.core.story.Sources(dir).add(File(f).name, bytes.decodeToString().removePrefix("\uFEFF"))
+        }
+        e.setup(o.named["--seed"].orEmpty())
+        println("# " + File(dir, "state/title.txt").takeIf { it.exists() }?.readText()?.trim())
+        println(File(dir, "state/world.md").readText())
+        println("You: " + File(dir, "state/player.md").readText())
+        if (!e.hasStyle()) e.pickStyle(com.cramtale.core.story.StylePresets.ALL.first())
+    }
+    if (e.pending == null) e.startSession(pool).forEach { System.err.println("  session: $it") }
+    val script = o.named["--script"]?.let { File(it).readLines() }
+    var step = 0
+    var message: String? = null
+    var quiet = false
+    while (true) {
+        val t = if (e.pending?.ready == true) e.pending!! else e.playerTurn(message, pool, mistakes.promptKeys(), mistakes::seen)
+        if (!quiet) {
+            if (message != null && !t.mistakesRecorded) { mistakes.record(message, t.corrections, t.correctKeys); t.mistakesRecorded = true }
+            t.corrections.forEach { c -> println("  ✎ ${if (c.shown) "" else "(kept back) "}[${c.level}${if (c.repeat) ", again" else ""}] ${c.wrong} → ${c.right}: ${c.reason}") }
+            t.roll?.let { println("  🎲 ${it.dice.joinToString("+")}${"%+d".format(it.modifier)}: ${it.outcome.label}" + (t.rollAction?.let { a -> ", tried to $a" } ?: "")) }
+            println("\n" + t.draft.passage + "\n")
+            println("  review words used: " + t.draft.used.joinToString { it.second }.ifEmpty { "none" })
+            t.draft.checks.filter { !it.passed }.forEach { System.err.println("  check ${it.name}: ${it.detail}") }
+        }
+        quiet = false
+        val line = if (script != null) (script.getOrNull(step++) ?: break).also { println("> $it") } else { print("> "); readLine() ?: break }
+        when (line.trim()) {
+            "/quit" -> break
+            // the same passage is still waiting after /ideas: not printed again
+            "/ideas" -> { e.ideas().forEach { println("  idea: ${it.ja}  (${it.en})") }; quiet = true; continue }
+        }
+        e.commit().forEach { System.err.println("  state: $it") }
+        message = line.takeIf { it.isNotBlank() }
+        // a fresh pool each chapter (Anki's due list moves on)
+        if (e.state.scene().turn % settings.chapterTurns == 0) pool = pool()
+    }
+    println("\n== story so far ==\n" + (e.saga() ?: "(no chapter has closed yet)"))
+    for (n in e.state.characterNames()) com.cramtale.core.story.StoryState.section(e.state.character(n).orEmpty(), "Remembers")
+        ?.let { println("\n== $n remembers ==\n$it") }
+    println("\nspent: $" + "%.3f".format(costs.total("cli")))
 }
 
 /** Rough cause of a self-test miss, from how Kuromoji reads the deck word on its own. */

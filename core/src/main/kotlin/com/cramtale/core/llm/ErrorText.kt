@@ -27,7 +27,9 @@ object ErrorText {
             "declined" in all -> "The model declined to write this passage. Try again, or reroll."
             "no usable reply" in all -> "Claude's answer came back unusable three times. Try again."
             "Add your Claude API key" in all -> "Add your Claude API key first (Settings → Claude API key)."
-            else -> "Something went wrong."
+            // an unrecognised failure: its own first line says more than "something went wrong" (Claude Code's are actionable)
+            else -> chain.firstNotNullOfOrNull { c -> c.message?.lineSequence()?.firstOrNull { it.isNotBlank() }?.trim()?.take(220) }
+                ?.let { "Something went wrong: $it" } ?: "Something went wrong."
         }
         val details = chain.joinToString("\n← ") { "${it.javaClass.simpleName}: ${it.message.orEmpty()}" }
         return "$headline\n\n$details"

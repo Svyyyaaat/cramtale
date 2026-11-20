@@ -14,13 +14,25 @@ android {
         applicationId = "com.cramtale.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = (System.getenv("VERSION_CODE") ?: "2").toInt()
+        versionName = System.getenv("VERSION_NAME") ?: "0.2.0"
+    }
+
+    // release signing from the environment (CI: the release workflow); without it a release build is unsigned
+    signingConfigs {
+        create("release") {
+            System.getenv("RELEASE_STORE_FILE")?.let { storeFile = file(it) }
+            storePassword = System.getenv("RELEASE_STORE_PASSWORD")
+            keyAlias = System.getenv("RELEASE_KEY_ALIAS")
+            keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+        }
     }
 
     buildTypes {
         release {
+            // no shrinking: the Claude SDK and its JSON library are reached by reflection
             isMinifyEnabled = false
+            if (System.getenv("RELEASE_STORE_FILE") != null) signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {

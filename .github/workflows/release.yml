@@ -1,0 +1,107 @@
+name: Release
+
+# A tag like v0.2.0-pre.1 builds a signed release APK and publishes it as a GitHub pre-release
+# (a tag without "-pre" makes a normal release).
+#
+# Signing: add these repository secrets once (Settings → Secrets and variables → Actions) and every release is
+# signed with the same key, so each one installs over the last:
+#   RELEASE_KEYSTORE_BASE64   the .jks file, base64-encoded (base64 -w0 release.jks)
+#   RELEASE_STORE_PASSWORD, RELEASE_KEY_ALIAS, RELEASE_KEY_PASSWORD
+# Without them the build makes a one-off key and says so in the release notes: that APK installs fine, but a
+# later release signed with another key can't be installed over it (uninstall first; save a backup of your
+# stories before).
+
+on:
+  push:
+    tags: [ "v*" ]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to publish, e.g. v0.2.0-pre.1"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Version from the tag
+        id: v
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "VERSION_NAME=${TAG#v}" >> "$GITHUB_ENV"
+          # increases with every run, so each release installs over the one before
+          echo "VERSION_CODE=$((100 + ${{ github.run_number }}))" >> "$GITHUB_ENV"
+          case "$TAG" in *-pre*|*-rc*|*-beta*|*-alpha*) echo "pre=true" >> "$GITHUB_OUTPUT";; *) echo "pre=false" >> "$GITHUB_OUTPUT";; esac
+
+      - name: Signing key
+        id: key
+        env:
+          KEYSTORE: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          KS="$RUNNER_TEMP/release.jks"
+          if [ -n "$KEYSTORE" ]; then
+            echo "$KEYSTORE" | base64 -d > "$KS"
+            echo "RELEASE_STORE_PASSWORD=$STORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "RELEASE_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+            echo "RELEASE_KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
+            echo "oneoff=false" >> "$GITHUB_OUTPUT"
+          else
+            PASS="$(openssl rand -hex 16)"
+            keytool -genkeypair -keystore "$KS" -storepass "$PASS" -keypass "$PASS" -alias release \
+              -keyalg RSA -keysize 4096 -validity 10000 -dname "CN=Cramtale" -noprompt
+            echo "::add-mask::$PASS"
+            echo "RELEASE_STORE_PASSWORD=$PASS" >> "$GITHUB_ENV"
+            echo "RELEASE_KEY_ALIAS=release" >> "$GITHUB_ENV"
+            echo "RELEASE_KEY_PASSWORD=$PASS" >> "$GITHUB_ENV"
+            echo "oneoff=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "RELEASE_STORE_FILE=$KS" >> "$GITHUB_ENV"
+
+      - name: Tests
+        run: ./gradlew --no-daemon :core:test
+
+      - name: Build the release APK
+        run: |
+          ./gradlew --no-daemon :app:assembleRelease
+          cp app/build/outputs/apk/release/app-release.apk "cramtale-${{ steps.v.outputs.tag }}.apk"
+          rm -f "$RUNNER_TEMP/release.jks"
+
+      - name: Release notes
+        run: |
+          {
+            echo "Cramtale ${{ steps.v.outputs.tag }}: a story you play in Japanese that is also your Anki review."
+            echo
+            echo "Install \`cramtale-${{ steps.v.outputs.tag }}.apk\` on Android 8.0 or newer (allow installs from your browser or files app)."
+            echo "You need AnkiDroid, and a Claude API key or Claude Code in Termux on your Claude subscription."
+            echo
+            git log -1 --format='Built from %h: %s' HEAD
+            if [ "${{ steps.key.outputs.oneoff }}" = "true" ]; then
+              echo
+              echo "**Signed with a one-off key.** A later release signed differently can't be installed over this one:"
+              echo "save a backup of your stories (Stories → Save a backup), uninstall, install the new one, open the backup."
+            fi
+          } > notes.md
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.v.outputs.tag }}
+          name: Cramtale ${{ steps.v.outputs.tag }}
+          prerelease: ${{ steps.v.outputs.pre }}
+          target_commitish: ${{ github.sha }}
+          body_path: notes.md
+          files: cramtale-${{ steps.v.outputs.tag }}.apk
