@@ -1,5 +1,6 @@
 package com.cramtale.app.ui
 
+import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.Close
@@ -182,6 +183,8 @@ fun RollLine(roll: com.cramtale.app.story.RollUi) {
             roll.action?.let { Text("You tried to: $it", style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant,
                 maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) }
         }
+        // tap for how rolls work
+        Icon(Icons.Outlined.Info, "How rolls work", Modifier.size(18.dp), tint = cs.onSurfaceVariant)
     }
     if (explain) AlertDialog(onDismissRequest = { explain = false }, title = { Text("How rolls work") },
         text = { Text("When what you try is risky, two dice decide, not the narrator. Harder moves take points off" +
@@ -267,7 +270,7 @@ fun PassageTools(p: ShownPassage, enabled: Boolean, onReroll: () -> Unit, onEdit
             active = listening, onClick = onListen)
         Tool(Icons.Filled.Refresh, "Rewrite", enabled = enabled, onClick = onReroll)
         Tool(Icons.Filled.Edit, "Edit", enabled = enabled, onClick = onEdit)
-        Tool(Icons.Filled.Casino, "Behind it", active = notes) { notes = !notes }
+        Tool(Icons.AutoMirrored.Filled.Notes, "Behind it", active = notes) { notes = !notes }
         Spacer(Modifier.weight(1f))
         if (p.versions > 1) Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton({ onVersion(p.version - 1) }, enabled = enabled && p.version > 0) {
@@ -363,12 +366,13 @@ fun IdeasArea(ui: IdeasUi, onPick: (String) -> Unit) {
     val cs = MaterialTheme.colorScheme
     if (ui.ideas.isEmpty()) {
         Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            androidx.compose.material3.FilledTonalButton(ui.onAsk, enabled = !ui.loading, contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+            // full contrast while loading too: busy, not unavailable
+            androidx.compose.material3.FilledTonalButton({ if (!ui.loading) ui.onAsk() }, contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
                 modifier = Modifier.heightIn(min = 36.dp)) {
                 if (ui.loading) androidx.compose.material3.CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                else Icon(Icons.Outlined.Lightbulb, null, Modifier.size(18.dp))
+                else Icon(if (ui.problem != null) Icons.Filled.Refresh else Icons.Outlined.Lightbulb, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text(if (ui.loading) "Finding ideas…" else "Ideas", style = MaterialTheme.typography.labelLarge)
+                Text(when { ui.loading -> "Finding ideas…"; ui.problem != null -> "Try again"; else -> "Ideas" }, style = MaterialTheme.typography.labelLarge)
             }
             Spacer(Modifier.width(10.dp))
             when {
@@ -382,9 +386,9 @@ fun IdeasArea(ui: IdeasUi, onPick: (String) -> Unit) {
     }
     Column(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 8.dp).clip(MaterialTheme.shapes.medium).background(cs.secondaryContainer)) {
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Tap one to start from it", style = MaterialTheme.typography.labelMedium, color = cs.onSecondaryContainer.copy(alpha = 0.75f),
+            Text("Tap one, then edit it", style = MaterialTheme.typography.labelMedium, color = cs.onSecondaryContainer.copy(alpha = 0.75f),
                 modifier = Modifier.weight(1f))
-            TextButton(ui.onAsk, enabled = !ui.loading) { Text(if (ui.loading) "Finding…" else "Other ideas") }
+            TextButton(ui.onAsk, enabled = !ui.loading) { Text(if (ui.loading) "Finding…" else "New ideas") }
             IconButton(ui.onDismiss) { Icon(Icons.Filled.Close, "Close ideas", tint = cs.onSecondaryContainer) }
         }
         ui.ideas.forEachIndexed { i, idea ->
@@ -433,6 +437,11 @@ fun StoryContent(
     ideas: IdeasUi? = null,
 ) {
     val listState = rememberLazyListState()
+    // the ideas take room at the bottom: the passage's last lines stay in view above them
+    LaunchedEffect(ideas?.ideas?.size) {
+        val n = history.size + (if (current != null) 1 else 0) + proposals.size
+        if ((ideas?.ideas?.size ?: 0) > 0 && n > 0) listState.animateScrollToItem(n - 1, 100_000)
+    }
     LaunchedEffect(history.size, current) {
         val n = history.size + (if (current != null) 1 else 0) + proposals.size
         if (n > 0) listState.animateScrollToItem(n - 1)

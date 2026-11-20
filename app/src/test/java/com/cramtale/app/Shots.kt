@@ -146,7 +146,7 @@ class Shots {
         StoryStepContent("", {}, null, null, {}, {}, sequelOf = "The Well Keeper")
     }
 
-    @Test fun a9_story_setup() = shot { StoryStepContent("", {}, null, null, {}, {}) }
+    @Test fun a9_story_setup() = shot { StoryStepContent("", {}, null, null, {}, {}, onAddFiles = {}) }
 
     @Test fun b1_styles() = shot {
         StyleStepContent(listOf(

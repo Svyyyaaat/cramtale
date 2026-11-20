@@ -225,7 +225,7 @@ fun StoryStepContent(seed: String, onSeed: (String) -> Unit, busy: String?, erro
                      sequelOf: String? = null) {
     // nothing typed: the story is a surprise (a spark from many genres), and the button says so
     val primary = when {
-        sequelOf != null -> "Continue the story"
+        sequelOf != null -> "Start the next part"
         seed.isBlank() && files.isEmpty() -> "Surprise me"
         else -> "Create the story"
     }
