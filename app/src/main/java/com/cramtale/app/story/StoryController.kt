@@ -782,7 +782,10 @@ class StoryController(
     )
 
     /** Your character in short (the card above the first passage). */
-    fun role(): String? = playerSheet()?.substringBefore("\n## ")?.trim()?.ifEmpty { null }
+    fun role(): String? = playerSheet()?.substringBefore("\n## ")?.trim()
+        // older stories' sheets open with the game master's phrasing: the card starts with the name
+        ?.replace(Regex("^(The )?player'?s character( is|:)?\\s*", RegexOption.IGNORE_CASE), "")
+        ?.replaceFirstChar { it.titlecase() }?.ifEmpty { null }
 
     /** Your character's whole sheet: who they are, what they know, what the story has established about them. */
     fun playerSheet(): String? = File(dir, "state/player.md").takeIf { it.exists() }?.readText()?.trim()?.ifEmpty { null }

@@ -1,5 +1,7 @@
 package com.cramtale.app.ui
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.filled.Check
@@ -213,15 +215,28 @@ fun KeyStepContent(key: String, onKey: (String) -> Unit, onNext: () -> Unit, onB
 @Composable
 fun StoryStepContent(seed: String, onSeed: (String) -> Unit, busy: String?, error: String?, onCreate: () -> Unit, onBack: () -> Unit,
                      taste: String = "", wait: (@Composable (String) -> Unit)? = null) {
-    StepFrame(onBack, footer = { StepFooter("Create the story", onCreate, enabled = busy == null) }) {
+    // nothing typed: the story is a surprise (a spark from many genres), and the button says so
+    StepFrame(onBack, footer = { StepFooter(if (seed.isBlank()) "Surprise me" else "Create the story", onCreate, enabled = busy == null) }) {
         StepHeader(6, SETUP_STEPS, "Your story",
-            "A place, a few people with their own goals and secrets, and trouble that moves while you're away.")
+            "Any genre. A few people with their own goals and secrets, and trouble that moves while you're away.")
         OutlinedTextField(seed, onSeed, Modifier.fillMaxWidth().heightIn(min = 120.dp), shape = MaterialTheme.shapes.medium,
-            label = { Text("What should it be about? (optional)") }, placeholder = { Text("e.g. a fishing town, a debt, a family business") })
+            label = { Text("What should it be about? (optional)") }, placeholder = { Text("A place, a trouble, who you play…") })
+        // a few starting points, one tap to fill in (and edit)
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (example in PREMISE_EXAMPLES) androidx.compose.material3.SuggestionChip({ onSeed(example) }, { Text(example, maxLines = 1) })
+        }
         if (busy != null) wait?.invoke(busy) ?: Busy(busy)
         if (error != null) ErrorNote(error)
     }
 }
+
+/** Example premises on the story step: different genres, so nobody assumes it's always a small-town drama. */
+val PREMISE_EXAMPLES = listOf(
+    "A dragon egg hatches in a temple kitchen",
+    "A ghost at a seaside café",
+    "A heist on a flying ship",
+    "A detective in a city that sells memories",
+)
 
 @Composable
 fun StyleStepContent(options: List<Pair<StoryEngine.StyleOption, Double>>?, busy: String?, error: String?, onPick: (StoryEngine.StyleOption) -> Unit, onMore: () -> Unit, onBack: () -> Unit,

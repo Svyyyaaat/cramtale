@@ -337,7 +337,12 @@ class StoryEngine(
                 o.optJSONObject("opening")?.optString("place")?.isNotBlank() == true
         }) {
             call("setup", Models.WRITER, Prompts.fill(prompts.prompt("setup"), mapOf(
-                "plot" to prompts.config("plot.md"), "seed" to if (seed.isBlank()) "" else "Seed from the player: $seed",
+                "plot" to prompts.config("plot.md"),
+                // what the player asked for is the premise, first; "Surprise me" gets a spark picked by code
+                "seed" to if (seed.isBlank()) "\n## A spark to build from (the player asked to be surprised)\n${surprise()}\n" +
+                    "Take it somewhere of your own: invent the specifics, keep the genre.\n" else
+                    "\n## What the player asked for\n$seed\n\nThis is the premise: the story is set where it says and is about what it says, " +
+                        "and if it says who the player plays, that is the player's character. Everything below serves it.\n",
             )), listOf(Msg(Role.USER, "Create the game now, with every field filled in.")), schema = SETUP_SCHEMA, maxTokens = 16000)
         }
         val stateDir = File(dir, "state").apply { mkdirs() }
@@ -369,12 +374,15 @@ class StoryEngine(
             val s = secrets!!.getJSONObject(i)
             "- S${i + 1}: ${s.getString("text")} [knows: ${(0 until s.getJSONArray("knows").length()).joinToString(", ") { s.getJSONArray("knows").getString(it) }}]"
         } + "\n")
-        o.optJSONArray("complications")?.let { a ->
+        o.optJSONArray("complications")?.takeIf { it.length() > 0 }?.let { a ->
             val f = File(dir, "config/complications.md")
+            // the world's own replace the generic ones (phones and trains don't belong in every world)
+            f.parentFile.mkdirs(); f.writeAtomic(defaultsHeader(f))
             f.appendText((0 until a.length()).joinToString("") { "- ${a.getString(it).removePrefix("- ")}\n" })
         }
-        o.optJSONArray("ambience")?.let { a ->
+        o.optJSONArray("ambience")?.takeIf { it.length() > 0 }?.let { a ->
             val f = File(dir, "config/ambience.md")
+            f.parentFile.mkdirs(); f.writeAtomic(defaultsHeader(f))
             f.appendText((0 until a.length()).joinToString("") { "- ${a.getString(it).removePrefix("- ")}\n" })
         }
         val opening = o.getJSONObject("opening")
@@ -384,6 +392,14 @@ class StoryEngine(
             beats = mutableListOf(StoryState.Beat(opening.getString("situation"), place, present.toList(), ""))
         })
     }
+
+    /** A config file's comment lines (how it works), without its generic entries. */
+    private fun defaultsHeader(f: File): String =
+        (f.takeIf { it.exists() }?.readText() ?: prompts.config(f.name).orEmpty()).lines().takeWhile { it.startsWith("#") || it.isBlank() }
+            .joinToString("\n").trimEnd() + "\n"
+
+    /** "Surprise me": a spark from a wide range of genres, picked by code (left alone, a model drifts to the same kind of story). */
+    private fun surprise(): String = SPARKS[dice.random.nextInt(SPARKS.size)]
 
     data class StyleOption(val name: String, val line: String, val passage: String)
 
@@ -1171,6 +1187,36 @@ class StoryEngine(
             "banned phrase" to "Avoid stock phrases (see the style rules); say the plain concrete thing.",
             "unknown words" to "Stay inside a 5,000-word vocabulary plus the review words; prefer the everyday word.",
             "leak" to "Don't make review words guessable from the sentence around them.",
+        )
+
+        /** Sparks for "Surprise me": genre and a hook, the specifics left to setup. */
+        val SPARKS = listOf(
+            "Fantasy: a dragon's egg hatches in the kitchen of a monastery that swore never to keep one.",
+            "Fantasy: the player is an apprentice to a mapmaker whose maps change the land they draw.",
+            "Science fiction: a mining station on a moon where the miners have started dreaming the same dream.",
+            "Science fiction: a smuggler's ship picks up a stowaway who claims to be the heir to a dead empire.",
+            "Horror: the night porter's first week at a hotel where some guests never check out.",
+            "Horror: a village where the dead come back for one night each winter, and this year one of them stays.",
+            "Mystery: a locked-room death aboard a sleeper train crossing the mountains in a snowstorm.",
+            "Noir with magic: a private investigator in a city where memories are bought and sold.",
+            "Myth: a hero summoned by a god who has been forgotten by everyone but the hero.",
+            "Pirates: a crew that stole the wrong ship, and whatever is in its hold wants to go home.",
+            "Gothic: a governess arrives at a cliff-top house where the portraits change overnight.",
+            "Cyberpunk: a courier carrying data in their own head that three corporations want back.",
+            "Post-apocalyptic: the last working radio tower, and a voice on it no one can place.",
+            "Heist: a crew planning to rob a sorcerer's vault on the one night the wards are down.",
+            "Wild West with the weird: a frontier town where the new railroad is digging up something old.",
+            "Fairy tale: a deal with the fae that the player's family made three generations ago comes due.",
+            "Space opera: a diplomat on a generation ship where two factions are one vote from war.",
+            "Supernatural: a medium who has always faked it, until a client's ghost actually answers.",
+            "Historical adventure: Edo-period Japan, a ronin hired to escort a girl who is more than she seems.",
+            "Yokai: a small mountain town where a fox spirit runs the only inn, and a guest has gone missing.",
+            "Survival: a research team cut off in the Antarctic winter, and the ice core holds something alive.",
+            "Steampunk: an airship courier race across a continent of floating cities, with sabotage aboard.",
+            "Urban fantasy: the player can see the hidden market under Tokyo, and someone there knows it.",
+            "Sword and sorcery: a mercenary company hired to guard a caravan carrying a sealed coffin.",
+            "School mystery: the student council of a mountain boarding school, and a club room that shouldn't exist.",
+            "Slice of life with a secret: a new job at a seaside café whose regulars all seem to be waiting for something.",
         )
 
         val REMEMBER_SCHEMA = """{"type":"object","additionalProperties":false,"required":["remembers"],"properties":{"remembers":{"type":"string"}}}"""

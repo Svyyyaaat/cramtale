@@ -1,14 +1,11 @@
-# One grounded complication per line, "- [place tag] text" (tag optional). One is drawn per scene.
+# One complication per line, "- [place tag] text" (tag optional). One is drawn per scene. A story's own setup replaces these.
 - Someone who shouldn't be here walks in.
-- A phone rings and the caller won't wait.
+- Weather, darkness or noise makes the obvious way harder.
 - The thing that was needed is missing, broken or the wrong one.
 - A third person overhears part of it.
-- Rain, cold or noise makes the obvious way harder.
 - Someone asks for a small favour at the worst moment.
-- A bill, a deadline or a debt comes up unprompted.
+- An old promise or an old enemy comes back unprompted.
 - The person who could help is busy with their own trouble.
 - A lie told earlier is about to be checked.
 - Something costs more than expected.
-- [店] A customer needs attention right now.
-- [倉庫] A delivery arrives early, or doesn't arrive.
-- [駅] The train is delayed or cancelled.
+- Something unexpected is watching, following or waiting.

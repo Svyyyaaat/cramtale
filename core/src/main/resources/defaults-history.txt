@@ -2,7 +2,9 @@ config/ambience.md	426e37fa1952c50e
 config/ambience.md	7568d2c88eaddf35
 config/banned.txt	0c39bdcece86c84b
 config/complications.md	6d117f1cda6f87bb
+config/complications.md	aa4159e5884f813e
 config/plot.md	69843df2f81218ed
+config/plot.md	eff34fe806cb75b2
 config/style_line.txt	e3b0c44298fc1c14
 config/style_rules_firm.md	19a9e39d73c34ee5
 config/style_rules_positive.md	9719b4623bb7c55d
@@ -58,6 +60,7 @@ prompts/setup.md	0c3396807b55d55c
 prompts/setup.md	196314d1d41b6f57
 prompts/setup.md	29b8272ec6d5035d
 prompts/setup.md	3516944cc6d37b19
+prompts/setup.md	3b40aaa2f11be44b
 prompts/setup.md	3fb2525e5db1b74d
 prompts/setup.md	4b2029e3676507da
 prompts/setup.md	57ac7e661147ec14
