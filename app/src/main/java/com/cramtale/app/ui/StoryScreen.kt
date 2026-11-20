@@ -1,5 +1,6 @@
 package com.cramtale.app.ui
 
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Lightbulb
@@ -131,6 +132,62 @@ fun PlayerBubble(text: String, corrections: List<Correction>, onNotAMistake: ((C
             }
         }
     }
+}
+
+/** One die, drawn: its pips on a rounded face. */
+@Composable
+fun DieFace(value: Int, size: androidx.compose.ui.unit.Dp, face: Color, pip: Color) {
+    androidx.compose.foundation.Canvas(Modifier.size(size)) {
+        val s = this.size.minDimension
+        drawRoundRect(face, cornerRadius = androidx.compose.ui.geometry.CornerRadius(s * 0.22f))
+        drawRoundRect(pip.copy(alpha = 0.35f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(s * 0.22f),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = s * 0.04f))
+        val r = s * 0.085f
+        val a = s * 0.27f; val m = s * 0.5f; val b = s * 0.73f
+        val spots = when (value) {
+            1 -> listOf(m to m)
+            2 -> listOf(a to a, b to b)
+            3 -> listOf(a to a, m to m, b to b)
+            4 -> listOf(a to a, b to a, a to b, b to b)
+            5 -> listOf(a to a, b to a, m to m, a to b, b to b)
+            else -> listOf(a to a, b to a, a to m, b to m, a to b, b to b)
+        }
+        for ((x, y) in spots) drawCircle(pip, r, androidx.compose.ui.geometry.Offset(x, y))
+    }
+}
+
+/**
+ * A roll as it lands in the story: the two dice, what they mean (in Japanese, with the English), and what was
+ * tried. Tapping it explains how rolls work.
+ */
+@Composable
+fun RollLine(roll: com.cramtale.app.story.RollUi) {
+    val cs = MaterialTheme.colorScheme
+    val (tone, ja, en) = when (roll.outcome) {
+        com.cramtale.core.story.Dice.Outcome.SUCCESS -> Triple(cs.tertiary, "成功", "success")
+        com.cramtale.core.story.Dice.Outcome.COST -> Triple(cs.accent, "代償つきの成功", "success, at a cost")
+        com.cramtale.core.story.Dice.Outcome.FAILURE -> Triple(cs.error, "失敗", "failure")
+    }
+    var explain by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).clickable { explain = true }.padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            roll.dice.forEach { DieFace(it, 28.dp, cs.onBackground.copy(alpha = 0.9f), cs.background) }
+        }
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(ja, style = ReadingText.copy(fontSize = 17.sp, lineHeight = 22.sp), color = tone)
+                Text(en, style = MaterialTheme.typography.labelMedium, color = tone)
+            }
+            roll.action?.let { Text("You tried to: $it", style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant,
+                maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) }
+        }
+    }
+    if (explain) AlertDialog(onDismissRequest = { explain = false }, title = { Text("How rolls work") },
+        text = { Text("When what you try is risky, two dice decide, not the narrator. Harder moves take points off" +
+            (if (roll.modifier != 0) " (this one: %+d, total %d)".format(roll.modifier, roll.total) else "") + ".\n\n" +
+            "10 or more: it works (成功).\n7 to 9: it works, at a cost (代償つきの成功).\n6 or less: it fails (失敗), and that costs something real.") },
+        confirmButton = { TextButton({ explain = false }) { Text("Got it") } })
 }
 
 /** How reading counts, and what the marks in the text are: shown until the first tap. */
@@ -399,6 +456,7 @@ fun StoryContent(
             items(history) { t ->
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     t.player?.let { m -> PlayerBubble(m, t.corrections.filter { !isDismissed(m, it) }) { c -> onNotAMistake(m, c) } }
+                    t.passage.roll?.let { RollLine(it) }
                     PassageText(t.passage, true, { false }, statusOf, tapVersion) { onLookup(it, t.passage) }
                     Ornament()
                 }
@@ -406,6 +464,7 @@ fun StoryContent(
             if (current != null) item {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     current.player?.let { m -> PlayerBubble(m, current.corrections.filter { !isDismissed(m, it) }) { c -> onNotAMistake(m, c) } }
+                    current.passage.roll?.let { RollLine(it) }
                     // a reroll streams its new version in place of the old one
                     if (busy != null && draft != null) DraftPassage(busy, draft.second)
                     else PassageText(current.passage, true, isTapped, statusOf, tapVersion) { onTap(it, current.passage) }

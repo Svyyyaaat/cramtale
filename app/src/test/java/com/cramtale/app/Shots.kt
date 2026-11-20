@@ -167,9 +167,10 @@ class Shots {
         return out
     }
 
-    private fun storyShot(dark: Boolean, error: String? = null, versions: Int = 1, ideas: com.cramtale.app.ui.IdeasUi? = null) = shot(dark) {
+    private fun storyShot(dark: Boolean, error: String? = null, versions: Int = 1, ideas: com.cramtale.app.ui.IdeasUi? = null,
+                          roll: com.cramtale.app.story.RollUi? = null) = shot(dark) {
         val p = ShownPassage(3, passage, spans(passage), emptyList(), setOf("早朝".hashCode().toLong()), mapOf("早朝".hashCode().toLong() to "early morning"), emptyList(), emptyList(),
-            version = versions - 1, versions = versions)
+            version = versions - 1, versions = versions, roll = roll)
         val prev = ShownPassage(2, "午前八時。事務所の暖房はまだ効いていない。", spans("午前八時。事務所の暖房はまだ効いていない。"), emptyList(), emptySet(), emptyMap(), emptyList(), emptyList())
         StoryContent("西田製作所", 0.18,
             history = listOf(ShownTurn(null, emptyList(), prev)),
@@ -187,6 +188,10 @@ class Shots {
         com.cramtale.core.story.StoryEngine.Idea("ファイルを見て、「これは誰が書いたんですか」", "Look at the file: \"Who wrote this?\""),
         com.cramtale.core.story.StoryEngine.Idea("黙って部屋を出る", "Leave the room without a word"),
     )
+
+    @Test fun d11_roll_cost() = storyShot(false, roll = com.cramtale.app.story.RollUi(listOf(4, 3), 0, com.cramtale.core.story.Dice.Outcome.COST, "talk Murai into waiting another week"))
+    @Test fun d11b_roll_failed_dark() = storyShot(true, roll = com.cramtale.app.story.RollUi(listOf(2, 3), -1, com.cramtale.core.story.Dice.Outcome.FAILURE, "talk Murai into waiting another week"))
+    @Test fun d11c_roll_success() = storyShot(false, roll = com.cramtale.app.story.RollUi(listOf(6, 5), 0, com.cramtale.core.story.Dice.Outcome.SUCCESS, "talk Murai into waiting another week"))
 
     @Test fun d10_ideas() = storyShot(false, ideas = com.cramtale.app.ui.IdeasUi(threeIdeas, false, null, {}, {}))
     @Test fun d10b_ideas_dark() = storyShot(true, ideas = com.cramtale.app.ui.IdeasUi(threeIdeas, false, null, {}, {}))

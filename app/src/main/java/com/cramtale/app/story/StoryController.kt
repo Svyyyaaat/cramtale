@@ -58,7 +58,14 @@ data class ShownPassage(
     /** Which version of this passage is shown, of how many (Reroll and Edit add versions). */
     val version: Int = 0,
     val versions: Int = 1,
+    /** The roll before it, if the player's move was risky: shown with the passage. */
+    val roll: RollUi? = null,
 )
+
+/** A roll as shown: two dice, the modifier, the outcome, and what was attempted. */
+data class RollUi(val dice: List<Int>, val modifier: Int, val outcome: com.cramtale.core.story.Dice.Outcome, val action: String?) {
+    val total get() = dice.sum() + modifier
+}
 
 data class ShownTurn(val player: String?, val corrections: List<Correction>, val passage: ShownPassage)
 
@@ -760,7 +767,7 @@ class StoryController(
         val passage = ShownPassage(turn, d.passage, analysis?.spans.orEmpty(), grammarFound, newNotes, glosses,
             d.checks.map { "${it.name}: ${if (it.passed) "ok" else it.detail}" },
             listOfNotNull(roll?.let { "Roll: $it" }, complication?.let { "Complication: $it" }, if (d.rewritten) "Rewritten once by the checks" else null),
-            version = t.current, versions = t.drafts.size)
+            version = t.current, versions = t.drafts.size, roll = t.roll?.let { RollUi(it.dice, it.modifier, it.outcome, t.rollAction) })
         current = ShownTurn(player, corrections, passage)
         if (ideasFor != null && ideasFor != (passage.turn to passage.version)) { dismissIdeas(); ideasFor = null }
         // the scribe for this version starts now, in the background, while it's read
@@ -776,8 +783,12 @@ class StoryController(
         f.tailJson(20).forEach { o ->
             val text = o.getString("passage")
             val a = (if (quick) app.matcherIfReady() else app.matcher())?.analyze(text)?.let(::withNames)
+            val roll = o.optJSONArray("dice")?.let { d -> runCatching {
+                RollUi((0 until d.length()).map { d.getInt(it) }, o.optInt("modifier"),
+                    com.cramtale.core.story.Dice.Outcome.valueOf(o.getString("outcome")), o.optString("rollAction").ifBlank { null })
+            }.getOrNull() }
             history += ShownTurn(o.optString("player").ifBlank { null }, emptyList(),
-                ShownPassage(o.getInt("turn"), text, a?.spans.orEmpty(), emptyList(), emptySet(), emptyMap(), emptyList(), emptyList()))
+                ShownPassage(o.getInt("turn"), text, a?.spans.orEmpty(), emptyList(), emptySet(), emptyMap(), emptyList(), emptyList(), roll = roll))
         }
     }
 

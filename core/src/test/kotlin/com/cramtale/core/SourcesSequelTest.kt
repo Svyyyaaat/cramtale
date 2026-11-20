@@ -85,4 +85,27 @@ class SourcesSequelTest {
         assertTrue("薪" in text && "「こんばんは」と言う" in text, "review words and how the player writes")
         assertEquals(com.cramtale.core.llm.Models.CHECKS, sent.model, "the cheap model")
     }
+
+    @Test
+    fun `a roll is kept with its turn, with its dice, outcome and what was tried`() {
+        val dir = Files.createTempDirectory("roll").toFile()
+        val f = FakeLlm(mapOf("setup" to setup, "knows_check" to """{"knows":"x"}""",
+            "director" to """{"beats":[{"goal":"g","place":"the gate","characters":["鷺沼"],"pressure":"p"}],"opening":""}""",
+            "adjudicator" to """{"roll":true,"action":"slip past the gate guard","difficulty":1,"stakes":"caught","observable":"a woodcutter edges along the wall"}""",
+            "mistakes" to """{"errors":[],"correct_keys":[]}""", "intent" to """{"notices":"x","wants":"y","does":"z"}""",
+            "judge" to """{"violations":[]}""", "leak" to """{"guesses":[]}""", "scribe" to """{"ops":[]}""",
+            "writer" to """{"passage":"大槻がこちらを見た。","used":[],"grammar":[]}"""))
+        val e = StoryEngine(dir, f, CostLog(null), "s", dice = com.cramtale.core.story.Dice(kotlin.random.Random(3)))
+        e.setup("")
+        e.startSession(DuePool())
+        val t = e.playerTurn("壁ぞいに歩く", DuePool())
+        assertEquals("slip past the gate guard", t.rollAction)
+        // a restart keeps it (the waiting turn is on disk)
+        assertEquals("slip past the gate guard", StoryEngine(dir, f, CostLog(null), "s").pending!!.rollAction)
+        e.commit()
+        val o = File(dir, "log/turns.jsonl").tailJson(1).single()
+        assertEquals(t.roll!!.dice, (0 until o.getJSONArray("dice").length()).map { o.getJSONArray("dice").getInt(it) })
+        assertEquals(t.roll!!.outcome.name, o.getString("outcome"))
+        assertEquals("slip past the gate guard", o.getString("rollAction"))
+    }
 }

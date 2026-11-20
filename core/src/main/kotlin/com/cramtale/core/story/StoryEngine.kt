@@ -77,6 +77,8 @@ class PendingTurn(
     var intents: String? = null
     /** What others could notice of the player's message (the referee's neutral line); "" if nothing. */
     var observable: String = ""
+    /** What the player's character tried, when it took a roll (the referee's words), for showing the dice. */
+    var rollAction: String? = null
     val draft get() = drafts[current]
     /** Written yet? A turn whose writer call failed has no drafts and resumes from here. */
     val ready get() = drafts.isNotEmpty()
@@ -96,7 +98,7 @@ class PendingTurn(
             .put("grammar", JSONArray(d.grammar)).put("rewritten", d.rewritten)
             .put("checks", JSONArray(d.checks.map { JSONObject().put("name", it.name).put("passed", it.passed).put("detail", it.detail) })) }))
         .put("tapped", JSONArray(synchronized(tapped) { tapped.toList() })).put("mistakesRecorded", mistakesRecorded)
-        .put("correctKeys", JSONArray(correctKeys)).put("intents", intents ?: JSONObject.NULL).put("observable", observable)
+        .put("correctKeys", JSONArray(correctKeys)).put("intents", intents ?: JSONObject.NULL).put("observable", observable).put("rollAction", rollAction ?: JSONObject.NULL)
 
     companion object {
         private fun JSONArray?.objects() = if (this == null) emptyList() else (0 until length()).map { getJSONObject(it) }
@@ -130,6 +132,7 @@ class PendingTurn(
             t.mistakesRecorded = o.optBoolean("mistakesRecorded")
             t.intents = o.str("intents")
             t.observable = o.optString("observable")
+            t.rollAction = o.str("rollAction")
             t.correctKeys = o.optJSONArray("correctKeys")?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty()
             o.optJSONArray("tapped")?.let { a -> (0 until a.length()).forEach { t.tapped += a.getLong(it) } }
             return t
@@ -602,6 +605,7 @@ class StoryEngine(
         val turn = PendingTurn(s.turn, message, corrections, roll, rollNote, s.complication, pool)
         turn.correctKeys = correctKeys
         turn.observable = adjudication?.optString("observable").orEmpty()
+        if (roll != null) turn.rollAction = adjudication?.optString("action")?.takeIf { it.isNotBlank() }
         // saved before the writer runs: if that call fails, the roll and its consequence are already
         // decided and a retry resumes this turn instead of rolling again
         pending = turn
@@ -676,6 +680,9 @@ class StoryEngine(
         val entry = JSONObject()
             .put("turn", t.turn).put("at", System.currentTimeMillis()).put("chapter", s.chapter).put("player", t.player ?: "")
             .put("passage", t.draft.passage).put("roll", t.roll?.toString() ?: "")
+            // the dice themselves, so the story's history can show them
+            .apply { t.roll?.let { r -> put("dice", JSONArray(r.dice)).put("modifier", r.modifier).put("outcome", r.outcome.name)
+                .put("rollAction", t.rollAction ?: "") } }
             .put("place", s.place).put("present", JSONArray(s.present)).put("observable", t.observable)
             .put("corrections", JSONArray(t.corrections.map { it.toJson() }))
             .put("checks", JSONArray(t.draft.checks.map { "${it.name}: ${if (it.passed) "ok" else it.detail}" }))
