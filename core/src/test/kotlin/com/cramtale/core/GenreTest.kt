@@ -47,4 +47,13 @@ class GenreTest {
         // and the default taste no longer pulls toward money trouble
         assertFalse("debt" in Prompts(null).config("plot.md").orEmpty())
     }
+
+    @Test
+    fun `the name the player chose reaches setup exactly`() {
+        val dir = Files.createTempDirectory("name").toFile()
+        val fake = FakeLlm(mapOf("setup" to setup, "knows_check" to """{"knows":"Rin cooks."}"""))
+        engine(dir, fake).setup("a temple kitchen", name = "セラフ")
+        val sent = fake.sent("setup").single().messages.joinToString { it.text }
+        assertTrue("## The player's character's name\nセラフ" in sent && "Use exactly this name" in sent)
+    }
 }

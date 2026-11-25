@@ -334,7 +334,7 @@ class StoryEngine(
     fun isSetUp() = File(dir, "state/world.md").exists()
 
     /** Creates the world, cast, secrets, clocks and opening situation from the plot taste. */
-    fun setup(seed: String = "") {
+    fun setup(seed: String = "", name: String = "") {
         val o = validJson("setup", { o ->
             o.optString("world").isNotBlank() && (o.optJSONArray("characters")?.length() ?: 0) >= 2 &&
                 o.optJSONObject("opening")?.optString("place")?.isNotBlank() == true
@@ -344,10 +344,13 @@ class StoryEngine(
                 "material" to Sources(dir).material(MATERIAL_SETUP).let { m -> if (m.isEmpty()) "" else
                     "\n## Material from the player\n" + MATERIAL_RULES + "\n\n$m\n" },
                 // what the player asked for is the premise, first; "Surprise me" gets a spark picked by code
-                "seed" to if (seed.isBlank()) "\n## A spark to build from (the player asked to be surprised)\n${surprise()}\n" +
+                "seed" to (if (seed.isBlank()) "\n## A spark to build from (the player asked to be surprised)\n${surprise()}\n" +
                     "Take it somewhere of your own: invent the specifics, keep the genre.\n" else
                     "\n## What the player asked for\n$seed\n\nThis is the premise: the story is set where it says and is about what it says, " +
-                        "and if it says who the player plays, that is the player's character. Everything below serves it.\n",
+                        "and if it says who the player plays, that is the player's character. Everything below serves it.\n") +
+                    // the name the player chose: exact, and `player` starts with it
+                    (if (name.isBlank()) "" else "\n## The player's character's name\n${name.trim()}\n" +
+                        "Use exactly this name for the player's character (in `player` and everywhere else); everything else about them is yours to build around the premise.\n"),
             )), listOf(Msg(Role.USER, "Create the game now, with every field filled in.")), schema = SETUP_SCHEMA, maxTokens = 16000)
         }
         val stateDir = File(dir, "state").apply { mkdirs() }

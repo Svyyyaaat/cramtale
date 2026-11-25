@@ -222,7 +222,10 @@ fun StoryStepContent(seed: String, onSeed: (String) -> Unit, busy: String?, erro
                      files: List<Pair<String, Int>> = emptyList(), onAddFiles: (() -> Unit)? = null, onRemoveFile: (String) -> Unit = {},
                      fileNote: String? = null,
                      /** The story this one continues (its world and people), or null for a fresh one. */
-                     sequelOf: String? = null) {
+                     sequelOf: String? = null,
+                     /** Who you play, if you want to name them; and this story's style (blank: [styleDefault]). */
+                     name: String = "", onName: (String) -> Unit = {},
+                     style: String = "", onStyle: (String) -> Unit = {}, styleDefault: String = "") {
     // nothing typed: the story is a surprise (a spark from many genres), and the button says so
     val primary = when {
         sequelOf != null -> "Start the next part"
@@ -243,6 +246,18 @@ fun StoryStepContent(seed: String, onSeed: (String) -> Unit, busy: String?, erro
             // a few starting points, one tap to fill in (and edit)
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 for (example in PREMISE_EXAMPLES) androidx.compose.material3.SuggestionChip({ onSeed(example) }, { Text(example, maxLines = 1) })
+            }
+            OutlinedTextField(name, onName, Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, singleLine = true,
+                label = { Text("Your character's name (optional)") }, placeholder = { Text("Left empty, the story names them") })
+            // the default shows greyed out: type to replace it for this story only
+            // the title sits above, not inside: a field with a label hides its placeholder until focused, and the
+            // default has to be visible (greyed out) while nothing is typed
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Story style (optional)", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 4.dp))
+                OutlinedTextField(style, onStyle, Modifier.fillMaxWidth().heightIn(min = 120.dp), shape = MaterialTheme.shapes.medium,
+                    placeholder = { Text(styleDefault, maxLines = 6, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
+                    supportingText = { Text(if (style.isBlank()) "Your default style, shown greyed out (change it in Settings). Type to use another for this story." else "For this story only") })
             }
         }
         // your own material: lore, a character sheet, notes, an old chat log
@@ -413,6 +428,8 @@ fun OnboardingFlow(state: AppState, onFinished: () -> Unit) {
             val sequelOf = remember { state.story.sequelTitle() }
             StoryStepContent(state.story.seedDraft, { state.story.seedDraft = it }, state.story.busy, state.story.error,
                 files = files, fileNote = fileNote, sequelOf = sequelOf,
+                name = state.story.nameDraft, onName = { state.story.nameDraft = it },
+                style = state.story.styleDraft, onStyle = { state.story.styleDraft = it }, styleDefault = remember { state.story.defaultTaste() },
                 // files are for a fresh story (a sequel keeps the earlier one's world and files)
                 onAddFiles = if (sequelOf == null) ({ pick.launch(arrayOf("text/*", "application/json", "application/octet-stream")) }) else null,
                 onRemoveFile = { n -> state.story.detach(n); files = state.story.attachments().map { it.name to it.text.length } },

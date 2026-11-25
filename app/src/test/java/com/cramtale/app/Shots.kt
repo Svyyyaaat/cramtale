@@ -146,7 +146,10 @@ class Shots {
         StoryStepContent("", {}, null, null, {}, {}, sequelOf = "The Well Keeper")
     }
 
-    @Test fun a9_story_setup() = shot { StoryStepContent("", {}, null, null, {}, {}, onAddFiles = {}) }
+    @Test fun a9_story_setup() = shot { StoryStepContent("", {}, null, null, {}, {}, onAddFiles = {},
+        styleDefault = com.cramtale.core.story.Prompts(null).config("plot.md").orEmpty()) }
+    @Test fun a9d_story_setup_named_dark() = shot(dark = true) { StoryStepContent("A ghost at a seaside café", {}, null, null, {}, {}, onAddFiles = {},
+        name = "セラフ", style = "Quiet and eerie; small stakes that grow.", styleDefault = com.cramtale.core.story.Prompts(null).config("plot.md").orEmpty()) }
 
     @Test fun b1_styles() = shot {
         StyleStepContent(listOf(
@@ -337,7 +340,8 @@ class Shots {
     }
 
     @Test fun e1_settings() = shot {
-        SettingsContent(SettingsValues(1.15f, com.cramtale.core.story.PassageLength.LONG, false, false, "sk-ant-…x9Qa", "Spare and close: short sentences, objects and what people do."), {}, {}, {}, {}, {}, {})
+        SettingsContent(SettingsValues(1.15f, com.cramtale.core.story.PassageLength.LONG, false, false, "sk-ant-…x9Qa", "Spare and close: short sentences, objects and what people do.",
+            defaultStyle = "Cosy mysteries, low stakes, a town where everyone knows everyone.", ownDefaultStyle = true), {}, {}, {}, {}, {}, {})
     }
 
     @Test fun d3_word_sheet() = shot {

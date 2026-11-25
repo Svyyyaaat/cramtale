@@ -1,5 +1,7 @@
 package com.cramtale.app.ui
 
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material3.Icon
@@ -47,6 +49,9 @@ data class SettingsValues(
     val claudeCode: Boolean = false,
     /** 0 normal, 1 strict, 2 annoying. */
     val corrections: Int = 0,
+    /** New stories' default story style (how it should feel), and whether it's yours or the app's. */
+    val defaultStyle: String = "",
+    val ownDefaultStyle: Boolean = false,
 )
 
 val TEXT_SCALES = listOf(0.85f to "Small", 1f to "Normal", 1.15f to "Large", 1.3f to "Larger")
@@ -56,7 +61,8 @@ fun SettingsScreen(state: AppState, onNewStory: () -> Unit, onScale: (Float) -> 
                    go: (Screen) -> Unit = {}, onRestartSetup: () -> Unit = {}) {
     var v by remember {
         mutableStateOf(SettingsValues(state.textScale, state.passageLength, state.twoReads, state.firmStyleRules, state.story.keyHint(),
-            state.story.styleLine(), state.themeMode, state.materialYou, state.claudeCode, state.correctionLevel))
+            state.story.styleLine(), state.themeMode, state.materialYou, state.claudeCode, state.correctionLevel,
+            state.story.defaultTaste(), state.story.hasOwnDefaultTaste()))
     }
     SettingsContent(v,
         onScale = { state.textScale = it; onScale(it); v = v.copy(textScale = it) },
@@ -70,6 +76,8 @@ fun SettingsScreen(state: AppState, onNewStory: () -> Unit, onScale: (Float) -> 
         onColors = { state.chooseMaterialYou(it); v = v.copy(materialYou = it) },
         onBackend = { state.chooseClaudeCode(it); v = v.copy(claudeCode = it) },
         onCorrections = { state.correctionLevel = it; v = v.copy(corrections = it) },
+        onDefaultStyle = { t -> state.story.saveDefaultTaste(t); v = v.copy(defaultStyle = state.story.defaultTaste(), ownDefaultStyle = state.story.hasOwnDefaultTaste()) },
+        shippedStyle = state.story.shippedTaste(),
         claudeCodeSetup = { ClaudeCodeSetup(state) },
         advanced = listOf(
             Triple("Calibrate on real text", "Paste Japanese you read; it marks what you know") { go(Screen.CALIBRATE) },
@@ -88,11 +96,14 @@ fun SettingsContent(
     onColors: (Boolean) -> Unit = {},
     onBackend: (Boolean) -> Unit = {},
     onCorrections: (Int) -> Unit = {},
+    /** Saves the default story style ("" or the shipped text: back to the app's). */
+    onDefaultStyle: (String) -> Unit = {}, shippedStyle: String = "",
     claudeCodeSetup: @Composable () -> Unit = {},
     /** Rarely used screens: (name, what it is, open). */
     advanced: List<Triple<String, String, () -> Unit>> = emptyList(),
 ) {
     var keyInput by remember { mutableStateOf<String?>(null) }
+    var styleInput by remember { mutableStateOf<String?>(null) }
     Page {
         SectionTitle("Look and reading")
         PaperCard {
@@ -130,6 +141,14 @@ fun SettingsContent(
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Toggle("Stricter style", "Claude gets the style as rules (\"never…\") instead of a description. Try it if passages drift from the style.", v.firmStyle, onFirm)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Default story style", style = MaterialTheme.typography.titleSmall)
+                    Hint((if (v.ownDefaultStyle) "Yours: " else "The app's: ") + v.defaultStyle.take(90) + if (v.defaultStyle.length > 90) "…" else "")
+                }
+                TextButton({ styleInput = v.defaultStyle }) { Text("Edit") }
+            }
         }
 
         SectionTitle("Reviews")
@@ -175,6 +194,19 @@ fun SettingsContent(
         }
     }
 
+    styleInput?.let { t ->
+        AlertDialog(onDismissRequest = { styleInput = null }, title = { Text("Default story style") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("How new stories should feel, whatever they're about. A story's own style, typed when you create it, replaces this for that story.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedTextField(t, { styleInput = it }, Modifier.fillMaxWidth().heightIn(min = 160.dp))
+                    if (t.trim() != shippedStyle) TextButton({ styleInput = shippedStyle }, contentPadding = PaddingValues(horizontal = 0.dp)) { Text("Use the app's original") }
+                }
+            },
+            confirmButton = { TextButton({ onDefaultStyle(t); styleInput = null }) { Text("Save") } },
+            dismissButton = { TextButton({ styleInput = null }) { Text("Cancel") } })
+    }
     keyInput?.let { k ->
         AlertDialog(onDismissRequest = { keyInput = null }, title = { Text("Claude API key") },
             text = {

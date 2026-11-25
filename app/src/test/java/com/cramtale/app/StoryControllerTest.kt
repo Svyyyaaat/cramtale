@@ -366,4 +366,24 @@ class StoryControllerTest {
         assertTrue(role, "way home" in role)
         assertTrue(role, "sinks" !in role && "Hidden" !in role)
     }
+
+    @Test
+    fun `a story's own style is used for it, otherwise your default`() = runBlocking {
+        val c = controller()
+        c.saveDefaultTaste("Cosy mysteries, low stakes.")
+        assertTrue(c.hasOwnDefaultTaste())
+        c.styleDraft = "Grim and fast."
+        c.nameDraft = "セラフ"
+        assertEquals("survives a restart", "Grim and fast.", controller().styleDraft)
+        c.setup("")
+        assertEquals("Grim and fast.", File(c.dir, "config/plot.md").readText().trim())
+        assertEquals("", c.styleDraft)
+        assertEquals("", c.nameDraft)
+
+        c.archiveAndReset()
+        c.setup("")
+        assertEquals("Cosy mysteries, low stakes.", File(c.dir, "config/plot.md").readText().trim())
+        c.saveDefaultTaste(c.shippedTaste())
+        assertTrue("the app's text again: no own default", !c.hasOwnDefaultTaste())
+    }
 }

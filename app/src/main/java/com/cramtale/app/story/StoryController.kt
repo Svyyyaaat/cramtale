@@ -184,6 +184,17 @@ class StoryController(
     fun sequelTitle(): String? = (sequelOf() ?: prefs.getString("newFrom", "")?.takeIf { it.isNotEmpty() }?.let(::File))
         ?.let { summary(it, it == dir)?.title }
 
+    /** The new story's character name and story style, saved as typed. */
+    var nameDraft: String
+        get() = nameState
+        set(v) { nameState = v; prefs.edit().putString("nameDraft", v).apply() }
+    private var nameState by mutableStateOf(context.getSharedPreferences("settings", Context.MODE_PRIVATE).getString("nameDraft", "").orEmpty())
+
+    var styleDraft: String
+        get() = styleState
+        set(v) { styleState = v; prefs.edit().putString("styleDraft", v).apply() }
+    private var styleState by mutableStateOf(context.getSharedPreferences("settings", Context.MODE_PRIVATE).getString("styleDraft", "").orEmpty())
+
     // ------------------------------------------------------------------ a new story, safely
 
     /** Where a story being set up keeps its files until it's created: the story you're in stays untouched until then. */
@@ -199,14 +210,14 @@ class StoryController(
     fun beginNewStory(from: File? = null): Boolean {
         if (isWorking) return false
         staging.deleteRecursively()
-        seedDraft = ""
+        seedDraft = ""; nameDraft = ""; styleDraft = ""
         prefs.edit().putBoolean("newStoryAsked", true).putString("newFrom", from?.path.orEmpty()).apply()
         return true
     }
 
     /** Backing out of setting up a new story: its files go, the story you were in is as it was. */
     fun cancelNewStory() {
-        staging.deleteRecursively(); seedDraft = ""
+        staging.deleteRecursively(); seedDraft = ""; nameDraft = ""; styleDraft = ""
         prefs.edit().remove("newStoryAsked").remove("newFrom").apply()
     }
 
@@ -418,18 +429,42 @@ class StoryController(
         return true
     }
 
-    suspend fun setup(seed: String): Unit? = work("Creating the story…", again = { setup(seed) }) {
-        runCatching { takeSnapshot() }   // flashcards for the wait
-        val from = sequelOf()
-        if (from != null) engine().carryOver(from, seed) else engine().setup(seed)
-        prefs.edit().remove("sequelOf").remove("newFrom").apply()
-        // made: the description has done its job
-        seedDraft = ""
+    suspend fun setup(seed: String, name: String = nameDraft, style: String = styleDraft): Unit? =
+        work("Creating the story…", again = { setup(seed, name, style) }) {
+            runCatching { takeSnapshot() }   // flashcards for the wait
+            val from = sequelOf()
+            if (from != null) engine().carryOver(from, seed)
+            else {
+                // this story's style: what was typed for it, else your default (Settings)
+                File(dir, "config").mkdirs()
+                File(dir, "config/plot.md").writeText(style.trim().ifEmpty { defaultTaste() } + "\n")
+                engine().setup(seed, name)
+            }
+            prefs.edit().remove("sequelOf").remove("newFrom").apply()
+            // made: the drafts have done their job
+            seedDraft = ""; nameDraft = ""; styleDraft = ""
+        }
+
+    /** config/plot.md as it is now (the story's copy, else your default). */
+    fun taste(): String = File(dir, "config/plot.md").takeIf { it.exists() }?.readText()?.trim() ?: defaultTaste()
+
+    // ------------------------------------------------------------------ your default story style
+
+    private val defaultTasteFile get() = File(context.filesDir, "defaults/plot.md")
+
+    /** The story style new stories start with: yours (Settings), else the one that ships with the app. */
+    fun defaultTaste(): String = defaultTasteFile.takeIf { it.exists() }?.readText()?.trim()?.ifEmpty { null } ?: shippedTaste()
+
+    fun shippedTaste(): String = com.cramtale.core.story.Prompts(null).config("plot.md")?.trim().orEmpty()
+
+    /** Saves your default story style; blank or the shipped text goes back to following the app's. */
+    fun saveDefaultTaste(text: String) {
+        val t = text.trim()
+        if (t.isEmpty() || t == shippedTaste()) defaultTasteFile.delete()
+        else { defaultTasteFile.parentFile?.mkdirs(); defaultTasteFile.writeText(t + "\n") }
     }
 
-    /** config/plot.md as it is now (the story's copy, else the bundled default). */
-    fun taste(): String = File(dir, "config/plot.md").takeIf { it.exists() }?.readText()?.trim()
-        ?: com.cramtale.core.story.Prompts(null).config("plot.md")?.trim().orEmpty()
+    fun hasOwnDefaultTaste() = defaultTasteFile.exists()
 
     private val styleCache = File(dir, "state/style_options.json")
 
