@@ -335,6 +335,24 @@ class StoryController(
         return true
     }
 
+    /**
+     * Deletes a story from the phone for good: one on the shelf, or the one you're in (then there's none until you
+     * start or pick one). What's about you, not the story (mistakes, review log, costs), stays. A new story or
+     * sequel being set up from it is called off.
+     */
+    fun deleteStory(d: File): Boolean {
+        if (isWorking) return false
+        val target = if (d == dir) {
+            if (!isSetUp()) return false
+            archiveAndReset() ?: return false
+        } else {
+            if (d.parentFile != archiveRoot || !d.isDirectory) return false
+            d
+        }
+        listOf("sequelOf", "newFrom").forEach { k -> if (prefs.getString(k, "") == d.path || prefs.getString(k, "") == target.path) prefs.edit().remove(k).apply() }
+        return target.deleteRecursively()
+    }
+
     /** The style's short name ("Light novel"), or its description for styles picked before names were kept. */
     fun styleName(): String? = com.cramtale.core.story.StylePresets.name(dir) ?: styleLine()?.let { if (it.length > 40) it.take(38) + "…" else it }
 

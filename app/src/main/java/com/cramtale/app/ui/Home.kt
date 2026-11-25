@@ -79,10 +79,12 @@ data class HomeInfo(
     val title: String? = null,
     val styleName: String? = null,
     val storyCount: Int = 1,
+    /** False after the story you were in was deleted: the hero invites you to start one. */
+    val hasStory: Boolean = true,
 )
 
 @Composable
-fun HomeContent(info: HomeInfo, go: (Screen) -> Unit, onRestartSetup: () -> Unit) {
+fun HomeContent(info: HomeInfo, go: (Screen) -> Unit, onRestartSetup: () -> Unit, onNewStory: () -> Unit = {}) {
     Page {
         // wordmark and the collection's state
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -98,7 +100,7 @@ fun HomeContent(info: HomeInfo, go: (Screen) -> Unit, onRestartSetup: () -> Unit
             }
         }
 
-        StoryHero(info) { go(Screen.STORY) }
+        StoryHero(info) { if (info.hasStory) go(Screen.STORY) else onNewStory() }
         // the story's own choices, one tap away but quieter than Continue
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             QuickLink(Icons.AutoMirrored.Filled.LibraryBooks, "Stories",
@@ -175,6 +177,15 @@ fun StoryHero(info: HomeInfo, onOpen: () -> Unit) {
             .clickable(onClick = onOpen).padding(22.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        if (!info.hasStory) {
+            Text("No story yet", style = ReadingText.copy(fontSize = 24.sp, lineHeight = 32.sp), color = a.onHero)
+            Text("Start one: any genre, with your Anki words inside.", style = MaterialTheme.typography.bodyMedium, color = a.onHero.copy(alpha = 0.75f))
+            Button(onOpen, Modifier.heightIn(min = 48.dp), shape = RoundedCornerShape(24.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = a.heroButton, contentColor = a.onHeroButton)) {
+                Text("Start a story", style = MaterialTheme.typography.labelLarge)
+            }
+            return@Column
+        }
         Text(info.title ?: info.place ?: "Your story", style = ReadingText.copy(fontSize = 24.sp, lineHeight = 32.sp), color = a.onHero)
         Text(if (info.turn == 0) "Not started yet" else listOfNotNull("Chapter ${info.chapter}, turn ${info.turn}", info.place?.takeIf { info.title != null }?.let { "in $it" }).joinToString(" "),
             style = MaterialTheme.typography.bodyMedium, color = a.onHero.copy(alpha = 0.75f), maxLines = 1, overflow = TextOverflow.Ellipsis)

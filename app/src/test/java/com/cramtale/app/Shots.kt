@@ -158,6 +158,11 @@ class Shots {
         ), null, null, {}, {}, {})
     }
 
+    @Test fun c1b_home_no_story() = shot {
+        HomeContent(HomeInfo(null, 0, 1, null, 1.42, "Real collection · com.ichi2.anki", true, true, 7127, 10000,
+            due = DueCounts(42, 3, 10), hasStory = false, storyCount = 0), {}, {})
+    }
+
     @Test fun c1_home() = shot {
         HomeContent(HomeInfo("西田製作所の事務所", 12, 1, "村井はかばんの口を閉めて、立ち上がらずに待っていた。", 1.42,
             "Real collection · com.ichi2.anki", true, true, 7127, 10000,

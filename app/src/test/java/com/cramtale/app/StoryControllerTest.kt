@@ -386,4 +386,27 @@ class StoryControllerTest {
         c.saveDefaultTaste(c.shippedTaste())
         assertTrue("the app's text again: no own default", !c.hasOwnDefaultTaste())
     }
+
+    @Test
+    fun `stories can be deleted, and your history stays`() = runBlocking {
+        val c = controller()
+        c.setup("")
+        File(c.dir, "state/title.txt").writeText("Old\n")
+        c.archiveAndReset()
+        c.setup("")
+        File(c.dir, "state/title.txt").writeText("Now\n")
+        File(c.dir, "log/mistakes.json").writeText("[\"mine\"]")
+        val old = c.stories().single { !it.current }
+        assertTrue(c.deleteStory(old.dir))
+        assertEquals(listOf("Now"), c.stories().map { it.title })
+
+        // the one you're in: gone, nothing current, your mistakes still here
+        assertTrue(c.deleteStory(c.dir))
+        assertTrue(!c.isSetUp() && c.stories().isEmpty())
+        assertEquals("[\"mine\"]", File(c.dir, "log/mistakes.json").readText())
+
+        // only stories: nothing outside the shelf
+        assertTrue(!c.deleteStory(File(context.filesDir, "lists").apply { mkdirs() }))
+        assertTrue(File(context.filesDir, "lists").exists())
+    }
 }

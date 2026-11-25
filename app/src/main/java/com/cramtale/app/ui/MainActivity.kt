@@ -94,7 +94,7 @@ fun App(state: AppState) {
             return@Column
         }
         when (screen) {
-            Screen.HOME -> home?.let { HomeContent(it, go = { s -> stack.add(s) }, onRestartSetup = { state.onboardingStep = 0; state.onboardingDone = false; onboarding = true }) }
+            Screen.HOME -> home?.let { HomeContent(it, go = { s -> stack.add(s) }, onNewStory = newStory, onRestartSetup = { state.onboardingStep = 0; state.onboardingDone = false; onboarding = true }) }
                 ?: Busy("Opening…")
             Screen.STORY -> StoryScreen(state, onBack = back)
             Screen.VOCAB -> { AppBar(screen.title, back); VocabCheckFlow(state) { back() } }
@@ -139,6 +139,7 @@ fun homeInfo(state: AppState): HomeInfo {
     val stories = s.stories()
     return HomeInfo(
         due = due, perPassage = s.cardsPerPassage() ?: state.passageLength.estimate, readToday = today.cards, goodToday = today.good, againToday = today.again,
+        hasStory = s.isSetUp(),
         title = stories.firstOrNull { it.current }?.title, styleName = s.styleName(), storyCount = stories.size,
         place = s.place(), turn = s.turn(), chapter = s.chapter(), lastLines = s.lastLines(), totalCost = s.totalCost(),
         collection = t?.let { (if (it.isReal) "Real collection" else "Copy") + " · " + it.packageName } ?: "Not connected",

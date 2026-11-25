@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -84,6 +86,9 @@ fun StoriesScreen(state: AppState, onContinue: () -> Unit, onNewStory: () -> Uni
     StoriesContent(list, onContinue, onNewStory, problem, writing = state.story.isWorking, note = note, onSwitch = { s ->
         if (state.story.switchTo(s.dir)) { problem = null; tick++; onSwitched() }
         else problem = if (state.story.isWorking) "A passage is still being written. Switch once it's done." else "Couldn't open “${s.title}”. It's still in the list; try again."
+    }, onDelete = { s ->
+        if (state.story.deleteStory(s.dir)) { note = "“${s.title}” is deleted."; problem = null; tick++ }
+        else problem = if (state.story.isWorking) "A passage is still being written. Delete once it's done." else "Couldn't delete “${s.title}”."
     }, onExport = { s -> exporting = s; saveTo.launch(state.story.exportName(s)) },
         onImport = { openZip.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) }, onSequel = onSequel)
 }
@@ -95,9 +100,12 @@ fun StoriesContent(stories: List<StorySummary>, onContinue: () -> Unit, onNewSto
                    /** A story to a zip (a backup), and a zip back onto the shelf. */
                    onExport: (StorySummary) -> Unit = {}, onImport: () -> Unit = {},
                    /** A new story that keeps this one's world and people (and their memories). */
-                   onSequel: (StorySummary) -> Unit = {}) {
+                   onSequel: (StorySummary) -> Unit = {},
+                   /** Removes a story from the phone for good (after asking). */
+                   onDelete: (StorySummary) -> Unit = {}) {
     var confirmNew by remember { mutableStateOf(false) }
     var confirmSwitch by remember { mutableStateOf<StorySummary?>(null) }
+    var confirmDelete by remember { mutableStateOf<StorySummary?>(null) }
     val current = stories.firstOrNull { it.current }
     val others = stories.filter { !it.current }
     val cs = MaterialTheme.colorScheme
@@ -118,7 +126,11 @@ fun StoriesContent(stories: List<StorySummary>, onContinue: () -> Unit, onNewSto
                 }
             }
             PrimaryButton(if (current.turn == 0) "Begin" else "Continue", onContinue, icon = Icons.AutoMirrored.Filled.MenuBook)
-            QuietButton("Save a backup", { onExport(current) }, icon = Icons.Filled.SaveAlt, enabled = !writing)
+            Row {
+                QuietButton("Save a backup", { onExport(current) }, icon = Icons.Filled.SaveAlt, enabled = !writing)
+                Spacer(Modifier.weight(1f))
+                TextButton({ confirmDelete = current }, enabled = !writing) { Text("Delete", color = if (writing) cs.onSurfaceVariant else cs.error) }
+            }
         } else {
             // nothing set up: the only thing to do here is start one
             Text("No story yet.", style = ReadingText.copy(fontSize = 22.sp, lineHeight = 30.sp))
@@ -130,7 +142,7 @@ fun StoriesContent(stories: List<StorySummary>, onContinue: () -> Unit, onNewSto
             Column {
                 others.forEachIndexed { i, s ->
                     if (i > 0) HorizontalDivider(color = cs.outlineVariant)
-                    ShelfRow(s, enabled = !writing, onExport = { onExport(s) }) { confirmSwitch = s }
+                    ShelfRow(s, enabled = !writing, onExport = { onExport(s) }, onDelete = { confirmDelete = s }) { confirmSwitch = s }
                 }
             }
         } else if (current != null) {
@@ -150,6 +162,16 @@ fun StoriesContent(stories: List<StorySummary>, onContinue: () -> Unit, onNewSto
             TextButton({ confirmNew = false }) { Text("Cancel") }
             current?.let { c -> TextButton({ confirmNew = false; onSequel(c) }) { Text("Keep its people") } }
         } })
+    confirmDelete?.let { s ->
+        AlertDialog(onDismissRequest = { confirmDelete = null }, title = { Text("Delete “${s.title}”?") },
+            text = { Text("It's removed from this phone for good. Your mistakes and review history stay. " +
+                "If you might want it again, save a backup first.") },
+            confirmButton = { TextButton({ confirmDelete = null; onDelete(s) }) { Text("Delete", color = MaterialTheme.colorScheme.error) } },
+            dismissButton = { Row {
+                TextButton({ confirmDelete = null; onExport(s) }) { Text("Save a backup") }
+                TextButton({ confirmDelete = null }) { Text("Cancel") }
+            } })
+    }
     confirmSwitch?.let { s ->
         AlertDialog(onDismissRequest = { confirmSwitch = null }, title = { Text("Continue “${s.title}”?") },
             text = { Text("It opens where you left off." + (current?.let { " “${it.title}” stays here." } ?: "")) },
@@ -160,18 +182,28 @@ fun StoriesContent(stories: List<StorySummary>, onContinue: () -> Unit, onNewSto
 
 /** An earlier story on the shelf: its title in the reading face, where it stands, when you last played it. */
 @Composable
-private fun ShelfRow(s: StorySummary, enabled: Boolean, onExport: () -> Unit = {}, onPick: () -> Unit) {
+private fun ShelfRow(s: StorySummary, enabled: Boolean, onExport: () -> Unit = {}, onDelete: () -> Unit = {}, onPick: () -> Unit) {
     val cs = MaterialTheme.colorScheme
+    var menu by remember { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onPick).padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(s.title, style = ReadingText.copy(fontSize = 18.sp, lineHeight = 26.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(progress(s), style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(ago(s.lastActive), style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
         }
-        androidx.compose.material3.IconButton(onExport, enabled = enabled) {
-            Icon(Icons.Filled.SaveAlt, "Save a backup of ${s.title}", tint = cs.onSurfaceVariant)
-        }
         TextButton(onPick, enabled = enabled) { Text("Continue") }
+        // the less common things, named, behind one button
+        Box {
+            androidx.compose.material3.IconButton({ menu = true }, enabled = enabled) {
+                Icon(Icons.Filled.MoreVert, "More for ${s.title}", tint = cs.onSurfaceVariant)
+            }
+            androidx.compose.material3.DropdownMenu(menu, { menu = false }) {
+                androidx.compose.material3.DropdownMenuItem({ Text("Save a backup") }, { menu = false; onExport() },
+                    leadingIcon = { Icon(Icons.Filled.SaveAlt, null) })
+                androidx.compose.material3.DropdownMenuItem({ Text("Delete", color = cs.error) }, { menu = false; onDelete() },
+                    leadingIcon = { Icon(Icons.Filled.DeleteOutline, null, tint = cs.error) })
+            }
+        }
     }
 }
 
