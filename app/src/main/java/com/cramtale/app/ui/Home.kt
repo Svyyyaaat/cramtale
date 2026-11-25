@@ -46,6 +46,10 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
@@ -92,12 +96,18 @@ fun HomeContent(info: HomeInfo, go: (Screen) -> Unit, onRestartSetup: () -> Unit
             Spacer(Modifier.width(10.dp))
             Text("Cramtale", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.weight(1f))
-            when {
+            var explain by remember { mutableStateOf(false) }
+            if (explain) androidx.compose.material3.AlertDialog(onDismissRequest = { explain = false },
+                title = { Text("Practice only, for now") },
+                text = { Text(if (!info.connected) "AnkiDroid isn't connected, so the story can't use your due words. Connect it in Settings → AnkiDroid connection."
+                    else "Cramtale reads your decks and what's due, and logs how you'd have answered. It doesn't answer cards in AnkiDroid yet, so keep reviewing there. The Review log compares the two.") },
+                confirmButton = { androidx.compose.material3.TextButton({ explain = false }) { Text("Got it") } })
+            Box(Modifier.clip(RoundedCornerShape(50)).clickable { explain = true }) { when {
                 !info.connected -> StatusPill(Icons.Filled.LinkOff, "No Anki", MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.onSurfaceVariant)
                 // a state, not a warning: neutral
                 info.collectionIsReal -> StatusPill(Icons.Filled.Lock, "Anki: read-only", MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.onSurfaceVariant)
                 else -> StatusPill(Icons.Filled.Lock, "Anki copy: read-only", MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+            } }
         }
 
         StoryHero(info) { if (info.hasStory) go(Screen.STORY) else onNewStory() }
@@ -105,7 +115,7 @@ fun HomeContent(info: HomeInfo, go: (Screen) -> Unit, onRestartSetup: () -> Unit
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             QuickLink(Icons.AutoMirrored.Filled.LibraryBooks, "Stories",
                 if (info.storyCount > 1) "${info.storyCount} on this phone" else "new or earlier", Modifier.weight(1f)) { go(Screen.STORIES) }
-            QuickLink(Icons.Filled.Brush, "Style", info.styleName ?: "pick one", Modifier.weight(1f)) { go(Screen.STYLE) }
+            QuickLink(Icons.Filled.Brush, "Writing style", info.styleName ?: "pick one", Modifier.weight(1f)) { go(Screen.STYLE) }
         }
         TodayCard(info)
 
@@ -114,8 +124,8 @@ fun HomeContent(info: HomeInfo, go: (Screen) -> Unit, onRestartSetup: () -> Unit
         TileGrid(listOf(
             Tile(Icons.Filled.BarChart, "Review log", if (info.readToday > 0) "${info.readToday} read today" else "what you read") { go(Screen.LOGS) },
             Tile(Icons.Filled.Style, "Your decks", "%,d words".format(info.deckWords), Tint.VERMILION) { go(Screen.DECK) },
-            Tile(Icons.Filled.Quiz, "Vocab check", "what you already know", Tint.JADE) { go(Screen.VOCAB) },
-            Tile(Icons.Filled.Settings, "Settings", "reading, Claude, Anki", Tint.NEUTRAL) { go(Screen.SETTINGS) },
+            Tile(Icons.Filled.Quiz, "Vocab check", "your level", Tint.JADE) { go(Screen.VOCAB) },
+            Tile(Icons.Filled.Settings, "Settings", "reading, Claude", Tint.NEUTRAL) { go(Screen.SETTINGS) },
         ))
         Spacer(Modifier.height(12.dp))
     }
@@ -257,7 +267,7 @@ fun TodayCard(info: HomeInfo) {
                 else Breakdown(listOf(d.review to "review", d.learn to "learning", d.new to "new"))
             }
         }
-        StatCard(Modifier.weight(1f), Icons.AutoMirrored.Filled.MenuBook, info.readToday.toString(), "read in the story", cs.tertiary) {
+        StatCard(Modifier.weight(1f), Icons.AutoMirrored.Filled.MenuBook, info.readToday.toString(), "practised in the story", cs.tertiary) {
             if (info.readToday == 0) Text("none yet", style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
             else Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Dot(cs.tertiary, "${info.goodToday} good")
@@ -267,8 +277,8 @@ fun TodayCard(info: HomeInfo) {
     }
     if (info.due != null && info.due.total > 0) {
         val n = kotlin.math.ceil(info.due.total / info.perPassage.coerceAtLeast(1.0)).toInt()
-        Text("≈ $n passages to get through what's due", style = MaterialTheme.typography.bodySmall,
-            color = cs.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp))
+        Text("≈ $n passages to practise what's due. Practice only: Anki isn't updated, so review there as usual.",
+            style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp))
     }
 }
 

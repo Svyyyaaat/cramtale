@@ -47,6 +47,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Casino
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AlertDialog
@@ -202,7 +203,9 @@ fun TeachTaps(onDone: () -> Unit) {
             Text("Your Anki words are in the story", style = MaterialTheme.typography.titleSmall, color = cs.onSecondaryContainer)
             Text("Read past a word you know: it counts as Good. Don't know one? Tap it: you see its meaning, and it counts as Again.",
                 style = MaterialTheme.typography.bodyMedium, color = cs.onSecondaryContainer)
-            MarkKey(SpanStyle(textDecoration = TextDecoration.Underline, color = cs.tertiary), "箇所", "a new card: tap it for its meaning")
+            Text("Your due words look like the rest of the text. Underlines mark only words that are new to you.",
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold), color = cs.onSecondaryContainer)
+            MarkKey(SpanStyle(textDecoration = TextDecoration.Underline, color = cs.primary), "箇所", "a new card: tap it for its meaning")
             MarkKey(SpanStyle(textDecoration = TextDecoration.Underline, color = cs.accent), "返済", "probably new to you, not in your decks")
             MarkKey(SpanStyle(background = LocalAccents.current.tapped), "布", "a word you tapped")
             TextButton(onDone, contentPadding = PaddingValues(horizontal = 0.dp)) { Text("Got it") }
@@ -234,7 +237,8 @@ fun Ornament() {
 fun PassageText(p: ShownPassage, interactive: Boolean, isTapped: (Span) -> Boolean, statusOf: (Span) -> Status, tapVersion: Int, onTap: (Span) -> Unit) {
     // names are tappable too (for the reading); other ignored tokens (particles, numbers…) aren't
     val tappedBg = LocalAccents.current.tapped
-    val glossColor = MaterialTheme.colorScheme.tertiary
+    // new cards in the theme's own colour: green means "Good" elsewhere in the app
+    val glossColor = MaterialTheme.colorScheme.primary
     val unknownLine = MaterialTheme.colorScheme.accent
     val text = remember(p, tapVersion, interactive) {
         buildAnnotatedString {
@@ -264,15 +268,25 @@ fun PassageText(p: ShownPassage, interactive: Boolean, isTapped: (Span) -> Boole
 fun PassageTools(p: ShownPassage, enabled: Boolean, onReroll: () -> Unit, onEdit: () -> Unit, onGrammar: (GrammarPatterns.Found) -> Unit,
                   onVersion: (Int) -> Unit = {}, listening: Boolean = false, onListen: (() -> Unit)? = null) {
     var notes by remember { mutableStateOf(false) }
-    // a quiet row of round tools; the passage is what matters
+    var more by remember { mutableStateOf(false) }
+    // a quiet row of round tools; the passage is what matters. Listen and Rewrite are the everyday ones;
+    // editing the text and the game master's notes (spoilers) wait under More
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         if (onListen != null) Tool(if (listening) Icons.Filled.Stop else Icons.AutoMirrored.Filled.VolumeUp, if (listening) "Stop" else "Listen",
             active = listening, onClick = onListen)
         Tool(Icons.Filled.Refresh, "Rewrite", enabled = enabled, onClick = onReroll)
-        Tool(Icons.Filled.Edit, "Edit", enabled = enabled, onClick = onEdit)
-        Tool(Icons.AutoMirrored.Filled.Notes, "Behind it", active = notes) { notes = !notes }
-        Spacer(Modifier.weight(1f))
-        if (p.versions > 1) Row(verticalAlignment = Alignment.CenterVertically) {
+        Box {
+            Tool(Icons.Filled.MoreHoriz, "More", active = notes) { more = true }
+            androidx.compose.material3.DropdownMenu(more, { more = false }) {
+                androidx.compose.material3.DropdownMenuItem({ Text("Edit the text") }, { more = false; onEdit() }, enabled = enabled,
+                    leadingIcon = { Icon(Icons.Filled.Edit, null) })
+                androidx.compose.material3.DropdownMenuItem({ Text(if (notes) "Hide the game master's notes" else "Game master's notes (spoilers)") },
+                    { more = false; notes = !notes }, leadingIcon = { Icon(Icons.AutoMirrored.Filled.Notes, null) })
+            }
+        }
+    }
+    // versions on their own line: the row above stays the same wherever you are
+    if (p.versions > 1) Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton({ onVersion(p.version - 1) }, enabled = enabled && p.version > 0) {
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Previous version")
             }
@@ -280,7 +294,6 @@ fun PassageTools(p: ShownPassage, enabled: Boolean, onReroll: () -> Unit, onEdit
             IconButton({ onVersion(p.version + 1) }, enabled = enabled && p.version < p.versions - 1) {
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Next version")
             }
-        }
     }
     if (p.grammar.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         for (g in p.grammar.distinctBy { it.pattern.id }) {
@@ -291,7 +304,7 @@ fun PassageTools(p: ShownPassage, enabled: Boolean, onReroll: () -> Unit, onEdit
         }
     }
     if (notes) PaperCard {
-        Text("Behind the passage: dice, plans and checks", style = MaterialTheme.typography.titleSmall)
+        Text("Game master's notes: dice, plans and checks", style = MaterialTheme.typography.titleSmall)
         (p.gmNotes + p.checks).forEach { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
@@ -316,13 +329,14 @@ fun ProposalCard(p: MistakeLog.Key, onDecide: (Boolean) -> Unit) {
 fun ReplyBar(busy: String?, canSend: Boolean, input: String, onInput: (String) -> Unit, onSend: (String) -> Unit,
              ideas: IdeasUi? = null) {
     Surface(color = MaterialTheme.colorScheme.surfaceContainer, tonalElevation = 2.dp) {
-        Column(Modifier.navigationBarsPadding()) {
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+        Column(Modifier.widthIn(max = MAX_CONTENT_WIDTH + 24.dp).navigationBarsPadding()) {
             if (busy != null) LinearProgressIndicator(Modifier.fillMaxWidth())
             // ideas sit on the reply box: lines to start from when writing Japanese is the hard part
             if (ideas != null && canSend && busy == null && input.isBlank()) IdeasArea(ideas) { onInput(it) }
             Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(input, onInput, Modifier.weight(1f).heightIn(min = 52.dp),
-                    placeholder = { Text(if (busy != null) "Writing the next passage…" else "Say or do something…", maxLines = 1) }, shape = RoundedCornerShape(26.dp), maxLines = 5,
+                    placeholder = { Text(when { busy != null -> "Wait a moment…"; !canSend -> "Write after the passage appears"; else -> "Say or do something…" }, maxLines = 1) }, shape = RoundedCornerShape(26.dp), maxLines = 5,
                     colors = OutlinedTextFieldDefaults.colors(
                         unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
                         focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
@@ -343,6 +357,7 @@ fun ReplyBar(busy: String?, canSend: Boolean, input: String, onInput: (String) -
                     }
                 }
             }
+        }
         }
     }
 }
@@ -450,7 +465,9 @@ fun StoryContent(
         AppBar(title, onBack = onBack) {
             if (onInfo != null) IconButton(onInfo) { Icon(Icons.Outlined.Info, "The story so far") }
         }
-        LazyColumn(Modifier.weight(1f), state = listState, contentPadding = PaddingValues(horizontal = 22.dp, vertical = 8.dp),
+        // a readable measure on wide screens: the side padding grows instead of the lines
+        val side = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp.let { w -> maxOf(22.dp, (w - MAX_CONTENT_WIDTH) / 2) }
+        LazyColumn(Modifier.weight(1f), state = listState, contentPadding = PaddingValues(horizontal = side, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)) {
             if (intro != null && history.isEmpty()) item {
                 PaperCard {
@@ -564,23 +581,23 @@ fun WordSheetBody(info: WordInfo, onKnow: () -> Unit, onClose: () -> Unit, onSay
             Text("Dictionary", style = MaterialTheme.typography.labelMedium, color = cs.onSurfaceVariant)
             info.senses.forEachIndexed { i, s -> Text("${i + 1}. $s", style = MaterialTheme.typography.bodyMedium) }
         }
-        if (info.newCard) Text("Know it already? It's skipped from now on (and would be suspended in Anki once the app may write).",
+        if (info.newCard) Text("Already know it? The story stops teaching it to you.",
             style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             when {
                 info.newCard -> {
-                    SecondaryButton("Close", onClose, Modifier.weight(1f))
-                    PrimaryButton("Already know it", onKnownNew, Modifier.weight(1f), icon = Icons.Filled.Check)
+                    SecondaryButton("Already know it", onKnownNew, Modifier.weight(1f))
+                    PrimaryButton("Close", onClose, Modifier.weight(1f))
                 }
                 info.isName || (info.earlier && info.inDeck) -> PrimaryButton("Close", onClose, Modifier.weight(1f))
                 info.inDeck -> {
                     // closing is the normal end of a lookup; "I knew it" undoes a mis-tap's Again
-                    SecondaryButton("I knew it, mis-tap", onKnow, Modifier.weight(1f))
+                    SecondaryButton("I knew it", onKnow, Modifier.weight(1f))
                     PrimaryButton("Close", onClose, Modifier.weight(1f))
                 }
                 else -> {
-                    SecondaryButton("Close", onClose, Modifier.weight(1f))
-                    PrimaryButton("I know it", onKnow, Modifier.weight(1f))
+                    SecondaryButton("I know it", onKnow, Modifier.weight(1f))
+                    PrimaryButton("Close", onClose, Modifier.weight(1f))
                 }
             }
         }
@@ -614,7 +631,7 @@ fun StoryScreen(state: AppState, onBack: () -> Unit) {
     androidx.compose.runtime.DisposableEffect(Unit) { onDispose { state.speaker.stop() } }
     LaunchedEffect(infoWanted) { if (infoWanted) { info = withContext(Dispatchers.IO) { story.storyInfo() }; infoWanted = false } }
     var grammar by remember { mutableStateOf<GrammarPatterns.Found?>(null) }
-    var editing by remember { mutableStateOf<String?>(null) }
+    var editing by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
     var tapVersion by remember { mutableIntStateOf(0) }
     // start() is safe to repeat: it shows the waiting passage, finishes a half-done turn, or answers an
     // unsent reply; an error left over from elsewhere (setup, styles) must not keep the story from opening
@@ -670,7 +687,7 @@ fun StoryScreen(state: AppState, onBack: () -> Unit) {
     }
     grammar?.let { g -> GrammarSheet(g, story.current?.passage?.text.orEmpty()) { grammar = null } }
     editing?.let { text ->
-        var t by remember { mutableStateOf(text) }
+        var t by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(text) }
         AlertDialog(onDismissRequest = { editing = null }, title = { Text("Edit the passage") },
             text = { OutlinedTextField(t, { t = it }, Modifier.fillMaxWidth().heightIn(min = 220.dp), textStyle = ReadingText.copy(fontSize = 16.sp, lineHeight = 26.sp)) },
             confirmButton = { TextButton({ editing = null; story.launch { edit(t) } }) { Text("Save") } },
@@ -719,11 +736,11 @@ fun StoryInfoBody(info: StoryController.StoryInfo) {
                 style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.accent)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 info.today.forEach { (w, good) ->
-                    Pill(w, if (good) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.accentContainer,
-                        if (good) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onAccentContainer)
+                    Pill(w, if (good) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.accentContainer,
+                        if (good) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onAccentContainer)
                 }
             }
-            Text("Not sent to Anki yet: this version only reads your collection.", style = MaterialTheme.typography.bodySmall,
+            Text("Practice only: these aren't sent to Anki yet. Review your cards in AnkiDroid as usual.", style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (info.spent > 0) Text("Claude so far: $%.2f this session, $%.2f in all".format(info.spentSession, info.spent),
@@ -746,7 +763,7 @@ fun DraftPassage(label: String, text: String) {
             androidx.compose.material3.CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
             Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Text(text, style = readingStyle(), color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f))
+        Text(text, style = readingStyle(), color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f))
     }
 }
 
@@ -782,7 +799,7 @@ fun Flashcard(card: DueCard, left: Int, onAnswer: (DueCard, Boolean) -> Unit, on
             when {
                 !shown -> androidx.compose.material3.FilledTonalButton({ shown = true }, Modifier.weight(1f).heightIn(min = 52.dp)) { Text("Show") }
                 card.isNew -> {
-                    SecondaryButton("For the story", { onTriage(card, false) }, Modifier.weight(1f))
+                    SecondaryButton("Learn it in the story", { onTriage(card, false) }, Modifier.weight(1f))
                     PrimaryButton("Already know it", { onTriage(card, true) }, Modifier.weight(1f))
                 }
                 else -> {

@@ -102,8 +102,8 @@ fun SettingsContent(
     /** Rarely used screens: (name, what it is, open). */
     advanced: List<Triple<String, String, () -> Unit>> = emptyList(),
 ) {
-    var keyInput by remember { mutableStateOf<String?>(null) }
-    var styleInput by remember { mutableStateOf<String?>(null) }
+    var keyInput by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
+    var styleInput by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
     Page {
         SectionTitle("Look and reading")
         PaperCard {
@@ -140,33 +140,33 @@ fun SettingsContent(
                 TextButton(onPickStyle) { Text("Change") }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Toggle("Stricter style", "Claude gets the style as rules (\"never…\") instead of a description. Try it if passages drift from the style.", v.firmStyle, onFirm)
+            Toggle("Stick closer to the style", "Try this if passages drift away from the writing style you picked.", v.firmStyle, onFirm)
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Default story style", style = MaterialTheme.typography.titleSmall)
+                    Text("How new stories feel", style = MaterialTheme.typography.titleSmall)
                     Hint((if (v.ownDefaultStyle) "Yours: " else "The app's: ") + v.defaultStyle.take(90) + if (v.defaultStyle.length > 90) "…" else "")
                 }
                 TextButton({ styleInput = v.defaultStyle }) { Text("Edit") }
             }
         }
 
-        SectionTitle("Reviews")
+        SectionTitle("Corrections and grading")
         PaperCard {
             Text("Corrections to your Japanese", style = MaterialTheme.typography.titleSmall)
-            Segmented(listOf("Normal", "Strict", "Annoying"), v.corrections) { onCorrections(it) }
+            Segmented(listOf("Mistakes", "+ Phrasing", "Everything"), v.corrections) { onCorrections(it) }
             Hint(when (v.corrections) {
                 0 -> "Only real mistakes."
                 1 -> "Also phrasing that's correct but not how people say it."
                 else -> "Everything a teacher would mention, small polish included."
             } + " Ones not shown are kept, and shown if you make the same one again.")
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Toggle("Young cards need two untapped reads", "Cards with an interval under 21 days count as Good only after two reads in separate passages.", v.twoReads, onTwoReads)
+            Toggle("Recently learned words need two reads", "A word you learned in the last three weeks counts as known only after you've read past it in two different passages.", v.twoReads, onTwoReads)
         }
 
         SectionTitle("Claude")
         PaperCard {
-            Segmented(listOf("API key", "Claude Code"), if (v.claudeCode) 1 else 0) { onBackend(it == 1) }
+            Segmented(listOf("API key", "Claude subscription"), if (v.claudeCode) 1 else 0) { onBackend(it == 1) }
             if (v.claudeCode) claudeCodeSetup()
             else Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
@@ -195,10 +195,10 @@ fun SettingsContent(
     }
 
     styleInput?.let { t ->
-        AlertDialog(onDismissRequest = { styleInput = null }, title = { Text("Default story style") },
+        AlertDialog(onDismissRequest = { styleInput = null }, title = { Text("How new stories feel") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("How new stories should feel, whatever they're about. A story's own style, typed when you create it, replaces this for that story.",
+                    Text("Pace, mood and what you enjoy, whatever a story is about. What you type when creating a story replaces this for that story.",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     OutlinedTextField(t, { styleInput = it }, Modifier.fillMaxWidth().heightIn(min = 160.dp))
                     if (t.trim() != shippedStyle) TextButton({ styleInput = shippedStyle }, contentPadding = PaddingValues(horizontal = 0.dp)) { Text("Use the app's original") }
@@ -213,7 +213,7 @@ fun SettingsContent(
                 OutlinedTextField(k, { keyInput = it }, Modifier.fillMaxWidth(), placeholder = { Text("sk-ant-…") }, singleLine = true,
                     visualTransformation = PasswordVisualTransformation())
             },
-            confirmButton = { TextButton({ onKey(k); keyInput = null }, enabled = k.trim().startsWith("sk-")) { Text("Save") } },
+            confirmButton = { TextButton({ onKey(k); keyInput = null }, enabled = looksLikeKey(k)) { Text("Save") } },
             dismissButton = { TextButton({ keyInput = null }) { Text("Cancel") } })
     }
 }

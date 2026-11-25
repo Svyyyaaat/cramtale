@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -65,13 +66,19 @@ fun AppBar(title: String, onBack: (() -> Unit)? = null, actions: @Composable Row
     )
 }
 
+/** The widest a column of reading or controls gets (about 70 Japanese characters at the default size). */
+val MAX_CONTENT_WIDTH = 640.dp
+
 /** A scrolling page with the app's margins. */
 @Composable
 fun Page(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    Column(
-        modifier.fillMaxSize().verticalScroll(rememberScrollState()).navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp), content = content,
-    )
+    // scrolls across the whole width; the content keeps a readable measure on tablets and in landscape
+    Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            Modifier.widthIn(max = MAX_CONTENT_WIDTH).fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp), content = content,
+        )
+    }
 }
 
 @Composable
@@ -155,14 +162,17 @@ fun Pill(text: String, container: Color, content: Color, modifier: Modifier = Mo
 @Composable
 fun StepHeader(step: Int, of: Int, title: String, body: String) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            repeat(of) { i ->
-                Box(Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(
-                    if (i < step) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                ))
+        // of = 0: the same screen outside setup (a new story from the home screen), without setup's progress
+        if (of > 0) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                repeat(of) { i ->
+                    Box(Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(
+                        if (i < step) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                    ))
+                }
             }
+            Text("Step $step of $of", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.accent)
         }
-        Text("Step $step of $of", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.accent)
         Text(title, style = MaterialTheme.typography.headlineSmall)
         Text(body, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }

@@ -58,8 +58,8 @@ import org.junit.Test
 class Shots {
     @get:Rule val paparazzi = Paparazzi(deviceConfig = DeviceConfig.PIXEL_6, maxPercentDifference = 0.1)
 
-    private fun shot(dark: Boolean = false, content: @Composable () -> Unit) {
-        paparazzi.unsafeUpdateConfig(deviceConfig = DeviceConfig.PIXEL_6.copy(nightMode = if (dark) NightMode.NIGHT else NightMode.NOTNIGHT))
+    private fun shot(dark: Boolean = false, wide: Boolean = false, content: @Composable () -> Unit) {
+        paparazzi.unsafeUpdateConfig(deviceConfig = (if (wide) DeviceConfig.PIXEL_C else DeviceConfig.PIXEL_6).copy(nightMode = if (dark) NightMode.NIGHT else NightMode.NOTNIGHT))
         paparazzi.snapshot {
             CramtaleTheme(dark = dark) { androidx.compose.material3.Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { content() } }
         }
@@ -143,8 +143,17 @@ class Shots {
     }
 
     @Test fun a9c_story_sequel_dark() = shot(dark = true) {
-        StoryStepContent("", {}, null, null, {}, {}, sequelOf = "The Well Keeper")
+        StoryStepContent("", {}, null, null, {}, {}, sequelOf = "The Well Keeper", inApp = true)
     }
+
+    // a new story from the home screen: no setup progress
+    @Test fun a9e_story_new_in_app() = shot { StoryStepContent("", {}, null, null, {}, {}, onAddFiles = {}, inApp = true,
+        styleDefault = com.cramtale.core.story.Prompts(null).config("plot.md").orEmpty()) }
+    // while it's written, the wait is in view instead of the form
+    @Test fun a9f_story_writing() = shot { StoryStepContent("A ghost at a seaside café", {}, "Writing the opening…", null, {}, {}, onAddFiles = {}) }
+    @Test fun a9g_story_error() = shot { StoryStepContent("A ghost at a seaside café", {}, null,
+        "The API key was refused. Check it in Settings → Claude.\n\n401 authentication_error", {}, {}, onAddFiles = {}, onFixClaude = {}) }
+    @Test fun a2b_anki_missing() = shot { AnkiStepContent(emptyList(), null, {}, {}, {}, {}) }
 
     @Test fun a9_story_setup() = shot { StoryStepContent("", {}, null, null, {}, {}, onAddFiles = {},
         styleDefault = com.cramtale.core.story.Prompts(null).config("plot.md").orEmpty()) }
@@ -156,6 +165,11 @@ class Shots {
             StoryEngine.StyleOption("Terse first person", "", "ドアを叩く音がした。三回。弱い音だ。\n開けると、二階の田中が立っていた。顔色が悪い。\n「家賃のことなんですが」\n「わかってる」") to 0.016,
             StoryEngine.StyleOption("Close third person, quiet", "", "夕方の光が、台所の窓から斜めに入っていた。佐藤さんは湯のみを両手で包んだまま、向かいに座る若い女の話を聞いていた。") to 0.053,
         ), null, null, {}, {}, {})
+    }
+
+    @Test fun w1_home_wide() = shot(wide = true) {
+        HomeContent(HomeInfo("西田製作所の事務所", 12, 1, "村井はかばんの口を閉めて、立ち上がらずに待っていた。", 1.42, "Real collection · com.ichi2.anki", true, true, 7127, 10000,
+            due = DueCounts(142, 6, 20), readToday = 23, goodToday = 19, againToday = 4, title = "The Well Keeper", styleName = "Light novel", storyCount = 3), {}, {})
     }
 
     @Test fun c1b_home_no_story() = shot {
@@ -186,7 +200,7 @@ class Shots {
     }
 
     private fun storyShot(dark: Boolean, error: String? = null, versions: Int = 1, ideas: com.cramtale.app.ui.IdeasUi? = null,
-                          roll: com.cramtale.app.story.RollUi? = null) = shot(dark) {
+                          roll: com.cramtale.app.story.RollUi? = null, wide: Boolean = false, teach: Boolean = false) = shot(dark, wide) {
         val p = ShownPassage(3, passage, spans(passage), emptyList(), setOf("早朝".hashCode().toLong()), mapOf("早朝".hashCode().toLong() to "early morning"), emptyList(), emptyList(),
             version = versions - 1, versions = versions, roll = roll)
         val prev = ShownPassage(2, "午前八時。事務所の暖房はまだ効いていない。", spans("午前八時。事務所の暖房はまだ効いていない。"), emptyList(), emptySet(), emptyMap(), emptyList(), emptyList())
@@ -198,7 +212,7 @@ class Shots {
             reply = if (error != null) "すみません、もう少し待ってくれませんか。" else "", proposals = emptyList(), tapVersion = 0,
             isTapped = { it.surface == "布" }, statusOf = { if (it.surface == "返済") Status.UNKNOWN else Status.DECK },
             onBack = {}, onTap = { _, _ -> }, onGrammar = {}, onReroll = {}, onEdit = {}, onSend = {}, onDecide = { _, _ -> }, onListen = {},
-            ideas = ideas ?: com.cramtale.app.ui.IdeasUi(emptyList(), false, null, {}, {}))
+            ideas = ideas ?: com.cramtale.app.ui.IdeasUi(emptyList(), false, null, {}, {}), teach = teach)
     }
 
     private val threeIdeas = listOf(
@@ -229,6 +243,8 @@ class Shots {
     }
 
     @Test fun d1_story() = storyShot(false)
+    @Test fun d1d_story_first_time() = storyShot(false, teach = true)
+    @Test fun w2_story_wide() = storyShot(false, wide = true)
     @Test fun d2_story_dark() = storyShot(true)
 
     @Test fun d1b_story_versions() = storyShot(false, versions = 3)

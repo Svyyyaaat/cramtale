@@ -104,7 +104,6 @@ fun StoriesContent(stories: List<StorySummary>, onContinue: () -> Unit, onNewSto
                    /** Removes a story from the phone for good (after asking). */
                    onDelete: (StorySummary) -> Unit = {}) {
     var confirmNew by remember { mutableStateOf(false) }
-    var confirmSwitch by remember { mutableStateOf<StorySummary?>(null) }
     var confirmDelete by remember { mutableStateOf<StorySummary?>(null) }
     val current = stories.firstOrNull { it.current }
     val others = stories.filter { !it.current }
@@ -126,10 +125,19 @@ fun StoriesContent(stories: List<StorySummary>, onContinue: () -> Unit, onNewSto
                 }
             }
             PrimaryButton(if (current.turn == 0) "Begin" else "Continue", onContinue, icon = Icons.AutoMirrored.Filled.MenuBook)
-            Row {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 QuietButton("Save a backup", { onExport(current) }, icon = Icons.Filled.SaveAlt, enabled = !writing)
                 Spacer(Modifier.weight(1f))
-                TextButton({ confirmDelete = current }, enabled = !writing) { Text("Delete", color = if (writing) cs.onSurfaceVariant else cs.error) }
+                var menu by remember { mutableStateOf(false) }
+                Box {
+                    androidx.compose.material3.IconButton({ menu = true }, enabled = !writing) {
+                        Icon(Icons.Filled.MoreVert, "More for ${current.title}", tint = cs.onSurfaceVariant)
+                    }
+                    androidx.compose.material3.DropdownMenu(menu, { menu = false }) {
+                        androidx.compose.material3.DropdownMenuItem({ Text("Delete", color = cs.error) }, { menu = false; confirmDelete = current },
+                            leadingIcon = { Icon(Icons.Filled.DeleteOutline, null, tint = cs.error) })
+                    }
+                }
             }
         } else {
             // nothing set up: the only thing to do here is start one
@@ -142,7 +150,7 @@ fun StoriesContent(stories: List<StorySummary>, onContinue: () -> Unit, onNewSto
             Column {
                 others.forEachIndexed { i, s ->
                     if (i > 0) HorizontalDivider(color = cs.outlineVariant)
-                    ShelfRow(s, enabled = !writing, onExport = { onExport(s) }, onDelete = { confirmDelete = s }) { confirmSwitch = s }
+                    ShelfRow(s, enabled = !writing, onExport = { onExport(s) }, onDelete = { confirmDelete = s }) { onSwitch(s) }
                 }
             }
         } else if (current != null) {
@@ -157,10 +165,10 @@ fun StoriesContent(stories: List<StorySummary>, onContinue: () -> Unit, onNewSto
     if (confirmNew) AlertDialog(onDismissRequest = { confirmNew = false }, title = { Text("Start a new story?") },
         text = { Text("“${current?.title}” stays here; you can pick it up again any time. A new story can start fresh, " +
             "or keep this one's world and people, who remember what happened.") },
-        confirmButton = { TextButton({ confirmNew = false; onNewStory() }) { Text("Start fresh") } },
-        dismissButton = { Row {
-            TextButton({ confirmNew = false }) { Text("Cancel") }
-            current?.let { c -> TextButton({ confirmNew = false; onSequel(c) }) { Text("Keep its people") } }
+        confirmButton = { Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            PrimaryButton("A new world", { confirmNew = false; onNewStory() })
+            current?.let { c -> SecondaryButton("Same world and people", { confirmNew = false; onSequel(c) }) }
+            TextButton({ confirmNew = false }, Modifier.fillMaxWidth()) { Text("Cancel") }
         } })
     confirmDelete?.let { s ->
         AlertDialog(onDismissRequest = { confirmDelete = null }, title = { Text("Delete “${s.title}”?") },
@@ -171,12 +179,6 @@ fun StoriesContent(stories: List<StorySummary>, onContinue: () -> Unit, onNewSto
                 TextButton({ confirmDelete = null; onExport(s) }) { Text("Save a backup") }
                 TextButton({ confirmDelete = null }) { Text("Cancel") }
             } })
-    }
-    confirmSwitch?.let { s ->
-        AlertDialog(onDismissRequest = { confirmSwitch = null }, title = { Text("Continue “${s.title}”?") },
-            text = { Text("It opens where you left off." + (current?.let { " “${it.title}” stays here." } ?: "")) },
-            confirmButton = { TextButton({ confirmSwitch = null; onSwitch(s) }) { Text("Continue it") } },
-            dismissButton = { TextButton({ confirmSwitch = null }) { Text("Cancel") } })
     }
 }
 
@@ -191,7 +193,7 @@ private fun ShelfRow(s: StorySummary, enabled: Boolean, onExport: () -> Unit = {
             Text(progress(s), style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(ago(s.lastActive), style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
         }
-        TextButton(onPick, enabled = enabled) { Text("Continue") }
+        TextButton(onPick, enabled = enabled) { Text("Open") }
         // the less common things, named, behind one button
         Box {
             androidx.compose.material3.IconButton({ menu = true }, enabled = enabled) {
@@ -232,7 +234,8 @@ fun StyleScreen(state: AppState) {
     var current by remember { mutableStateOf(story.styleName()) }
     var sample by remember { mutableStateOf(story.styleSample()) }
     var generated by remember { mutableStateOf<List<Pair<StyleOption, Double>>?>(null) }
-    val presets = remember { story.presets() }
+    // ordered once, the one in use first: picking another doesn't move cards under your thumb
+    val presets = remember { story.presets().let { p -> val s = story.styleSample()?.trim(); p.sortedByDescending { it.first.passage.trim() == s } } }
     StyleContent(current, sample, presets, generated, story.busy, story.error,
         onPick = { o -> story.pickStyle(o); current = story.styleName(); sample = story.styleSample() },
         onGenerate = { scope.launch { generated = story.styleOptions(fresh = generated != null) } })
@@ -245,7 +248,7 @@ fun StyleContent(currentName: String?, currentSample: String?, presets: List<Pai
         Text("The same scene in each style. Your pick applies from the next passage.",
             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         // the one in use first: you see what you have, then the alternatives
-        for ((o, rate) in presets.sortedByDescending { it.first.passage.trim() == currentSample?.trim() })
+        for ((o, rate) in presets)
             StylePage(o, rate, o.passage.trim() == currentSample?.trim(), onPick)
         // a style picked earlier from generated ones, not in the list: still shown, so you can see what you have
         if (currentSample != null && (presets + generated.orEmpty()).none { it.first.passage.trim() == currentSample.trim() })

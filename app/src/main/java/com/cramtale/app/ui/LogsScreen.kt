@@ -85,7 +85,7 @@ fun LogsContent(d: LogsData, onUndoKnown: (Long) -> Unit) {
     val cs = MaterialTheme.colorScheme
     val amber = cs.outline
     Page {
-        SectionTitle("Would-be answers vs what you pressed")
+        SectionTitle("Cramtale's grades vs your AnkiDroid answers")
         val r = d.report
         if (r == null) { if (d.reportNote != null) ErrorNote(d.reportNote) else Busy("Comparing with AnkiDroid…") } else {
             PaperCard {
@@ -94,7 +94,7 @@ fun LogsContent(d: LogsData, onUndoKnown: (Long) -> Unit) {
                     Text(if (decided == 0) "–" else "${(100 * (r.agreeGood + r.agreeAgain) / decided)}%",
                         style = MaterialTheme.typography.displaySmall, color = cs.primary)
                     Spacer(Modifier.width(10.dp))
-                    Text("agree with you", style = MaterialTheme.typography.titleSmall, color = cs.onSurfaceVariant,
+                    Text("matched", style = MaterialTheme.typography.titleSmall, color = cs.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 6.dp))
                 }
                 Text("${r.rows.size} answers logged · ${r.undecided} not reviewed in AnkiDroid yet", style = MaterialTheme.typography.bodySmall,
@@ -102,8 +102,8 @@ fun LogsContent(d: LogsData, onUndoKnown: (Long) -> Unit) {
                 Spacer(Modifier.height(4.dp))
                 Outcome(cs.tertiary, "Both Good", r.agreeGood)
                 Outcome(cs.primary, "Both Again", r.agreeAgain)
-                Outcome(cs.accent, "App Good, you Again", r.appGoodRealAgain, "a leak or an over-easy context")
-                Outcome(amber, "App Again, you passed", r.appAgainRealPassed, "a needless tap, or a word you half knew")
+                Outcome(cs.accent, "Story said Good, you said Again", r.appGoodRealAgain, "the story may have made the word too easy to guess")
+                Outcome(amber, "Story said Again, you passed", r.appAgainRealPassed, "a needless tap, or a word you half knew")
             }
             if (r.rows.isNotEmpty()) PaperCard {
                 Text("Latest", style = MaterialTheme.typography.titleSmall)

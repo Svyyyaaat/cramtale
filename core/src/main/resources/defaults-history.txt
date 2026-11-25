@@ -17,6 +17,7 @@ prompts/director.md	3cb930e28cadea56
 prompts/director.md	7cbf277c440278ee
 prompts/director.md	e19192516fdf93aa
 prompts/ideas.md	2908c42394563729
+prompts/ideas.md	8aa1c5e990e626df
 prompts/ideas.md	8f0f916bde9c27c6
 prompts/ideas.md	c2285b90ff50568c
 prompts/intent.md	158b4d4d5d66a141

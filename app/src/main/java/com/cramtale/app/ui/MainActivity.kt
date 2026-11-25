@@ -29,7 +29,7 @@ import com.cramtale.app.CramtaleApp
 
 enum class Screen(val title: String) {
     HOME("Cramtale"), STORY("Story"), VOCAB("Vocabulary check"), CALIBRATE("Calibrate on text"), DECK("Your decks"),
-    LOGS("Review log and costs"), FILES("Prompts and story files"), TARGET("AnkiDroid connection"), PROBE("AnkiDroid probe"),
+    LOGS("Review log"), FILES("Prompts and story files"), TARGET("AnkiDroid connection"), PROBE("AnkiDroid probe"),
     SETTINGS("Settings"), STORIES("Your stories"), STYLE("Writing style"),
 }
 
@@ -62,7 +62,11 @@ fun App(state: AppState) {
     var onboarding by remember { mutableStateOf(!state.onboardingDone) }
     var scale by remember { mutableStateOf(state.textScale) }
     var home by remember { mutableStateOf<HomeInfo?>(null) }
-    val stack = remember { mutableStateListOf(Screen.HOME) }
+    // where you are survives rotation, a theme switch and Android closing the app in the background
+    val stack = androidx.compose.runtime.saveable.rememberSaveable(saver = androidx.compose.runtime.saveable.listSaver<
+        androidx.compose.runtime.snapshots.SnapshotStateList<Screen>, String>(save = { it.map { s -> s.name } },
+        restore = { names -> mutableStateListOf(*names.mapNotNull { n -> Screen.entries.firstOrNull { it.name == n } }.toTypedArray()).also { if (it.isEmpty()) it.add(Screen.HOME) } })) {
+        mutableStateListOf(Screen.HOME) }
     val screen = stack.last()
     val back: () -> Unit = { if (stack.size > 1) stack.removeAt(stack.size - 1) }
     BackHandler(enabled = !onboarding && stack.size > 1) { back() }
@@ -97,7 +101,7 @@ fun App(state: AppState) {
             Screen.HOME -> home?.let { HomeContent(it, go = { s -> stack.add(s) }, onNewStory = newStory, onRestartSetup = { state.onboardingStep = 0; state.onboardingDone = false; onboarding = true }) }
                 ?: Busy("Opening…")
             Screen.STORY -> StoryScreen(state, onBack = back)
-            Screen.VOCAB -> { AppBar(screen.title, back); VocabCheckFlow(state) { back() } }
+            Screen.VOCAB -> VocabCheckFlow(state, onLeave = back) { back() }
             else -> {
                 AppBar(screen.title, back)
                 when (screen) {

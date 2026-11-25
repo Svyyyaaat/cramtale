@@ -2,6 +2,21 @@
 
 Still read-only: nothing is written to AnkiDroid. What to try, and what to look for.
 
+## First-run and everyday polish (this round)
+- **Rotate the phone** (or switch dark mode) in the story, in Settings and halfway through the vocabulary check:
+  you stay where you were, with your answers, an open dialog and a half-typed key or edit intact.
+- **Vocabulary check:** system Back undoes the last answer; on the first word (or the ✕/arrow) it asks before
+  throwing answers away.
+- **Setup Back:** from "Your story" and "Pick a writing style", Back goes to an earlier step that actually shows,
+  instead of bouncing you forward again.
+- **No AnkiDroid installed:** step 1 offers *Get AnkiDroid* and picks it up when you come back. Refuse the
+  permission twice: it now offers *Open Cramtale's settings*.
+- **Create the story with a wrong key:** the error sits above the button with *Change how Claude connects*.
+- **New story from Stories:** no "Step 6 of 7" bar; it's titled "New story".
+- **Word popup:** *Close* is always the filled button on the right; *I know it* / *Already know it* sit left.
+- **Ideas:** the English under each idea keeps your review words in Japanese.
+- **Tablet or landscape:** text keeps a readable width instead of running edge to edge.
+
 ## Turns that survive
 - Open the story, read the passage, tap a couple of words. Swipe the app away and reopen it: the same
   passage comes back with the same words highlighted, and no new passage is written (the cost in the corner

@@ -1,5 +1,7 @@
 package com.cramtale.app.ui
 
+import androidx.compose.ui.graphics.luminance
+
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -71,7 +73,7 @@ data class Accents(
 )
 
 // Dusk: aubergine (tapped words in its soft tint), a peach accent used sparingly, moss for right/known
-private val LightAccents = Accents(Color(0xFFF2DDEC), Color(0xFF2C0F27), Color(0xFFF0A47A), Color(0xFF7A4772), Color(0xFF4A2846),
+private val LightAccents = Accents(Color(0xFFE8C2DD), Color(0xFF2C0F27), Color(0xFFF0A47A), Color(0xFF7A4772), Color(0xFF4A2846),
     Color(0xFFB8613A), Color.White, Color(0xFFFBDCCB), Color(0xFF43200C))
 private val DarkAccents = Accents(Color(0xFF5E3157), Color(0xFFFFD7F3), Color(0xFFF0A47A), Color(0xFF5E3157), Color(0xFF2E1A2B),
     Color(0xFFF4B08A), Color(0xFF4A1E05), Color(0xFF6A3A22), Color(0xFFFFDCC8))
@@ -129,7 +131,7 @@ fun CramtaleTheme(dark: Boolean = isSystemInDarkTheme(), materialYou: Boolean = 
 
 /** With Material You, the extra colours come from the wallpaper scheme too (secondary for taps, tertiary for the accent). */
 private fun accentsFrom(s: androidx.compose.material3.ColorScheme) = Accents(
-    tapped = s.primaryContainer, onTapped = s.onPrimaryContainer, amber = s.primaryContainer,
+    tapped = s.primary.copy(alpha = if (s.background.luminance() < 0.5f) 0.38f else 0.22f), onTapped = s.onPrimaryContainer, amber = s.primaryContainer,
     // the wallpaper's own soft tones (a darkened primary turns muddy grey with pale wallpapers)
     heroStart = s.primaryContainer, heroEnd = s.tertiaryContainer,
     onHero = s.onPrimaryContainer, heroButton = s.primary, onHeroButton = s.onPrimary,

@@ -29,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -57,7 +58,8 @@ fun VocabQuestion(
             trackColor = MaterialTheme.colorScheme.surfaceVariant, drawStopIndicator = {})
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("${index + 1} of $total", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-            Text("frequency ${item.band / 1000}k+", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.accent)
+            Text(if (item.band < 3000) "common" else if (item.band < 10000) "less common" else "rare",
+                style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -76,12 +78,12 @@ fun VocabQuestion(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(previous.first.spelling, style = ReadingText.copy(fontSize = 20.sp, lineHeight = 24.sp))
                         }
-                        Text("  ·  ${if (previous.second) "you said known" else "you said unknown"}",
+                        Text("  ·  ${if (previous.second) "you knew it" else "you didn't know it"}",
                             style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(bottom = 2.dp))
                     }
                     Text(previous.first.gloss, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
                 }
-                QuietButton("Back", onBack, icon = Icons.AutoMirrored.Filled.Undo)
+                QuietButton("Undo", onBack, icon = Icons.AutoMirrored.Filled.Undo)
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -100,7 +102,7 @@ fun VocabQuestion(
 fun VocabResults(results: List<VocabCheck.BandResult>, suggested: Int, applied: Boolean, onApply: () -> Unit, onBack: () -> Unit, onRedo: () -> Unit) {
     Page {
         Text("Your result", style = MaterialTheme.typography.headlineSmall)
-        Text("How many words you knew in each frequency band. The cut-off goes where you stop knowing 90%.",
+        Text("How many words you knew, from the most common words down to rarer ones.",
             style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         PaperCard {
             for (r in results) Row(verticalAlignment = Alignment.CenterVertically) {
@@ -112,14 +114,13 @@ fun VocabResults(results: List<VocabCheck.BandResult>, suggested: Int, applied: 
             }
         }
         PaperCard {
-            Text("Suggested cut-off", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("%,d".format(suggested), style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
-            Text("Words more common than this count as known. The words you said you know are added to your Known list either way.",
+            Text("You know roughly the", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("%,d most common words".format(suggested), style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
+            Text("The story won't mark those as new to you. Words you said you know count as known too.",
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        if (applied) Pill("Saved", MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer)
-        PrimaryButton(if (applied) "Done" else "Use %,d".format(suggested), if (applied) onBack else onApply)
-        SecondaryButton("Change my last answer", onRedo)
+        PrimaryButton("Save and continue", onApply)
+        SecondaryButton("Back to the last word", onRedo)
     }
 }
 
@@ -128,12 +129,26 @@ fun VocabResults(results: List<VocabCheck.BandResult>, suggested: Int, applied: 
  * answer, and the result sets the frequency cut-off.
  */
 @Composable
-fun VocabCheckFlow(state: AppState, onDone: () -> Unit) {
+fun VocabCheckFlow(state: AppState, onLeave: () -> Unit, onDone: () -> Unit) {
     var items by remember { mutableStateOf<List<VocabCheck.Item>?>(null) }
     var error by remember { mutableStateOf("") }
-    var index by remember { mutableIntStateOf(0) }
-    val answers = remember { mutableStateListOf<Boolean>() }
+    // answers survive rotation and the app being closed by Android (the word list is rebuilt the same way)
+    var index by androidx.compose.runtime.saveable.rememberSaveable { mutableIntStateOf(0) }
+    // the same words in the same order after a restore, so saved answers still belong to their words
+    val seed = androidx.compose.runtime.saveable.rememberSaveable { kotlin.random.Random.nextLong() }
+    val answers = androidx.compose.runtime.saveable.rememberSaveable(saver = androidx.compose.runtime.saveable.listSaver<
+        androidx.compose.runtime.snapshots.SnapshotStateList<Boolean>, Boolean>(save = { it.toList() }, restore = { it.toMutableStateList() })) {
+        mutableStateListOf() }
     var applied by remember { mutableStateOf(false) }
+    var confirmLeave by remember { mutableStateOf(false) }
+    // Back undoes one answer; on the first word (or with nothing answered) it leaves, asking if answers would be lost
+    val leave = { if (answers.isEmpty()) onLeave() else confirmLeave = true }
+    androidx.activity.compose.BackHandler { if (index > 0 && items != null && index <= items!!.size) { index--; answers.removeAt(answers.size - 1) } else leave() }
+    AppBar("Vocabulary check", onBack = leave)
+    if (confirmLeave) androidx.compose.material3.AlertDialog(onDismissRequest = { confirmLeave = false },
+        title = { Text("Leave the check?") }, text = { Text("Your ${answers.size} answers will be lost.") },
+        confirmButton = { androidx.compose.material3.TextButton({ confirmLeave = false; onLeave() }) { Text("Leave") } },
+        dismissButton = { androidx.compose.material3.TextButton({ confirmLeave = false }) { Text("Keep going") } })
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
@@ -142,13 +157,15 @@ fun VocabCheckFlow(state: AppState, onDone: () -> Unit) {
             when {
                 dict == null -> error = "Set up the dictionary first."
                 freq == null -> error = "This build has no frequency list."
-                else -> items = VocabCheck.items(dict, freq, DeckIndex(state.deck(), dict))
+                else -> items = VocabCheck.items(dict, freq, DeckIndex(state.deck(), dict), kotlin.random.Random(seed))
             }
         }
     }
     if (error.isNotEmpty()) { Page { ErrorNote(error) }; return }
     val list = items ?: run { Page { Busy("Picking words outside your decks…") }; return }
 
+    if (answers.size > list.size) { answers.clear(); index = 0 }
+    index = index.coerceIn(0, answers.size)
     if (index < list.size) {
         VocabQuestion(
             item = list[index], index = index, total = list.size,
