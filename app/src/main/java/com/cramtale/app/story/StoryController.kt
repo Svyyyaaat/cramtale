@@ -922,6 +922,8 @@ class StoryController(
     fun role(): String? = playerSheet()?.substringBefore("\n## ")?.trim()
         // older stories' sheets open with the game master's phrasing: the card starts with the name
         ?.replace(Regex("^(The )?player'?s character( is|:)?\\s*", RegexOption.IGNORE_CASE), "")
+        // a story not yet split (see StoryEngine.splitPlayerSheet): never show what the character doesn't know
+        ?.let { t -> com.cramtale.core.story.StoryEngine.HIDDEN_HINT.find(t)?.let { m -> t.substring(0, t.lastIndexOfAny(charArrayOf('.', '。'), m.range.first).let { if (it < 0) 0 else it + 1 }).trim() } ?: t }
         ?.replaceFirstChar { it.titlecase() }?.ifEmpty { null }
 
     /** Your character's whole sheet: who they are, what they know, what the story has established about them. */

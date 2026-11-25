@@ -108,4 +108,43 @@ class SourcesSequelTest {
         assertEquals(t.roll!!.outcome.name, o.getString("outcome"))
         assertEquals("slip past the gate guard", o.getString("rollAction"))
     }
+
+    @Test
+    fun `what the character doesn't know about themself stays off the player's sheet`() {
+        val dir = Files.createTempDirectory("hidden").toFile()
+        val withHidden = setup.replace("\"player\":\"Vaal, a demon hiding as a woodcutter.\"",
+            "\"player\":\"Vaal, a demon hiding as a woodcutter.\",\"player_hidden\":\"Each use of his power wakes the ward's old guardian.\"")
+        val f = FakeLlm(mapOf("setup" to withHidden, "knows_check" to """{"knows":"x"}""",
+            "director" to """{"beats":[{"goal":"g","place":"the gate","characters":["鷺沼"],"pressure":"p"}],"opening":""}""",
+            "adjudicator" to """{"roll":false,"action":"","difficulty":0,"stakes":"","observable":"x"}""",
+            "mistakes" to """{"errors":[],"correct_keys":[]}""", "intent" to """{"notices":"x","wants":"y","does":"z"}""",
+            "judge" to """{"violations":[]}""", "leak" to """{"guesses":[]}""", "scribe" to """{"ops":[]}""",
+            "writer" to """{"passage":"鷺沼は薪を見た。","used":[],"grammar":[]}""",
+            "ideas" to """{"ideas":[{"ja":"「はい」","en":"Yes"}]}"""))
+        val e = StoryEngine(dir, f, CostLog(null), "s")
+        e.setup("")
+        assertFalse("guardian" in File(dir, "state/player.md").readText(), "the sheet the player reads")
+        e.startSession(DuePool())
+        e.playerTurn("「こんにちは」", DuePool())
+        assertTrue("guardian" in f.sent("writer").last().system.joinToString { it.text }, "the game master knows")
+        e.ideas()
+        assertFalse("guardian" in f.sent("ideas").single().messages.joinToString { it.text }, "suggestions don't")
+        assertFalse("guardian" in f.sent("mistakes").single().messages.joinToString { it.text })
+    }
+
+    @Test
+    fun `an older sheet with a hidden truth in it is split once`() {
+        val dir = Files.createTempDirectory("split").toFile()
+        File(dir, "state").mkdirs()
+        File(dir, "state/player.md").writeText("Svyat is a student who can rewind objects. Hidden from him at first: each use erases a memory.\n\n## Established in the story\n- He sells bread\n")
+        val f = FakeLlm(mapOf("player_split" to """{"known":"Svyat is a student who can rewind objects.","hidden":"Each use erases a memory."}"""))
+        val e = StoryEngine(dir, f, CostLog(null), "s")
+        e.splitPlayerSheet()
+        val sheet = File(dir, "state/player.md").readText()
+        assertFalse("erases" in sheet, sheet)
+        assertTrue("## Established in the story\n- He sells bread" in sheet, "the rest of the sheet stays")
+        assertEquals("Each use erases a memory.", File(dir, "state/player_hidden.md").readText().trim())
+        e.splitPlayerSheet()
+        assertEquals(1, f.sent("player_split").size, "once")
+    }
 }

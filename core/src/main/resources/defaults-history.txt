@@ -48,6 +48,7 @@ prompts/offscreen.md	3c5b2ca8d82fc08a
 prompts/offscreen.md	50a7616a879f03a5
 prompts/offscreen.md	53c25900549f9fb6
 prompts/offscreen.md	da33d7a258c6887e
+prompts/player_split.md	b9ab0d2f460870a5
 prompts/remember.md	98d618f1d1d8b074
 prompts/rewrite.md	03d628a71348ed45
 prompts/rewrite.md	d0230c2a7f4b7475
@@ -73,6 +74,7 @@ prompts/setup.md	5fcef9cc8fee0427
 prompts/setup.md	ae0bde9ca89c1cd9
 prompts/setup.md	c5759716b16003ab
 prompts/setup.md	d85539029951c09b
+prompts/setup.md	ecf5ff51d866b974
 prompts/style_picker.md	9cca079d4411fee2
 prompts/style_picker.md	bd9d51280ffbb58c
 prompts/summary.md	729ce6b9ae001da3

@@ -358,6 +358,8 @@ class StoryEngine(
                 "- ${c.getString("name")}: 0/${c.optInt("size", 6)} — when full: ${c.optString("when_full")}"
             } + "\n")
         File(stateDir, "player.md").writeAtomic(o.optString("player").trim() + "\n")
+        // what's true about them that they don't know: the game master's, never on the player's screen
+        o.optString("player_hidden").trim().let { h -> if (h.isNotEmpty()) hiddenFile.writeAtomic(h + "\n") else File(stateDir, "player_split").writeText("1\n") }
         o.optString("title").takeIf { it.isNotBlank() }?.let { File(stateDir, "title.txt").writeAtomic(it.trim() + "\n") }
         // the backstory goes into the record as witnessed events: everyone's memory, the player's included, starts here
         o.optJSONArray("history")?.let { h ->
@@ -508,6 +510,7 @@ class StoryEngine(
 
     fun startSession(pool: DuePool): List<String> {
         runCatching { checkKnows() }
+        runCatching { splitPlayerSheet() }
         val scene = state.scene()
         val log = ArrayList<String>()
         if (scene.session > 0 && scene.turn > 0 && scene.movedForSession != scene.session + 1) {
@@ -1092,7 +1095,7 @@ class StoryEngine(
         val o = json(call("mistakes", Models.CHECKS, Prompts.fill(prompts.prompt("mistakes"), mapOf(
             "context" to context.ifBlank { "(start of the story)" }, "known_keys" to knownKeys.joinToString("\n").ifBlank { "(none yet)" },
             // who is speaking, to whom and where: what sounds natural depends on it
-            "player" to playerText(), "setting" to "Place: ${s.place}. Present: ${s.present.joinToString().ifEmpty { "nobody else" }}.",
+            "player" to playerKnown(), "setting" to "Place: ${s.place}. Present: ${s.present.joinToString().ifEmpty { "nobody else" }}.",
             "message" to message,
         )), listOf(Msg(Role.USER, "Check the message.")), schema = MISTAKES_SCHEMA, maxTokens = 1200))
         lastCorrectKeys = o.optJSONArray("correct_keys")?.let { k -> (0 until k.length()).map { k.getString(it) } }.orEmpty()
@@ -1117,6 +1120,7 @@ class StoryEngine(
     private fun decideIntents(t: PendingTurn): String {
         // stories older than the Knows check get it here once, before anyone decides from a leaky file
         runCatching { checkKnows() }
+        runCatching { splitPlayerSheet() }
         val s = state.scene()
         val cast = state.characterNames().toSet()
         val people = s.present.filter { it in cast }
@@ -1179,7 +1183,7 @@ class StoryEngine(
         val lastMessage = turnsInChapter(s.chapter).lastOrNull { it.optString("player").isNotBlank() }?.optString("player")
             ?: t.player ?: "(nothing yet: plain です/ます is a safe start)"
         val o = json(call("ideas", Models.CHECKS, Prompts.fill(prompts.prompt("ideas"), mapOf(
-            "player" to playerText(), "scene" to "Place: ${s.place}. Present: ${s.present.joinToString().ifEmpty { "nobody else" }}.",
+            "player" to playerKnown(), "scene" to "Place: ${s.place}. Present: ${s.present.joinToString().ifEmpty { "nobody else" }}.",
             "review_words" to t.pool.words.take(10).joinToString("、") { it.word }.ifEmpty { "(none today)" },
             "last_message" to lastMessage.take(300), "passage" to t.draft.passage,
         )), listOf(Msg(Role.USER, "Three ideas.")), schema = IDEAS_SCHEMA, maxTokens = 800, quiet = true))
@@ -1206,7 +1210,37 @@ class StoryEngine(
     /** What other people can see of the player's character (falls back to the full text for older stories). */
     private fun playerPublic() = File(dir, "state/player_public.md").takeIf { it.exists() }?.readText()?.trim().orEmpty().ifEmpty { playerText() }
 
-    private fun playerText() = File(dir, "state/player.md").takeIf { it.exists() }?.readText()?.trim().orEmpty().ifEmpty { "the protagonist" }
+    /** The player's character for the game master: their sheet, and what's true about them that they don't know. */
+    private fun playerText() = playerKnown() + (hiddenFile.takeIf { it.exists() }?.readText()?.trim()?.takeIf { it.isNotEmpty() }
+        ?.let { "\n\n## Hidden from the player's character (game master only; they don't know this)\n$it" }.orEmpty())
+
+    /** The player's character as they know themself: what the player sees, and what's safe for suggestions. */
+    private fun playerKnown() = File(dir, "state/player.md").takeIf { it.exists() }?.readText()?.trim().orEmpty().ifEmpty { "the protagonist" }
+
+    private val hiddenFile get() = File(dir, "state/player_hidden.md")
+
+    /**
+     * Stories made before the hidden part had its own file: the sheet's opening is split once (cheap model, copied
+     * word for word), so "who you are" on screen stops showing what the character doesn't know. A failed split
+     * leaves the sheet as it was and is tried again later.
+     */
+    fun splitPlayerSheet() {
+        val done = File(dir, "state/player_split")
+        if (done.exists() || hiddenFile.exists()) return
+        val f = File(dir, "state/player.md").takeIf { it.exists() } ?: return
+        val sheet = f.readText()
+        val opening = sheet.substringBefore("\n## ").trim()
+        // nothing that reads like a hidden truth: nothing to split
+        if (!HIDDEN_HINT.containsMatchIn(opening)) { done.writeText("1\n"); return }
+        val o = json(call("player_split", Models.CHECKS, Prompts.fill(prompts.prompt("player_split"), mapOf("sheet" to opening)),
+            listOf(Msg(Role.USER, "Split it.")), schema = SPLIT_SCHEMA, maxTokens = 2000, quiet = true))
+        val known = o.optString("known").trim()
+        val hidden = o.optString("hidden").trim()
+        if (known.isEmpty() || hidden.isEmpty()) { done.writeText("1\n"); return }
+        f.writeAtomic(known + sheet.removePrefix(sheet.substringBefore("\n## ")).let { if (it.isBlank()) "\n" else it })
+        hiddenFile.writeAtomic(hidden + "\n")
+        done.writeText("1\n")
+    }
 
     private fun sceneSummary(s: StoryState.Scene) =
         "Place: ${s.place}. Present: ${s.present.joinToString()}. Beat: ${s.beats.firstOrNull { !it.done }?.goal ?: "none"}.\n" +
@@ -1334,14 +1368,18 @@ class StoryEngine(
         const val STYLE_SCENE = "On a snowy night a traveller reaches a small mountain inn and asks for a room. The innkeeper says it is full, " +
             "but a light is on in the last room, the one he says nobody uses."
 
+        val SPLIT_SCHEMA = """{"type":"object","additionalProperties":false,"required":["known","hidden"],"properties":{"known":{"type":"string"},"hidden":{"type":"string"}}}"""
+        /** A sheet that reads like it holds something the character doesn't know about themself. */
+        val HIDDEN_HINT = Regex("(hidden|unknown|secret)\\b[^.]{0,30}\\b(from|to) (him|her|them|the player)|(doesn't|does not|don't|do not) (yet )?know|without (him|her|them) knowing", RegexOption.IGNORE_CASE)
+
         val IDEAS_SCHEMA = """{"type":"object","additionalProperties":false,"required":["ideas"],"properties":{"ideas":{"type":"array","items":{
             "type":"object","additionalProperties":false,"required":["ja","en"],"properties":{"ja":{"type":"string"},"en":{"type":"string"}}}}}}"""
         val REMEMBER_SCHEMA = """{"type":"object","additionalProperties":false,"required":["remembers"],"properties":{"remembers":{"type":"string"}}}"""
         val KNOWS_SCHEMA = """{"type":"object","additionalProperties":false,"required":["knows"],"properties":{"knows":{"type":"string"}}}"""
 
-        val SETUP_SCHEMA = """{"type":"object","additionalProperties":false,"required":["title","world","player","history","player_public","characters","extras","secrets","clocks","complications","ambience","opening"],"properties":{
+        val SETUP_SCHEMA = """{"type":"object","additionalProperties":false,"required":["title","world","player","player_hidden","history","player_public","characters","extras","secrets","clocks","complications","ambience","opening"],"properties":{
             "title":{"type":"string"},
-            "world":{"type":"string"},"player":{"type":"string"},"history":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["text","witnesses"],"properties":{"text":{"type":"string"},"witnesses":{"type":"array","items":{"type":"string"}}}}},"player_public":{"type":"string"},
+            "world":{"type":"string"},"player":{"type":"string"},"player_hidden":{"type":"string"},"history":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["text","witnesses"],"properties":{"text":{"type":"string"},"witnesses":{"type":"array","items":{"type":"string"}}}}},"player_public":{"type":"string"},
             "characters":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["name","file"],"properties":{"name":{"type":"string"},"file":{"type":"string"}}}},
             "extras":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["name","line"],"properties":{"name":{"type":"string"},"line":{"type":"string"}}}},
             "secrets":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["text","knows"],"properties":{"text":{"type":"string"},"knows":{"type":"array","items":{"type":"string"}}}}},

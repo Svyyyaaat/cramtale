@@ -356,4 +356,14 @@ class StoryControllerTest {
         assertTrue(File(c.dir, "state/characters").listFiles()!!.isNotEmpty())
         assertEquals(2, c.stories().size)
     }
+
+    @Test
+    fun `the You are card never shows what the character doesn't know, even before the split`() {
+        val c = controller()
+        File(c.dir, "state").mkdirs()
+        File(c.dir, "state/player.md").writeText("ユウト is a student who fell onto Whale Town. He wants a way home. Hidden even from him: every use sinks the whale.\n")
+        val role = c.role()!!
+        assertTrue(role, "way home" in role)
+        assertTrue(role, "sinks" !in role && "Hidden" !in role)
+    }
 }
