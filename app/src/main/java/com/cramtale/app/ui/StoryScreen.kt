@@ -610,7 +610,8 @@ fun StoryScreen(state: AppState, onBack: () -> Unit) {
     var info by remember { mutableStateOf<StoryController.StoryInfo?>(null) }
     var role by remember { mutableStateOf<String?>(null) }
     var infoWanted by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { role = withContext(Dispatchers.IO) { story.role() } }
+    // read again when a passage shows: an older story's sheet is split while it opens, and only then shown
+    LaunchedEffect(story.current?.passage?.turn) { role = withContext(Dispatchers.IO) { story.role() } }
     androidx.compose.runtime.DisposableEffect(Unit) { onDispose { state.speaker.stop() } }
     LaunchedEffect(infoWanted) { if (infoWanted) { info = withContext(Dispatchers.IO) { story.storyInfo() }; infoWanted = false } }
     var grammar by remember { mutableStateOf<GrammarPatterns.Found?>(null) }

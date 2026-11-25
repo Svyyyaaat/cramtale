@@ -358,13 +358,19 @@ class StoryControllerTest {
     }
 
     @Test
-    fun `the You are card never shows what the character doesn't know, even before the split`() {
+    fun `the You are card waits for an older sheet to be split, and an edited taste becomes your default`() {
         val c = controller()
         File(c.dir, "state").mkdirs()
-        File(c.dir, "state/player.md").writeText("ユウト is a student who fell onto Whale Town. He wants a way home. Hidden even from him: every use sinks the whale.\n")
-        val role = c.role()!!
-        assertTrue(role, "way home" in role)
-        assertTrue(role, "sinks" !in role && "Hidden" !in role)
+        File(c.dir, "state/player.md").writeText("ユウト is a student who fell onto Whale Town. Unbeknownst to him, every use sinks the whale.\n")
+        assertNull("not split yet: nothing about the character is shown", c.role())
+        assertNull(c.storyInfo().role)
+        File(c.dir, "state/player_split").writeText("1\n")
+        assertTrue(c.role()!!.startsWith("ユウト"))
+
+        // a taste edited in the story before the Settings default existed: it becomes the default, once
+        File(c.dir, "config").mkdirs(); File(c.dir, "config/plot.md").writeText("Slow-burn ghost stories.\n")
+        assertEquals("Slow-burn ghost stories.", c.defaultTaste())
+        assertTrue(c.hasOwnDefaultTaste())
     }
 
     @Test

@@ -429,7 +429,8 @@ class StoryEngine(
             if (f.name == "sources") f.listFiles().orEmpty().forEach { s -> if (!File(to, s.name).exists()) { to.mkdirs(); s.copyTo(File(to, s.name)) } }
             else f.copyRecursively(to, overwrite = true)
         }
-        for (n in listOf("complications.md", "ambience.md")) File(from, "config/$n").takeIf { it.exists() }?.copyTo(File(dir, "config/$n").also { it.parentFile.mkdirs() }, overwrite = true)
+        // the earlier story's own tables, story style and writing style: a sequel reads like what it continues
+        for (n in listOf("complications.md", "ambience.md", "plot.md", "style_sample.md", "style_line.txt", "style_name.txt")) File(from, "config/$n").takeIf { it.exists() }?.copyTo(File(dir, "config/$n").also { it.parentFile.mkdirs() }, overwrite = true)
         val sc = old.state.scene()
         val earlier = File(from, "state/chapters").listFiles { f -> f.extension == "md" }.orEmpty()
             .sortedBy { it.nameWithoutExtension.toIntOrNull() ?: 0 }.map { it.readText().trim() }
@@ -1215,10 +1216,11 @@ class StoryEngine(
 
     /** The player's character for the game master: their sheet, and what's true about them that they don't know. */
     private fun playerText() = playerKnown() + (hiddenFile.takeIf { it.exists() }?.readText()?.trim()?.takeIf { it.isNotEmpty() }
-        ?.let { "\n\n## Hidden from the player's character (game master only; they don't know this)\n$it" }.orEmpty())
+        ?.let { "\n\n## Hidden from the player's character (game master only: they don't know this, unless the story has since " +
+            "shown them finding out; see what's established about them and the record)\n$it" }.orEmpty())
 
     /** The player's character as they know themself: what the player sees, and what's safe for suggestions. */
-    private fun playerKnown() = File(dir, "state/player.md").takeIf { it.exists() }?.readText()?.trim().orEmpty().ifEmpty { "the protagonist" }
+    private fun playerKnown() = File(dir, "state/player.md").also { if (!isPlayerSplit()) runCatching { splitPlayerSheet() } }.takeIf { it.exists() }?.readText()?.trim().orEmpty().ifEmpty { "the protagonist" }
 
     private val hiddenFile get() = File(dir, "state/player_hidden.md")
 
@@ -1227,19 +1229,23 @@ class StoryEngine(
      * word for word), so "who you are" on screen stops showing what the character doesn't know. A failed split
      * leaves the sheet as it was and is tried again later.
      */
+    /** The sheet is safe to show: made with the hidden part apart, or split already. */
+    fun isPlayerSplit() = File(dir, "state/player_split").exists() || hiddenFile.exists()
+
     fun splitPlayerSheet() {
         val done = File(dir, "state/player_split")
         if (done.exists() || hiddenFile.exists()) return
         val f = File(dir, "state/player.md").takeIf { it.exists() } ?: return
         val sheet = f.readText()
         val opening = sheet.substringBefore("\n## ").trim()
-        // nothing that reads like a hidden truth: nothing to split
-        if (!HIDDEN_HINT.containsMatchIn(opening)) { done.writeText("1\n"); return }
+        // every older sheet is asked once (wording varies too much to guess from: "hidden from him", "unbeknownst",
+        // "has no idea"…); one cheap call per story
         val o = json(call("player_split", Models.CHECKS, Prompts.fill(prompts.prompt("player_split"), mapOf("sheet" to opening)),
             listOf(Msg(Role.USER, "Split it.")), schema = SPLIT_SCHEMA, maxTokens = 2000, quiet = true))
         val known = o.optString("known").trim()
         val hidden = o.optString("hidden").trim()
-        if (known.isEmpty() || hidden.isEmpty()) { done.writeText("1\n"); return }
+        // nothing hidden, or an answer that lost the sheet: the sheet stays as it is
+        if (known.isEmpty() || hidden.isEmpty() || known.length < opening.length / 4) { done.writeText("1\n"); return }
         f.writeAtomic(known + sheet.removePrefix(sheet.substringBefore("\n## ")).let { if (it.isBlank()) "\n" else it })
         hiddenFile.writeAtomic(hidden + "\n")
         done.writeText("1\n")
@@ -1372,8 +1378,6 @@ class StoryEngine(
             "but a light is on in the last room, the one he says nobody uses."
 
         val SPLIT_SCHEMA = """{"type":"object","additionalProperties":false,"required":["known","hidden"],"properties":{"known":{"type":"string"},"hidden":{"type":"string"}}}"""
-        /** A sheet that reads like it holds something the character doesn't know about themself. */
-        val HIDDEN_HINT = Regex("(hidden|unknown|secret)\\b[^.]{0,30}\\b(from|to) (him|her|them|the player)|(doesn't|does not|don't|do not) (yet )?know|without (him|her|them) knowing", RegexOption.IGNORE_CASE)
 
         val IDEAS_SCHEMA = """{"type":"object","additionalProperties":false,"required":["ideas"],"properties":{"ideas":{"type":"array","items":{
             "type":"object","additionalProperties":false,"required":["ja","en"],"properties":{"ja":{"type":"string"},"en":{"type":"string"}}}}}}"""

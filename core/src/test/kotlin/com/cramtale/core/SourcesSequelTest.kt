@@ -45,6 +45,9 @@ class SourcesSequelTest {
         e.setup("")
         e.state.writeCharacter("鷺沼", e.state.character("鷺沼")!! + "\n## Remembers\nThe woodcutter never feels the cold.")
         File(old, "state/title.txt").writeText("Frost\n")
+        File(old, "config").mkdirs()
+        File(old, "config/plot.md").writeText("Cold, quiet dread.\n")
+        File(old, "config/style_name.txt").writeText("Light novel\n")
         File(old, "state/chapters").mkdirs(); File(old, "state/chapters/1.md").writeText("Chapter one: snow.")
 
         val dir = Files.createTempDirectory("next").toFile()
@@ -57,6 +60,8 @@ class SourcesSequelTest {
         assertEquals("Frost II", File(dir, "state/title.txt").readText().trim())
         assertTrue("Chapter one: snow." in n.saga()!! && File(dir, "state/chapters/0.md").exists())
         assertTrue(n.state.scene().sessionDue)
+        assertEquals("Cold, quiet dread.", File(dir, "config/plot.md").readText().trim(), "the sequel keeps the earlier story's style")
+        assertEquals("Light novel", File(dir, "config/style_name.txt").readText().trim())
         n.startSession(DuePool())
         assertTrue("A month later, the ward cracks" in f.sent("director").last().messages.joinToString { it.text }, "the player's wish reaches the plan")
         assertFalse(File(dir, "state/next.md").exists(), "used once")
@@ -136,7 +141,8 @@ class SourcesSequelTest {
     fun `an older sheet with a hidden truth in it is split once`() {
         val dir = Files.createTempDirectory("split").toFile()
         File(dir, "state").mkdirs()
-        File(dir, "state/player.md").writeText("Svyat is a student who can rewind objects. Hidden from him at first: each use erases a memory.\n\n## Established in the story\n- He sells bread\n")
+        // wording no pattern would catch: every older sheet is asked once
+        File(dir, "state/player.md").writeText("Svyat is a student who can rewind objects. He has no idea each use erases a memory.\n\n## Established in the story\n- He sells bread\n")
         val f = FakeLlm(mapOf("player_split" to """{"known":"Svyat is a student who can rewind objects.","hidden":"Each use erases a memory."}"""))
         val e = StoryEngine(dir, f, CostLog(null), "s")
         e.splitPlayerSheet()

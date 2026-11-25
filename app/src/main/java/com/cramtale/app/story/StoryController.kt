@@ -349,7 +349,10 @@ class StoryController(
             if (d.parentFile != archiveRoot || !d.isDirectory) return false
             d
         }
-        listOf("sequelOf", "newFrom").forEach { k -> if (prefs.getString(k, "") == d.path || prefs.getString(k, "") == target.path) prefs.edit().remove(k).apply() }
+        // a new story being set up as its sequel is called off
+        if (listOf("sequelOf", "newFrom").any { k -> prefs.getString(k, "").let { it == d.path || it == target.path } }) {
+            cancelNewStory(); prefs.edit().remove("sequelOf").apply()
+        }
         return target.deleteRecursively()
     }
 
@@ -471,7 +474,23 @@ class StoryController(
     private val defaultTasteFile get() = File(context.filesDir, "defaults/plot.md")
 
     /** The story style new stories start with: yours (Settings), else the one that ships with the app. */
-    fun defaultTaste(): String = defaultTasteFile.takeIf { it.exists() }?.readText()?.trim()?.ifEmpty { null } ?: shippedTaste()
+    fun defaultTaste(): String {
+        migrateTaste()
+        return defaultTasteFile.takeIf { it.exists() }?.readText()?.trim()?.ifEmpty { null } ?: shippedTaste()
+    }
+
+    /**
+     * Before the Settings default, your taste lived in the story (config/plot.md) and went along to each new story. If
+     * you had edited it, it becomes your default once, so new stories keep it.
+     */
+    private fun migrateTaste() {
+        if (prefs.getBoolean("tasteMigrated", false)) return
+        prefs.edit().putBoolean("tasteMigrated", true).apply()
+        if (defaultTasteFile.exists()) return
+        val mine = File(dir, "config/plot.md").takeIf { it.exists() }?.readText() ?: return
+        val shipped = "config/plot.md\t${com.cramtale.core.story.Prompts.fingerprint(mine)}" in com.cramtale.core.story.Prompts.HISTORY
+        if (!shipped && mine.isNotBlank()) { defaultTasteFile.parentFile?.mkdirs(); defaultTasteFile.writeText(mine.trim() + "\n") }
+    }
 
     fun shippedTaste(): String = com.cramtale.core.story.Prompts(null).config("plot.md")?.trim().orEmpty()
 
@@ -584,6 +603,8 @@ class StoryController(
     suspend fun start(): Unit? = work("Opening the story…", again = { start() }) {
         // the engine first: a waiting turn's review words must not be offered as flashcards
         val e = engine()
+        // an older story's sheet: split once before anything about the character is shown (one cheap call)
+        if (!e.isPlayerSplit()) runCatching { e.splitPlayerSheet() }
         val waiting = e.pending
         if (waiting != null && waiting.ready && outbox.takeIf { it.exists() }?.readText().isNullOrBlank()) {
             // a passage is waiting: show it at once; word taps and Anki's queue fill in right after
@@ -975,12 +996,18 @@ class StoryController(
     fun role(): String? = playerSheet()?.substringBefore("\n## ")?.trim()
         // older stories' sheets open with the game master's phrasing: the card starts with the name
         ?.replace(Regex("^(The )?player'?s character( is|:)?\\s*", RegexOption.IGNORE_CASE), "")
-        // a story not yet split (see StoryEngine.splitPlayerSheet): never show what the character doesn't know
-        ?.let { t -> com.cramtale.core.story.StoryEngine.HIDDEN_HINT.find(t)?.let { m -> t.substring(0, t.lastIndexOfAny(charArrayOf('.', '。'), m.range.first).let { if (it < 0) 0 else it + 1 }).trim() } ?: t }
         ?.replaceFirstChar { it.titlecase() }?.ifEmpty { null }
 
-    /** Your character's whole sheet: who they are, what they know, what the story has established about them. */
-    fun playerSheet(): String? = File(dir, "state/player.md").takeIf { it.exists() }?.readText()?.trim()?.ifEmpty { null }
+    /**
+     * Your character's whole sheet: who they are, what they know, what the story has established about them. Null
+     * for an older story until its sheet is split (StoryEngine.splitPlayerSheet, on opening): it may still hold what
+     * the character doesn't know.
+     */
+    fun playerSheet(): String? {
+        val split = File(dir, "state/player_split").exists() || File(dir, "state/player_hidden.md").exists()
+        if (!split) return null
+        return File(dir, "state/player.md").takeIf { it.exists() }?.readText()?.trim()?.ifEmpty { null }
+    }
 
     fun storyInfo(): StoryInfo {
         val role = playerSheet()
